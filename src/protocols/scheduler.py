@@ -3,6 +3,7 @@ import uuid
 import math
 from typing import Tuple, List
 from config.config_handler import ConfigHandler
+from utils import logging
 
 class BeaconScheduler:
     def __init__(self):

@@ -6,7 +6,7 @@ simulation:
   #- dynamic_miad
   #- rl
   min_buoys: 10
-  max_buoys: 80
+  max_buoys: 50
   step_buoys: 10
   intervals:
   - 1.0
@@ -17,12 +17,12 @@ simulation:
   ideal_channel: true
   ramp_scenario: false
   enable_metrics: true
-  enable_logging: true
+  enable_logging: false
   multihop_mode: none  # Options: none, append, forwarded
   multihop_limit: 2    # Maximum hops for forwarded mode
 world:
-  width: 800.0
-  height: 800.0
+  width: 400.0
+  height: 400.0
 buoys:
   mobile_percentage: 0.2
   default_battery: 100.0
