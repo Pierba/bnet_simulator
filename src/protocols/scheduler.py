@@ -26,17 +26,19 @@ class BeaconScheduler:
         else:
             return self.next_dynamic_interval if self.next_dynamic_interval is not None else self.min_interval
 
-    def should_send(self, battery, velocity, neighbors, current_time):
+    def should_send(self, battery, velocity, neighbors, collision_rate, current_time):
         if self.scheduler_type == "static":
             return self.should_send_static(current_time)
         elif self.scheduler_type in ["dynamic_adab", "dynamic_acab"]:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
+        elif self.scheduler_type == "dynamic_miad":
+            return self.should_send_dynamic_miad(battery, velocity, neighbors, collision_rate, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
     def should_send_static(self, current_time: float) -> bool:
         time_since_last = current_time - self.last_static_send_time
-        
+        logging.log_info(f"Static Scheduler: Time since last send: {time_since_last:.2f}s, Next interval: {self.next_static_interval:.2f}s")
         if time_since_last >= self.next_static_interval:
             self.last_static_send_time = current_time
             return True
@@ -59,6 +61,61 @@ class BeaconScheduler:
             self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time)
             return True
         return False
+
+
+    def should_send_dynamic_miad(
+        self,
+        battery,
+        velocity: Tuple[float, float],
+        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
+        collision_rate: float,
+        current_time: float,
+    )-> bool:
+        if self.next_dynamic_interval is None:
+            self.next_dynamic_interval = self.min_interval
+        if collision_rate > 0.1:
+            self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * 1.5)
+        elif collision_rate < 0.05:
+            self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - 0.1)
+
+        time_since_last = current_time - self.last_dynamic_send_time
+        if time_since_last >= self.next_dynamic_interval:
+            self.last_dynamic_send_time = current_time
+            return True
+        return False
+
+
+    def should_send_dynamic_rl(
+        self,
+        battery,
+        velocity: Tuple[float, float],
+        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
+        collision_rate: float,
+        current_time: float,
+    )-> bool:
+        context_vector = self.build_context_vector(battery, velocity, neighbors, collision_rate)
+        next_interval = self.rl_model.predict(context_vector)
+
+        reward = self.calculate_reward(
+            energy_level = battery,
+            collision_rate = collision_rate,
+            network_discovery = len(neighbors),
+            interval = next_interval,
+            max_energy = 100.0,
+            min_energy = 0.1,
+            max_discovery = 80,
+        )
+
+        self.rl_model.update(context_vector, next_interval, reward)
+
+        #check if it's time to send
+        time_since_last = current_time - self.last_dynamic_send_time
+        if time_since_last >= next_interval:
+            self.last_dynamic_send_time = current_time
+            return True
+        return False
+
+
 
     def compute_interval(
         self,

@@ -196,6 +196,23 @@ class Channel:
                 
         return False
 
+    #we also need collision rate
+    def get_collision_rate(self, position: Tuple[float, float], sim_time: float, window: float = 1.0) -> float:
+        window_start = sim_time - window #the time window we are considering for collisions
+
+        for beacon, start, end, _, _ in self.active_transmissions:
+            if start >= window_start and sim_time <= end:
+                if self.in_range(beacon.position, position):
+                    attempts +=1
+                    beacon_key = (beacon.sender_id, beacon.timestamp)
+                    if beacon_key in self.collision_beacons:
+                        collisions += 1
+
+        if attempts == 0:
+            return 0.0
+        collision_rate =  collisions / attempts   
+        return collision_rate
+
     def in_range(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> bool:
         dx = pos1[0] - pos2[0]
         dy = pos1[1] - pos2[1]

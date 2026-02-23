@@ -66,6 +66,7 @@ class Buoy:
         self.forwarded_beacons = set()
         
     def handle_event(self, event, sim_time: float):
+        logging.log_debug(f"Buoy {str(self.id)[:6]} handling event: {event.event_type} at time {sim_time:.4f}")
         handlers = {
             EventType.SCHEDULER_CHECK: self._handle_scheduler_check,
             EventType.CHANNEL_SENSE: self._handle_channel_sense,
@@ -84,8 +85,11 @@ class Buoy:
             logging.log_error(f"Buoy {str(self.id)[:6]} received unhandled event: {event.event_type}")
 
     def _handle_scheduler_check(self, event, sim_time: float):
+
+        collision_rate =  self.channel.get_collision_rate(self.position, sim_time,window = 1.0)
+
         should_send = self.scheduler.should_send(
-            self.battery, self.velocity, self.neighbors, sim_time
+            self.battery, self.velocity, self.neighbors, collision_rate, sim_time
         )
         
         if should_send:

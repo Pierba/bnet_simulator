@@ -1,13 +1,11 @@
 simulation:
   schedulers:
   - static
-  #- dynamic_adab
-  #- dynamic_acab
-  #- dynamic_miad
-  #- rl
-  min_buoys: 10
-  max_buoys: 80
-  step_buoys: 10
+  - dynamic_adab
+  - dynamic_acab
+  min_buoys: 20
+  max_buoys: 30
+  step_buoys: 20
   intervals:
   - 1.0
   - 0.5
@@ -17,14 +15,15 @@ simulation:
   ideal_channel: true
   ramp_scenario: false
   enable_metrics: true
-  enable_logging: true
-  multihop_mode: none  # Options: none, append, forwarded
-  multihop_limit: 2    # Maximum hops for forwarded mode
+  enable_logging: false
+  multihop_mode: none
+  multihop_limit: 2
 world:
   width: 800.0
   height: 800.0
 buoys:
-  mobile_percentage: 0.2
+  mobile: true
+  mobile_percentage: 1.0
   default_battery: 100.0
   default_velocity: 15.0
 network:
