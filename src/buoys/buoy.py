@@ -86,7 +86,7 @@ class Buoy:
 
     def _handle_scheduler_check(self, event, sim_time: float):
 
-        collision_rate =  self.channel.get_collision_rate(self.position, sim_time,window = 1.0)
+        collision_rate =  self.channel.get_collision_rate(self.position, sim_time,window = 10.0)
 
         should_send = self.scheduler.should_send(
             self.battery, self.velocity, self.neighbors, collision_rate, sim_time

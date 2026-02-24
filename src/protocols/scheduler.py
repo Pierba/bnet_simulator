@@ -72,16 +72,18 @@ class BeaconScheduler:
         collision_rate: float,
         current_time: float,
     )-> bool:
-        if self.next_dynamic_interval is None:
-            self.next_dynamic_interval = self.min_interval
-        if collision_rate > 0.1:
-            self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * 1.5)
-        elif collision_rate < 0.05:
-            self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - 0.1)
-
+        #print(f"{self.min_interval} {self.max_interval} {self.next_dynamic_interval} {collision_rate}")
+        #if self.next_dynamic_interval is None:
+        #    self.next_dynamic_interval = self.min_interval
+        self.next_dynamic_interval = self.static_interval
         time_since_last = current_time - self.last_dynamic_send_time
+        
         if time_since_last >= self.next_dynamic_interval:
             self.last_dynamic_send_time = current_time
+            #if collision_rate > 0.02:
+            #    self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * 2)
+            #elif collision_rate < 0.01:
+            #    self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - 0.1)
             return True
         return False
 

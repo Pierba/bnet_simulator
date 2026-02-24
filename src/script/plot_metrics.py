@@ -36,6 +36,8 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
                 sched_type = "dynamic_acab"
             elif f.startswith("dynamic_adab_"):
                 sched_type = "dynamic_adab"
+            elif f.startswith("dynamic_miad_"):
+                sched_type = "dynamic_miad"
             elif f.startswith("dynamic_"):
                 sched_type = "dynamic_adab"
             else:
@@ -55,6 +57,8 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
                 sched_type = "dynamic_acab"
             elif f.startswith("dynamic_adab_"):
                 sched_type = "dynamic_adab"
+            elif f.startswith("dynamic_miad_"):
+                sched_type = "dynamic_miad"
             elif f.startswith("dynamic_"):
                 sched_type = "dynamic_adab"
             else:
@@ -86,9 +90,9 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
     grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
     densities = sorted(df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_miad"]  
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}  
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_miad": "tab:red"}  
     bar_width = 0.25
     x = np.arange(len(densities))
     
@@ -214,7 +218,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     plt.close()
 
 def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]  # Added "miad"
     
     min_buoys = float('inf')
     max_buoys = 0
@@ -283,7 +287,7 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     bar_width = 0.25
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}  # Added "miad"
     offset = -(len(valid_modes) - 1) * bar_width / 2
     
     for i, (mode, color) in enumerate(valid_modes):
@@ -338,8 +342,8 @@ def extract_interval_from_dirname(dirname):
     return None
 
 def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]  # Added "miad"
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}  # Added "miad"
     plt.figure(figsize=(10, 6))
     found = False
 
@@ -479,9 +483,9 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
     grouped = df.groupby(["Density", "Scheduler", "MultihopMode"]).mean().reset_index()
     
     densities = sorted(df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_miad"]  # Added "miad"
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}  # Added "miad"
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_miad": "tab:red"}  # Added "miad"
     
     multihop_modes = sorted(df["MultihopMode"].unique())
     
@@ -562,8 +566,8 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
 
 def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None):
     """Plot average unique nodes discovered vs time for ramp scenarios"""
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]  # Added "miad"
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}  # Added "miad"
     plt.figure(figsize=(10, 6))
     found = False
 

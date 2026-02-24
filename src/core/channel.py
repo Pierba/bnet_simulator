@@ -204,11 +204,11 @@ class Channel:
         
         for beacon, start, end, _, _ in self.active_transmissions:
             if start >= window_start and sim_time <= end:
-                if self.in_range(beacon.position, position):
-                    attempts +=1
-                    beacon_key = (beacon.sender_id, beacon.timestamp)
-                    if beacon_key in self.collision_beacons:
-                        collisions += 1
+                sender_position = beacon.position
+                attempts +=1
+                beacon_key = (beacon.sender_id, beacon.timestamp)
+                if beacon_key in self.collision_beacons:
+                   collisions += 1
 
         if attempts == 0:
             return 0.0
@@ -220,3 +220,38 @@ class Channel:
         dy = pos1[1] - pos2[1]
         distance = math.hypot(dx, dy)
         return distance <= self.comm_range_max
+
+
+
+"""
+def get_collision_rate(self, sender_id: uuid.UUID, sim_time: float, window: float = 1.0) -> float:
+
+    window_start = sim_time - window
+    total_potential_transmissions = 0
+    total_collisions = 0
+
+    # Iterate through active transmissions
+    for beacon, start, end, potential_count, processed_count in self.active_transmissions:
+        if beacon.sender_id == sender_id and start >= window_start and end <= sim_time:
+            # Count neighbors in range
+            neighbors_in_range = 0
+            for neighbor in self.buoys:  # Assuming self.buoys contains all buoys in the simulation
+                if neighbor.id != sender_id and self.in_range(beacon.position, neighbor.position):
+                    neighbors_in_range += 1
+
+            # Add to potential transmissions
+            total_potential_transmissions += neighbors_in_range
+
+            # Check if the beacon collided
+            beacon_key = (beacon.sender_id, beacon.timestamp)
+            if beacon_key in self.collision_beacons:
+                total_collisions += 1
+
+    # Avoid division by zero
+    if total_potential_transmissions == 0:
+        return 0.0
+
+    # Calculate and return the collision rate
+    collision_rate = total_collisions / total_potential_transmissions
+    return collision_rate
+"""
