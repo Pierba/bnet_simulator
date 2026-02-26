@@ -48,6 +48,17 @@ class Buoy:
         self.world_height = cfg.get('world', 'height')
         self.speed_of_light = cfg.get('network', 'speed_of_light')
         self.comm_range_max = cfg.get('network', 'communication_range_max')
+
+        # --- MIAD Congestion Tracking ---
+        self.channel_busy_accum = 0.0  # Total busy time accumulated before sending
+        self.channel_busy_count = 0     # Number of send attempts measured
+        self.last_channel_busy_start = None  # For measuring busy periods
+
+        self.last_beacon_from_neighbor = {}  # {neighbor_id: last_time}
+        self.my_info_in_neighbor = {}        # {neighbor_id: (last_time_seen, my_info_timestamp)}
+
+        # For MIAD: store how up-to-date our info is in neighbor beacons
+        self.my_beacon_timestamp = 0.0      # Last time we sent a beacon
         
         self.multihop_mode = cfg.get('simulation', 'multihop_mode')
         self.multihop_limit = cfg.get('simulation', 'multihop_limit')
@@ -86,10 +97,9 @@ class Buoy:
 
     def _handle_scheduler_check(self, event, sim_time: float):
 
-        collision_rate =  self.channel.get_collision_rate(self.position, sim_time,window = 10.0)
 
-        should_send = self.scheduler.should_send(
-            self.battery, self.velocity, self.neighbors, collision_rate, sim_time
+        should_send = self.scheduler.should_send(self,
+            self.battery, self.velocity, self.neighbors, sim_time
         )
         
         if should_send:
@@ -122,10 +132,19 @@ class Buoy:
         elif self.want_to_send:
             # Normal transmission
             if self.channel.is_busy(self.position, sim_time):
+                # Start or continue measuring busy period
+                if self.last_channel_busy_start is None:
+                    self.last_channel_busy_start = sim_time
                 self.simulator.schedule_event(
                     sim_time + 0.01, EventType.CHANNEL_SENSE, self
                 )
             else:
+                # If we were waiting, accumulate busy time
+                if self.last_channel_busy_start is not None:
+                    busy_time = sim_time - self.last_channel_busy_start
+                    self.channel_busy_accum += busy_time
+                    self.channel_busy_count += 1
+                    self.last_channel_busy_start = None
                 self.state = BuoyState.WAITING_DIFS
                 self.simulator.schedule_event(
                     sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
@@ -184,11 +203,10 @@ class Buoy:
         
         beacon = self.create_beacon(sim_time)
         success = self.channel.broadcast(beacon, sim_time)
-        
+        self.my_beacon_timestamp = sim_time  # Track last beacon sent
         self.want_to_send = False
         self.backoff_remaining = 0.0  # Reset backoff for next transmission cycle
         self.state = BuoyState.RECEIVING
-        
         # Don't clear discovered_nodes - they persist like neighbors
         
         if success and self.metrics:
@@ -199,6 +217,20 @@ class Buoy:
         beacon = event.data.get("beacon")
         if not beacon:
             return
+        # --- MIAD: Track beacon reception from neighbors ---
+        self.last_beacon_from_neighbor[beacon.sender_id] = sim_time
+        # Check if our info appears in neighbor's beacon
+        found = False
+        my_info_ts = None
+        for neighbor_id, neighbor_ts, _ in beacon.neighbors:
+            if neighbor_id == self.id:
+                found = True
+                my_info_ts = neighbor_ts
+                break
+        if found:
+            self.my_info_in_neighbor[beacon.sender_id] = (sim_time, my_info_ts)
+        else:
+            self.my_info_in_neighbor[beacon.sender_id] = (sim_time, None)
     
         collision = False
         collision_checked = event.data.get("collision_checked", False)

@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import subprocess
 import time
@@ -132,8 +133,16 @@ def main():
         
     print("\nAll simulations complete!")
     print("Check the metrics directory for results and plots.")
-
-    subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
+    if sys.platform != "win32":
+        subprocess.run([
+            "notify-send",
+            "-e",
+            "-i", "pycad",
+            "-h", "string:sound-name:bell",
+            "-a", "BNet Simulator",
+            "Simulation Complete",
+            "All simulations and plotting are done."
+        ])
 
 if __name__ == "__main__":
     main()

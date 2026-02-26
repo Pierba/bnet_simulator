@@ -27,13 +27,13 @@ class BeaconScheduler:
         else:
             return self.next_dynamic_interval if self.next_dynamic_interval is not None else self.min_interval
 
-    def should_send(self, battery, velocity, neighbors, collision_rate, current_time):
+    def should_send(self, buoy, battery, velocity, neighbors, current_time):
         if self.scheduler_type == "static":
             return self.should_send_static(current_time)
         elif self.scheduler_type in ["dynamic_adab", "dynamic_acab"]:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
         elif self.scheduler_type == "dynamic_miad":
-            return self.should_send_dynamic_miad(battery, velocity, neighbors, collision_rate, current_time)
+            return self.should_send_dynamic_miad(buoy, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -60,30 +60,64 @@ class BeaconScheduler:
         if time_since_last >= self.next_dynamic_interval:
             self.last_dynamic_send_time = current_time
             self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time)
+            #print(f'{self.next_dynamic_interval}')
             return True
         return False
 
 
     def should_send_dynamic_miad(
         self,
-        battery,
-        velocity: Tuple[float, float],
-        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
-        collision_rate: float,
+        buoy,  # Pass the Buoy instance for local data #TODO: not sending buoy
         current_time: float,
-    )-> bool:
-        #print(f"{self.min_interval} {self.max_interval} {self.next_dynamic_interval} {collision_rate}")
-        #if self.next_dynamic_interval is None:
-        #    self.next_dynamic_interval = self.min_interval
-        self.next_dynamic_interval = self.static_interval
-        time_since_last = current_time - self.last_dynamic_send_time
+    ) -> bool:
+        # MIAD Congestion Detection
+        # 1. Channel busy time (average)
+        avg_busy = (buoy.channel_busy_accum / buoy.channel_busy_count) if buoy.channel_busy_count > 0 else 0.0
+        busy_threshold = 0.001  # TODO: think about value
+
+        # 2. Missing beacons from neighbors 
+        missing_neighbors = 0
+        expected_interval = self.next_dynamic_interval if  self.next_dynamic_interval is not None else self.min_interval
+        #expected_interval = self.min_interval
+        for nid, last_time in buoy.last_beacon_from_neighbor.items():
+            if current_time - last_time >  10 * expected_interval:
+                missing_neighbors += 1
+
+        # 3. My info in neighbor beacons (freshness)
+        outdated_count = 0
+        for nid, (seen_time, my_info_ts) in buoy.my_info_in_neighbor.items():
+            if my_info_ts is None:
+                outdated_count += 1  # Not present
+            elif buoy.my_beacon_timestamp - my_info_ts >  10 * expected_interval:
+                outdated_count += 1  # Info is stale
+
+        # Congestion if any metric is above threshold 
+        # TODO: think if we need 3 options inc dec and no action
+        congestion = (
+            avg_busy > busy_threshold or
+            missing_neighbors > 5 or
+            outdated_count > 5
+        )
+
+        # MIAD logic
+        if self.next_dynamic_interval is None:
+            self.next_dynamic_interval = self.min_interval
+        miad_mult = 1.5  # Multiplicative factor
+        miad_add = 0.2   # Additive decrease (seconds)
+
+        if congestion:
+            # Multiplicative increase
+            self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * miad_mult)
+        else:
+            # Additive decrease
+            self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - miad_add)
         
+        print(f'{self.next_dynamic_interval}')
+
+
+        time_since_last = current_time - self.last_dynamic_send_time
         if time_since_last >= self.next_dynamic_interval:
             self.last_dynamic_send_time = current_time
-            #if collision_rate > 0.02:
-            #    self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * 2)
-            #elif collision_rate < 0.01:
-            #    self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - 0.1)
             return True
         return False
 
