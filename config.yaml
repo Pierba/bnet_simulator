@@ -5,16 +5,16 @@ simulation:
   - dynamic_acab
   - dynamic_miad
   #- rl
-  min_buoys: 60
+  min_buoys: 10
   max_buoys: 80
   step_buoys: 10
   intervals:
-  #- 1.0
+  - 1.0
   - 0.5
-  #- 0.25
+  - 0.25
   duration: 600
   num_processes: 4
-  ideal_channel: true
+  ideal_channel: false
   ramp_scenario: false
   enable_metrics: true
   enable_logging: false

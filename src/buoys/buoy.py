@@ -1,6 +1,7 @@
 import uuid
 import random
 import math
+from collections import deque
 from enum import Enum
 from typing import Tuple
 from protocols.scheduler import BeaconScheduler
@@ -56,6 +57,9 @@ class Buoy:
 
         self.last_beacon_from_neighbor = {}  # {neighbor_id: last_time}
         self.my_info_in_neighbor = {}        # {neighbor_id: (last_time_seen, my_info_timestamp)}
+        # Keep a short history of received beacon timestamps per neighbor
+        # Used to determine if a neighbor was actively sending before a gap
+        self.beacon_history_from_neighbor = {}  # {neighbor_id: deque([t1, t2, ...])}
 
         # For MIAD: store how up-to-date our info is in neighbor beacons
         self.my_beacon_timestamp = 0.0      # Last time we sent a beacon
@@ -219,6 +223,15 @@ class Buoy:
             return
         # --- MIAD: Track beacon reception from neighbors ---
         self.last_beacon_from_neighbor[beacon.sender_id] = sim_time
+        # Update per-neighbor short history
+        dq = self.beacon_history_from_neighbor.get(beacon.sender_id)
+
+        #if there is no history for this neighbor, create a new deque
+        #maxlen=4 means we only keep the last 4 beacon reception times from this neighbor, which is enough to determine if they were actively sending before a gap
+        if dq is None:
+            dq = deque(maxlen=4)
+            self.beacon_history_from_neighbor[beacon.sender_id] = dq
+        dq.append(sim_time)
         # Check if our info appears in neighbor's beacon
         found = False
         my_info_ts = None
