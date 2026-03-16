@@ -34,6 +34,12 @@ class Metrics:
         
         # Track avg_neighbors samples over time
         self.avg_neighbors_samples = []
+        #todo: check with prof - add energy tracking to metrics
+        # Energy tracking
+        self.total_energy_consumed = 0.0  # Total energy consumed by all buoys
+        self.energy_consumed_per_buoy = {}  # {buoy_id: energy_consumed}
+        self.dead_buoys = set()  # Set of buoy IDs that died due to energy
+        self.dead_buoy_times = {}  # {buoy_id: time_died}
 
     def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration, multihop_mode=None):
         self.scheduler_type = scheduler_type
@@ -126,6 +132,18 @@ class Metrics:
             return self.avg_neighbors
         return sum(self.avg_neighbors_samples) / len(self.avg_neighbors_samples)
     
+    #todo: check with prof - add energy tracking to metrics
+    def log_buoy_dead(self, buoy_id):
+        """Record that a buoy has died from energy depletion."""
+        self.dead_buoys.add(buoy_id)
+    
+    def log_buoy_energy(self, buoy_id, energy_consumed):
+        """Record energy consumed by a buoy."""
+        if buoy_id not in self.energy_consumed_per_buoy:
+            self.energy_consumed_per_buoy[buoy_id] = 0.0
+        self.energy_consumed_per_buoy[buoy_id] += energy_consumed
+        self.total_energy_consumed += energy_consumed
+    
     def summary(self, sim_time: float):
         avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
         avg_unique_nodes = self.avg_unique_nodes_discovered()  # UPDATED: Use new method
@@ -158,6 +176,13 @@ class Metrics:
             "Actually Received": self.actually_received,
             "Average Neighbors": final_avg_neighbors,
             "Avg Unique Nodes Discovered": avg_unique_nodes,  # UPDATED: New name
+            #todo: check with prof - add energy tracking to summary
+            "Total Energy Consumed (J)": self.total_energy_consumed,
+            "Dead Buoys": len(self.dead_buoys),
+            "Avg Energy Per Buoy (J)": (
+                self.total_energy_consumed / len(self.energy_consumed_per_buoy)
+                if self.energy_consumed_per_buoy else 0
+            ),
         }
 
         summary = {**base_summary}

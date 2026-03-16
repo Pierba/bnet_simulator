@@ -51,6 +51,13 @@ class ConfigHandler:
             'beacon_min_interval': 1.0,
             'beacon_max_interval': 5.0,
             'static_interval': 1.0
+        },
+        'energy': { #check with prof
+            'enable_for_protocols': [],  # e.g., ['rl'] or empty to disable
+            'transmission_energy': 0.0044,  # 4.4 mJ per beacon
+            'reception_energy': 0.000088,  # 88 µJ per second
+            'idle_listening_energy': 0.000088,  # 88 µJ per second
+            'min_battery_threshold': 0.0
         }
     }
     

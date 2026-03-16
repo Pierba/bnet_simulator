@@ -200,6 +200,11 @@ class Simulator:
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
             self.running = False
+        finally:
+            #todo: check with prof
+            #todo: ask cesare why is he not havign already summery in finally block
+            # Finalize energy metrics from all buoys
+            self._finalize_energy_metrics()
             
         real_time_end = time.time()
         real_duration = real_time_end - real_time_start
@@ -231,3 +236,13 @@ class Simulator:
         if self.metrics:
             self.metrics.record_avg_neighbors_sample(avg_neighbors)
         return avg_neighbors
+    
+    #todo: check with prof - add energy tracking to metrics
+    def _finalize_energy_metrics(self):
+        """Collect final energy statistics from all buoys."""
+        if not self.metrics:
+            return
+        
+        for buoy in self.all_buoys:  # Use all_buoys to include inactive ones
+            if buoy.enable_energy_model:
+                self.metrics.log_buoy_energy(buoy.id, buoy.total_energy_consumed)

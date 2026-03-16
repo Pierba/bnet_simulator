@@ -24,7 +24,8 @@ class Buoy:
         is_mobile: bool = False,
         battery: float = None,
         velocity: Tuple[float, float] = (0.0, 0.0),
-        metrics = None
+        metrics = None,
+        scheduler_type: str = None
     ):
         cfg = ConfigHandler()
         
@@ -49,6 +50,17 @@ class Buoy:
         self.world_height = cfg.get('world', 'height')
         self.speed_of_light = cfg.get('network', 'speed_of_light')
         self.comm_range_max = cfg.get('network', 'communication_range_max')
+
+        # --- Energy Model ---
+        energy_enabled_for = cfg.get('energy', 'enable_for_protocols') or []
+        self.enable_energy_model = scheduler_type in energy_enabled_for
+        self.initial_battery = self.battery
+        self.total_energy_consumed = 0.0
+        self.is_dead = False
+        self.transmission_energy = cfg.get('energy', 'transmission_energy')
+        self.reception_energy = cfg.get('energy', 'reception_energy')
+        self.idle_listening_energy = cfg.get('energy', 'idle_listening_energy')
+        self.min_battery_threshold = cfg.get('energy', 'min_battery_threshold')
 
         # --- MIAD Congestion Tracking ---
         self.channel_busy_accum = 0.0  # Total busy time accumulated before sending
@@ -80,7 +92,26 @@ class Buoy:
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
         self.forwarded_beacons = set()
         
+    def _consume_energy(self, amount: float):
+        """Consume energy from battery. Mark buoy as dead if battery depletes."""
+        if not self.enable_energy_model:
+            return
+        
+        self.battery -= amount
+        self.total_energy_consumed += amount
+        
+        if self.battery <= self.min_battery_threshold:
+            self.battery = 0.0
+            self.is_dead = True
+            logging.log_info(f"Buoy {str(self.id)[:6]} died (battery depleted)")
+            if self.metrics:
+                self.metrics.log_buoy_dead(self.id)
     def handle_event(self, event, sim_time: float):
+        #todo: check with prof
+        # Dead buoys don't process events (except BUOY_MOVEMENT for mobility)
+        if self.is_dead and event.event_type != EventType.BUOY_MOVEMENT:
+            return
+        
         logging.log_debug(f"Buoy {str(self.id)[:6]} handling event: {event.event_type} at time {sim_time:.4f}")
         handlers = {
             EventType.SCHEDULER_CHECK: self._handle_scheduler_check,
@@ -213,6 +244,9 @@ class Buoy:
         self.state = BuoyState.RECEIVING
         # Don't clear discovered_nodes - they persist like neighbors
         
+        # Consume transmission energy
+        self._consume_energy(self.transmission_energy)
+        
         if success and self.metrics:
             latency = sim_time - self.scheduler_decision_time
             self.metrics.record_scheduler_latency(latency)
@@ -221,6 +255,14 @@ class Buoy:
         beacon = event.data.get("beacon")
         if not beacon:
             return
+        
+        #todo: check with prof
+        # Consume reception energy based on beacon transmission time
+        cfg = ConfigHandler()
+        bit_rate = cfg.get('network', 'bit_rate')
+        reception_time = beacon.size_bits() / bit_rate if bit_rate > 0 else 0.001
+        self._consume_energy(self.reception_energy * reception_time)
+        
         # --- MIAD: Track beacon reception from neighbors ---
         self.last_beacon_from_neighbor[beacon.sender_id] = sim_time
         # Update per-neighbor short history

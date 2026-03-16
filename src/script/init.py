@@ -148,7 +148,8 @@ def main():
             is_mobile=True,
             battery=default_battery,
             velocity=random_velocity(default_velocity),
-            metrics=metrics
+            metrics=metrics,
+            scheduler_type=args.mode
         )
         buoy.scheduler.scheduler_type = args.mode
         buoy.scheduler.static_interval = args.static_interval
@@ -163,7 +164,8 @@ def main():
             position=pos,
             is_mobile=False,
             battery=default_battery,
-            metrics=metrics
+            metrics=metrics,
+            scheduler_type=args.mode
         )
         buoy.scheduler.scheduler_type = args.mode
         buoy.scheduler.static_interval = args.static_interval

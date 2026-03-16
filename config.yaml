@@ -44,3 +44,14 @@ scheduler:
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
   static_interval: 1.0
+
+  
+energy:
+  # Enable energy modeling only for new protocols (not static, dynamic_adab, dynamic_acab, dynamic_miad)
+  enable_for_protocols: []  # e.g., ['rl'] or empty list to disable for all
+  # Energy costs in Joules
+  transmission_energy: 0.0044  # 4.4 mJ per beacon (500 bytes at 1 Mbps with 4.4ms airtime, 1W TX power)
+  reception_energy: 0.000088  # 88 µJ per second of reception (typical for Wi-Fi receiver ~99 mW)
+  idle_listening_energy: 0.000088  # 88 µJ per second of idle listening
+  # When battery <= 0, buoy becomes inactive (cannot transmit or receive)
+  min_battery_threshold: 0.0
