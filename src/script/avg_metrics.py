@@ -126,7 +126,7 @@ def process_density_files(input_dirs, output_dir):
 
 def process_timeseries_files(input_dirs, output_dir):
     # Dictionary to store timeseries data by mode
-    timeseries_data = {"static": [], "dynamic_acab": [], "dynamic_adab": [], "dynamic_miad": []}
+    timeseries_data = {"static": [], "dynamic_acab": [], "dynamic_adab": [], "dynamic_aimd": []}
     
     # Collect all timeseries CSV files
     for input_dir in input_dirs:
@@ -224,8 +224,8 @@ def get_density_dataframes(data_dir):
             sched_type = "dynamic_acab"
         elif os.path.basename(f).startswith("dynamic_adab_"):
             sched_type = "dynamic_adab"
-        elif os.path.basename(f).startswith("dynamic_miad_"):
-            sched_type = "dynamic_miad"
+        elif os.path.basename(f).startswith("dynamic_aimd_"):
+            sched_type = "dynamic_aimd"
         elif os.path.basename(f).startswith("dynamic_"):
             sched_type = "dynamic_adab"
         else:
@@ -303,9 +303,9 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     
     # Create B-PDR by density plot with error bars
     densities = sorted(pdr_df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_miad"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green",  "dynamic_miad": "tab:red"}
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green",  "dynamic_aimd": "tab:red"}
     bar_width = 0.25
     x = np.arange(len(densities))
     
@@ -493,9 +493,9 @@ def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
         mode_str = "Mixed Modes"
     
     densities = sorted(unique_df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_miad"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_miad": "MIAD"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_miad": "tab:red"}
+    schedulers = ["dynamic_acab", "dynamic_adab", "static", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_aimd": "AIMD"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green", "dynamic_aimd": "tab:red"}
     bar_width = 0.25
     x = np.arange(len(densities))
     
@@ -555,7 +555,7 @@ def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
     plt.close()
 
 def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_aimd", "tab:red")]
     
     min_buoys = float('inf')
     max_buoys = 0
@@ -632,7 +632,7 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
     bar_width = 0.25
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
     offset = -(len(valid_modes) - 1) * bar_width / 2
     
     for i, (mode, color) in enumerate(valid_modes):
@@ -683,8 +683,8 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
     plt.close()
 
 def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_aimd", "tab:red")]
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
     plt.figure(figsize=(10, 6))
     found = False
 
@@ -797,8 +797,8 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
 
 def plot_unique_nodes_vs_time_with_errors(data_dir, plot_dir, interval=None):
     """Plot average unique nodes discovered vs time with error bands"""
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_miad", "tab:red")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}
+    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue"), ("dynamic_aimd", "tab:red")]
+    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
     plt.figure(figsize=(10, 6))
     found = False
 

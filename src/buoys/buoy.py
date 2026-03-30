@@ -62,7 +62,7 @@ class Buoy:
         self.idle_listening_energy = cfg.get('energy', 'idle_listening_energy')
         self.min_battery_threshold = cfg.get('energy', 'min_battery_threshold')
 
-        # --- MIAD Congestion Tracking ---
+        # --- AIMD Congestion Tracking ---
         self.channel_busy_accum = 0.0  # Total busy time accumulated before sending
         self.channel_busy_count = 0     # Number of send attempts measured
         self.last_channel_busy_start = None  # For measuring busy periods
@@ -73,7 +73,7 @@ class Buoy:
         # Used to determine if a neighbor was actively sending before a gap
         self.beacon_history_from_neighbor = {}  # {neighbor_id: deque([t1, t2, ...])}
 
-        # For MIAD: store how up-to-date our info is in neighbor beacons
+        # For AIMD: store how up-to-date our info is in neighbor beacons
         self.my_beacon_timestamp = 0.0      # Last time we sent a beacon
         
         self.multihop_mode = cfg.get('simulation', 'multihop_mode')
@@ -263,7 +263,7 @@ class Buoy:
         reception_time = beacon.size_bits() / bit_rate if bit_rate > 0 else 0.001
         self._consume_energy(self.reception_energy * reception_time)
         
-        # --- MIAD: Track beacon reception from neighbors ---
+        # --- AIMD: Track beacon reception from neighbors ---
         self.last_beacon_from_neighbor[beacon.sender_id] = sim_time
         # Update per-neighbor short history
         dq = self.beacon_history_from_neighbor.get(beacon.sender_id)

@@ -3,7 +3,7 @@ simulation:
   - static
   - dynamic_adab
   - dynamic_acab
-  - dynamic_miad
+  - dynamic_aimd
   #- rl
   min_buoys: 10
   max_buoys: 80
@@ -45,10 +45,10 @@ scheduler:
   beacon_max_interval: 5.0
   static_interval: 1.0
 
-  
+
 energy:
-  # Enable energy modeling only for new protocols (not static, dynamic_adab, dynamic_acab, dynamic_miad)
-  enable_for_protocols: []  # e.g., ['rl'] or empty list to disable for all
+  # Enable energy modeling for AIMD protocol
+  enable_for_protocols: ['dynamic_aimd']  # e.g., ['rl'] or empty list to disable for all
   # Energy costs in Joules
   transmission_energy: 0.0044  # 4.4 mJ per beacon (500 bytes at 1 Mbps with 4.4ms airtime, 1W TX power)
   reception_energy: 0.000088  # 88 µJ per second of reception (typical for Wi-Fi receiver ~99 mW)

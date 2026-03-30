@@ -32,8 +32,8 @@ class BeaconScheduler:
             return self.should_send_static(current_time)
         elif self.scheduler_type in ["dynamic_adab", "dynamic_acab"]:
             return self.should_send_dynamic(battery, velocity, neighbors, current_time)
-        elif self.scheduler_type == "dynamic_miad":
-            return self.should_send_dynamic_miad(buoy, current_time)
+        elif self.scheduler_type == "dynamic_aimd":
+            return self.should_send_dynamic_aimd(buoy, current_time)
         else:
             raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -65,16 +65,18 @@ class BeaconScheduler:
         return False
 
 
-    def should_send_dynamic_miad(
+    def should_send_dynamic_aimd(
         self,
         buoy,  # Pass the Buoy instance for local data #TODO: not sending buoy
         current_time: float,
     ) -> bool:
-        # MIAD Congestion Detection
+        # AIMD Congestion Detection
         if self.next_dynamic_interval is None:
             self.next_dynamic_interval = 2 * self.min_interval
-        miad_mult = 1.5  # Multiplicative factor
-        miad_add = 0.2   # Additive decrease (seconds)
+        aimd_mult = 1.5  # Multiplicative factor
+        aimd_add = 0.3   # Additive decrease (seconds)
+
+        num_neighbors = len(buoy.last_beacon_from_neighbor)
 
         # 1. Channel busy time (average)
         avg_busy = (buoy.channel_busy_accum / buoy.channel_busy_count) if buoy.channel_busy_count > 0 else 0.0
@@ -96,7 +98,7 @@ class BeaconScheduler:
             # Check the gap between the last two beacons recemeived from that neighbor
             last_gap = times[-1] - times[-2]
             # Compare that observed gap against our expected interval (not current time)
-            if last_gap > 2 * miad_mult * expected_interval:
+            if last_gap > 2 * aimd_mult * expected_interval:
                 missing_neighbors += 1
 
         # 3. My info in neighbor beacons (freshness)
@@ -105,25 +107,25 @@ class BeaconScheduler:
         for nid, (seen_time, my_info_ts) in buoy.my_info_in_neighbor.items():
             if my_info_ts is None:
                 outdated_count += 1  # No info 
-            elif buoy.my_beacon_timestamp - my_info_ts > 2 * miad_mult * expected_interval:
+            elif buoy.my_beacon_timestamp - my_info_ts > 2 * aimd_mult * expected_interval:
                 outdated_count += 1  # Info is stale
         # Congestion if any metric is above threshold 
         # TODO: think if we need 3 options inc dec and no action
+        num_neighbors = max(1, num_neighbors)  # Avoid division by zero
         congestion = (
             avg_busy > 0 or
-            missing_neighbors > 5 or
-            outdated_count > 3
+            missing_neighbors / num_neighbors > 0.75 or
+            outdated_count/num_neighbors > 0.75
         )
 
         
 
         if congestion:
-            # Multiplicative increase
-            self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * miad_mult)
+            # Multiplicative increase of interval multiplicative decrease of rate
+            self.next_dynamic_interval = min(self.max_interval, self.next_dynamic_interval * aimd_mult)
         else:
-            # Additive decrease
-            self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - miad_add)
-        
+            # Additive decrease of interval additive increase of rate
+            self.next_dynamic_interval = max(self.min_interval, self.next_dynamic_interval - aimd_add)        
         logging.log_debug(self.next_dynamic_interval)
 
         time_since_last = current_time - self.last_dynamic_send_time

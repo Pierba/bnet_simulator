@@ -8,7 +8,7 @@ class ConfigHandler:
     
     DEFAULT_CONFIG = {
         'simulation': {
-            'schedulers': ['static', 'dynamic_adab', 'dynamic_acab','dynamic_miad','rl'],
+            'schedulers': ['static', 'dynamic_adab', 'dynamic_acab','dynamic_aimd','rl'],
             'min_buoys': 20,
             'max_buoys': 30,
             'step_buoys': 20,

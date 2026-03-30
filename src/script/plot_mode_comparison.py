@@ -137,8 +137,8 @@ def get_density_dataframes_by_mode(base_dirs, interval_suffix):
                 sched_type = "dynamic_acab"
             elif os.path.basename(f).startswith("dynamic_adab_"):
                 sched_type = "dynamic_adab"
-            elif os.path.basename(f).startswith("dynamic_miad_"):
-                sched_type = "dynamic_miad"
+            elif os.path.basename(f).startswith("dynamic_aimd_"):
+                sched_type = "dynamic_aimd"
             else:
                 continue
             
@@ -206,8 +206,8 @@ def plot_bpdr_by_mode_comparison(base_dirs, output_dir, interval, interval_suffi
     pdr_df = df[df['B-PDR'].notna()].copy()
     
     densities = sorted(pdr_df["Density"].unique())
-    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_miad"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_miad": "MIAD"}
+    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB", "dynamic_aimd": "AIMD"}
     modes = ["none", "append", "forward"]
     mode_labels = {"none": "Single-Hop", "append": "Append", "forward": "Forward"}
     mode_colors = {"none": "tab:blue", "append": "tab:orange", "forward": "tab:green"}
@@ -276,8 +276,8 @@ def plot_collision_by_mode_comparison(base_dirs, output_dir, interval, interval_
     coll_df = df[df['CollisionRate'].notna()].copy()
     
     densities = sorted(coll_df["Density"].unique())
-    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_miad"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_miad": "MIAD"}
+    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_aimd": "AIMD"}
     modes = ["none", "append", "forward"]
     mode_labels = {"none": "Single-Hop", "append": "Append", "forward": "Forward"}
     mode_colors = {"none": "tab:blue", "append": "tab:orange", "forward": "tab:green"}
@@ -346,8 +346,8 @@ def plot_unique_nodes_by_mode_comparison(base_dirs, output_dir, interval, interv
     unique_df = df[df['PercentageDiscovered'].notna()].copy()
     
     densities = sorted(unique_df["Density"].unique())
-    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_miad"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_miad": "MIAD"}
+    schedulers = ["static", "dynamic_acab", "dynamic_adab", "dynamic_aimd"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB",    "dynamic_aimd": "AIMD"}
     modes = ["none", "append", "forward"]
     mode_labels = {"none": "Single-Hop", "append": "Append", "forward": "Forward"}
     mode_colors = {"none": "tab:blue", "append": "tab:orange", "forward": "tab:green"}
