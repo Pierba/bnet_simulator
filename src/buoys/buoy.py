@@ -16,6 +16,7 @@ class BuoyState(Enum):
     BACKOFF = 3
 
 class Buoy:
+    # Initialization of a buoy with its properties
     def __init__(
         self,
         channel,
@@ -37,7 +38,7 @@ class Buoy:
         self.channel = channel
         self.state = BuoyState.RECEIVING
         self.metrics = metrics
-        self.simulator = None
+        self.schedule_callback = None
 
         self.difs_time = cfg.get('csma', 'difs_time')
         self.slot_time = cfg.get('csma', 'slot_time')
@@ -66,15 +67,16 @@ class Buoy:
         self.forwarded_beacons = set()
         
     def handle_event(self, event, sim_time: float):
+        # Dispatch event to the appropriate handler based on event type
         handlers = {
-            EventType.SCHEDULER_CHECK: self._handle_scheduler_check,
-            EventType.CHANNEL_SENSE: self._handle_channel_sense,
-            EventType.DIFS_COMPLETION: self._handle_difs_completion,
-            EventType.BACKOFF_COMPLETION: self._handle_backoff_completion,
-            EventType.TRANSMISSION_START: self._handle_transmission_start,
-            EventType.RECEPTION: self._handle_reception,
-            EventType.NEIGHBOR_CLEANUP: self._handle_neighbor_cleanup,
-            EventType.BUOY_MOVEMENT: self._handle_buoy_movement
+            EventType.SCHEDULER_CHECK:      self._handle_scheduler_check,
+            EventType.CHANNEL_SENSE:        self._handle_channel_sense,
+            EventType.DIFS_COMPLETION:      self._handle_difs_completion,
+            EventType.BACKOFF_COMPLETION:   self._handle_backoff_completion,
+            EventType.TRANSMISSION_START:   self._handle_transmission_start,
+            EventType.RECEPTION:            self._handle_reception,
+            EventType.NEIGHBOR_CLEANUP:     self._handle_neighbor_cleanup,
+            EventType.BUOY_MOVEMENT:        self._handle_buoy_movement
         }
         
         handler = handlers.get(event.event_type)
@@ -91,12 +93,12 @@ class Buoy:
         if should_send:
             self.want_to_send = True
             self.scheduler_decision_time = sim_time
-            self.simulator.schedule_event(
+            self.schedule_callback(
                 sim_time, EventType.CHANNEL_SENSE, self
             )
         
         next_check_interval = self.scheduler.get_next_check_interval()
-        self.simulator.schedule_event(
+        self.schedule_callback(
             sim_time + next_check_interval, EventType.SCHEDULER_CHECK, self
         )
 
@@ -107,7 +109,7 @@ class Buoy:
         if forward_beacon:
             # Forward mode: create forwarded beacon
             if self.channel.is_busy(self.position, sim_time):
-                self.simulator.schedule_event(
+                self.schedule_callback(
                     sim_time + 0.01, EventType.CHANNEL_SENSE, self, {"forward_beacon": forward_beacon}
                 )
             else:
@@ -118,12 +120,12 @@ class Buoy:
         elif self.want_to_send:
             # Normal transmission
             if self.channel.is_busy(self.position, sim_time):
-                self.simulator.schedule_event(
+                self.schedule_callback(
                     sim_time + 0.01, EventType.CHANNEL_SENSE, self
                 )
             else:
                 self.state = BuoyState.WAITING_DIFS
-                self.simulator.schedule_event(
+                self.schedule_callback(
                     sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
                 )
 
@@ -133,7 +135,7 @@ class Buoy:
             
         if self.channel.is_busy(self.position, sim_time):
             self.state = BuoyState.RECEIVING
-            self.simulator.schedule_event(sim_time, EventType.CHANNEL_SENSE, self)
+            self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
         else:
             # Only generate new random backoff if we don't have remaining backoff
             if self.backoff_remaining <= 0:
@@ -145,7 +147,7 @@ class Buoy:
             
             self.state = BuoyState.BACKOFF
             
-            self.simulator.schedule_event(
+            self.schedule_callback(
                 sim_time + self.backoff_remaining, 
                 EventType.BACKOFF_COMPLETION, 
                 self,
@@ -164,13 +166,13 @@ class Buoy:
             self.state = BuoyState.RECEIVING
             
             # Wait for channel to become idle, then resume with DIFS (which will resume backoff)
-            self.simulator.schedule_event(
+            self.schedule_callback(
                 sim_time + 0.01, EventType.CHANNEL_SENSE, self
             )
         else:
             # Backoff completed successfully, transmit
             self.backoff_remaining = 0.0  # Reset for next transmission
-            self.simulator.schedule_event(
+            self.schedule_callback(
                 sim_time, EventType.TRANSMISSION_START, self
             )
 
@@ -278,7 +280,7 @@ class Buoy:
             if beacon_key not in self.forwarded_beacons:
                 self.forwarded_beacons.add(beacon_key)
                 # Schedule forwarding immediately
-                self.simulator.schedule_event(
+                self.schedule_callback(
                     sim_time + 0.001,
                     EventType.CHANNEL_SENSE,
                     self,
@@ -325,7 +327,7 @@ class Buoy:
                 if sim_time - ts <= self.neighbor_timeout
             ]
         
-        self.simulator.schedule_event(
+        self.schedule_callback(
             sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self
         )
 
@@ -348,7 +350,7 @@ class Buoy:
         vx, vy = self.velocity
         self.position = (x + vx * dt, y + vy * dt)
         
-        self.simulator.schedule_event(
+        self.schedule_callback(
             sim_time + dt, EventType.BUOY_MOVEMENT, self
         )
     
@@ -387,12 +389,12 @@ class Buoy:
         # In forward mode, forward WITHOUT modification (only decrement hop_limit)
         # Forwarder becomes sender for channel purposes, but packet content unchanged
         return Beacon(
-            sender_id=self.id,  # Forwarder becomes sender for transmission
-            mobile=original_beacon.mobile,  # Keep original mobility
-            position=self.position,  # Use forwarder's position for range calculation
-            battery=self.battery,  # Forwarder's battery for transmission
-            neighbors=original_beacon.neighbors,  # KEEP ORIGINAL NEIGHBORS - NO MODIFICATION
-            timestamp=original_beacon.timestamp,  # Keep original timestamp
-            origin_id=original_beacon.origin_id,  # Keep origin ID
-            hop_limit=original_beacon.hop_limit - 1  # Only decrement hop limit
+            sender_id=self.id,                      # Forwarder becomes sender for transmission
+            mobile=original_beacon.mobile,          # Keep original mobility
+            position=self.position,                 # Use forwarder's position for range calculation
+            battery=self.battery,                   # Forwarder's battery for transmission
+            neighbors=original_beacon.neighbors,    # KEEP ORIGINAL NEIGHBORS - NO MODIFICATION
+            timestamp=original_beacon.timestamp,    # Keep original timestamp
+            origin_id=original_beacon.origin_id,    # Keep origin ID
+            hop_limit=original_beacon.hop_limit - 1 # Only decrement hop limit
         )

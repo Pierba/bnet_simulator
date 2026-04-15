@@ -2,6 +2,7 @@ import os
 import csv
 from utils import logging
 
+# Class to track and summarize metrics for the BNet simulation
 class Metrics:
     def __init__(self, density=None):
         self.beacons_sent = 0
@@ -35,6 +36,7 @@ class Metrics:
         # Track avg_neighbors samples over time
         self.avg_neighbors_samples = []
 
+    # Method to set simulation info for context in metrics
     def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration, multihop_mode=None):
         self.scheduler_type = scheduler_type
         self.world_width = world_width

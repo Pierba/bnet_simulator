@@ -32,18 +32,17 @@ class Simulator:
         self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max = cfg.get('network', 'communication_range_max')
 
+        # If ramp mode is enabled, start with only 2 buoys and add more over time
         if ramp:
             self.buoys = self.all_buoys[:2]
-        else:
-            self.buoys = buoys
 
         self.channel.set_buoys(self.buoys)
-        self.channel.simulator = self
+        self.channel.schedule_callback = self.schedule_event
         self.running = False
         self.simulated_time = 0.0
 
         for buoy in self.buoys:
-            buoy.simulator = self
+            buoy.schedule_callback = self.schedule_event
 
         self.event_queue = []
         self.event_counter = 0
@@ -123,7 +122,7 @@ class Simulator:
             
             for buoy in buoys_to_add:
                 self.buoys.append(buoy)
-                buoy.simulator = self
+                buoy.schedule_callback = self.schedule_event
                 initial_offset = random.uniform(0, 1.0) 
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                 self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
@@ -151,7 +150,7 @@ class Simulator:
             if inactive_buoys:
                 buoy = inactive_buoys[0]
                 self.buoys.append(buoy)
-                buoy.simulator = self
+                buoy.schedule_callback = self.schedule_event
                 initial_offset = random.uniform(0, 0.01)
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                 self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)

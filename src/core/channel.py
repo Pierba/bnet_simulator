@@ -7,16 +7,18 @@ from config.config_handler import ConfigHandler
 from utils import logging
 
 class Channel:
+    # Initialization of the Channel class with configuration parameters and state variables
     def __init__(self, metrics = None, ideal_channel = None):
         cfg = ConfigHandler()
         
         self.active_transmissions = []
         self.metrics = metrics
         self.buoys = []
-        self.simulator = None
+        self.schedule_callback = None
         self.seen_attempts = set()
         self.collision_beacons = set()
         
+        # Setting up channel parameters from configuration
         self.ideal_channel = ideal_channel if ideal_channel is not None else cfg.get('simulation', 'ideal_channel')
         self.bit_rate = cfg.get('network', 'bit_rate')
         self.speed_of_light = cfg.get('network', 'speed_of_light')
@@ -29,17 +31,18 @@ class Channel:
         self.buoys = buoys
 
     def handle_event(self, event, sim_time: float):
-        if event.event_type == EventType.CHANNEL_UPDATE:
-            self._handle_channel_update(event, sim_time)
-        elif event.event_type == EventType.TRANSMISSION_END:
-            self._handle_transmission_end(event, sim_time)
-        else:
-            logging.log_error(f"Channel received unhandled event: {event.event_type}")
+        match event.event_type:
+            case EventType.CHANNEL_UPDATE:
+                self._handle_channel_update(event, sim_time)
+            case EventType.TRANSMISSION_END:
+                self._handle_transmission_end(event, sim_time)
+            case _:
+                logging.log_error(f"Channel received unhandled event: {event.event_type}")
 
     def _handle_channel_update(self, event, sim_time: float):
         self.update(sim_time)
-        self.simulator.schedule_event(
-            sim_time + 1.0, EventType.CHANNEL_UPDATE, self
+        self.schedule_callback(
+            sim_time + 1.0, event.event_type, self
         )
 
     def _handle_transmission_end(self, event, sim_time: float):
@@ -53,18 +56,22 @@ class Channel:
         grace_period = max_delay + 1e-6
         
         for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
-            if end + grace_period <= sim_time:
-                expired_indices.append(i)
-                
-                if self.ideal_channel:
-                    beacon_key = (beacon.sender_id, beacon.timestamp)
-                    if beacon_key not in self.collision_beacons:
-                        unprocessed = potential_count - processed_count
-                        if unprocessed > 0:
-                            for _ in range(unprocessed):
-                                if self.metrics:
-                                    self.metrics.log_actually_received(beacon.sender_id)
-                                    logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
+            if end + grace_period > sim_time:
+                continue
+            expired_indices.append(i)
+            
+            if not self.ideal_channel:
+                continue
+            beacon_key = (beacon.sender_id, beacon.timestamp)
+            
+            if beacon_key in self.collision_beacons:
+                continue
+
+            unprocessed = potential_count - processed_count
+            for _ in range(unprocessed):
+                if self.metrics:
+                    self.metrics.log_actually_received(beacon.sender_id)
+                    logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
 
         for idx in sorted(expired_indices, reverse=True):
             self.active_transmissions.pop(idx)
@@ -106,8 +113,7 @@ class Channel:
                 self.collision_beacons.add(existing_key)
                 
                 for receiver in receivers_in_range:
-                    receivers_with_collisions.add(receiver.id)
-                    
+                    receivers_with_collisions.add(receiver.id)   
             else:
                 for receiver in receivers_in_range:
                     if self.in_range(receiver.position, existing.position):
@@ -119,7 +125,7 @@ class Channel:
         successful_receivers = 0
         self.active_transmissions.append((beacon, sim_time, new_end_time, n_receivers, successful_receivers))
         
-        self.simulator.schedule_event(
+        self.schedule_callback(
             new_end_time, 
             EventType.TRANSMISSION_END, 
             self,
@@ -159,7 +165,7 @@ class Channel:
                 will_receive = not (collision_loss or probability_loss)
             
             if will_receive:
-                self.simulator.schedule_event(
+                self.schedule_callback(
                     reception_time,
                     EventType.RECEPTION, 
                     receiver,

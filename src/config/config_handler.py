@@ -6,6 +6,7 @@ class ConfigHandler:
     _instance = None
     _config = None
     
+    # Default configuration sets for the simulation
     DEFAULT_CONFIG = {
         'simulation': {
             'schedulers': ['static', 'dynamic_adab', 'dynamic_acab'],
@@ -55,24 +56,29 @@ class ConfigHandler:
     }
     
     def __new__(cls):
+        # Singleton pattern to ensure only one instance of ConfigHandler exists
         if cls._instance is None:
             cls._instance = super(ConfigHandler, cls).__new__(cls)
         return cls._instance
     
     def __init__(self):
+        # Load configuration on initialization if it hasn't been loaded yet
         if self._config is None:
             self._load_config()
     
     def _load_config(self):
+        # Load configuration from file if it exists
         config_path = 'config.yaml'
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 self._config = yaml.safe_load(f)
+        # If config file doesn't exist, create it with default values
         else:
             self._config = self.DEFAULT_CONFIG.copy()
             with open(config_path, 'w') as f:
                 yaml.dump(self.DEFAULT_CONFIG, f, default_flow_style=False, sort_keys=False)
     
+    # Getter of configuration values
     def get(self, section: str, key: str) -> Any:
         # Special case: neighbor_timeout is calculated as 3 * static_interval
         if section == 'scheduler' and key == 'neighbor_timeout':
