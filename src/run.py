@@ -37,7 +37,7 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
     # Calculate the number of mobile and fixed buoys based on the total and the mobile percentage
     mobile_count = max(1, int(total_buoys * mobile_percentage)) if mobile_percentage > 0 else 0
     fixed_count = total_buoys - mobile_count
-    
+
     # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters
     cmd = ["uv", "run", "src/script/init.py",
            "--mode", mode,
@@ -83,6 +83,19 @@ def plot_results(results_dir, plots_dir, interval):
                 "--interval", str(interval)]
     subprocess.run(plot_cmd)
 
+# Naming system for results and plots directories based on the interval value.
+def get_interval_str(interval: float) -> str:
+    interval_str = None
+    if interval < 1:
+        interval_str = str(int(interval * 100))
+        if interval * 100 % 10 == 0: # 0.5
+            interval_str = str(int(interval * 10))
+        else: # 0.25
+            interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
+    else:
+        interval_str = str(int(interval))
+    return interval_str
+
 def main():
     cfg = ConfigHandler()
     
@@ -103,34 +116,21 @@ def main():
     #=======================
     # SIMULATION PARAMETERS
     #=======================
-    intervals = cfg.get('simulation', 'intervals')          # List of beacon intervals to simulate
-    num_processes = cfg.get('simulation', 'num_processes')  # Number of parallel processes to use for parallel simulations
-    ideal = cfg.get('simulation', 'ideal_channel')          # Whether to simulate with an ideal channel (no collisions)
-    ramp = cfg.get('simulation', 'ramp_scenario')           # Whether to run the ramp scenario (increasing density over time)
-    world_width = cfg.get('world', 'width')                 # Width of the simulation world
-    world_height = cfg.get('world', 'height')               # Height of the simulation world
+    intervals: list[float] = cfg.get('simulation', 'intervals')     # List of beacon intervals to simulate
+    num_processes: int = cfg.get('simulation', 'num_processes')     # Number of parallel processes to use for parallel simulations
+    ideal: bool = cfg.get('simulation', 'ideal_channel')            # Whether to simulate with an ideal channel (no collisions)
+    ramp: bool = cfg.get('simulation', 'ramp_scenario')             # Whether to run the ramp scenario (increasing density over time)
+    world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
+    world_height: float = cfg.get('world', 'height')                # Height of the simulation world
     
-    # Density of buoys within the specified range and step size
-    densities = list(range(min_buoys, max_buoys + 1, step_buoys))
-    print(f"Densities: {densities}")
     
     for interval in intervals: # [1.0, 0.5, 0.25]
-        # Naming system for results and plots directories
-        if interval < 1:
-            interval_str = str(int(interval * 100))
-            if interval * 100 % 10 == 0: # 0.5
-                interval_str = str(int(interval * 10))
-            else: # 0.25
-                interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
-        else:
-            interval_str = str(int(interval))
-            
+        interval_str = get_interval_str(interval)
         ideal_suffix = "_ideal" if ideal else ""
         ramp_suffix = "_ramp" if ramp else ""
         
         results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
         plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-        
         os.makedirs(results_dir, exist_ok=True)
         os.makedirs(plots_dir, exist_ok=True)
         
@@ -141,7 +141,9 @@ def main():
             for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
                 run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
         else:
+            # Density of buoys within the specified range and step size
             tasks = []
+            densities = list(range(min_buoys, max_buoys + 1, step_buoys))
             for density in densities:
                 positions = arrange_buoys_randomly(density, world_width, world_height)
                 for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols

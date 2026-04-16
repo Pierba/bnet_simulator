@@ -72,7 +72,7 @@ def parse_args():
     )
     parser.add_argument(
         "--density",
-        type=float,
+        type=int,
         default=None,
         help="Density value for this scenario"
     )
@@ -112,76 +112,61 @@ def main():
     cfg = ConfigHandler()
     args = parse_args()
 
+    # Unpacking args values
+    mode: str = args.mode
+    duration: float = args.duration
+    seed: float = args.seed
+    world_width: float = args.world_width
+    world_height: float = args.world_height
+    mobile_buoy_count: int = args.mobile_buoy_count
+    fixed_buoy_count: int = args.fixed_buoy_count
+    result_file: str = args.result_file
+    positions_file: str = args.positions_file
+    density: int = args.density
+    ideal: bool = args.ideal
+    static_interval: float = args.static_interval
+    ramp: bool = args.ramp
+
     # Set the random seed if provided, otherwise use the current time    
-    if args.seed is not None:
-        random.seed(args.seed)
+    if seed is not None:
+        random.seed(seed)
     else:
         random.seed(time.time())
 
     # Load buoy positions from file if provided, otherwise they will be generated randomly in the simulation
     positions = None
-    if args.positions_file:
-        with open(args.positions_file, "r") as f:
+    if positions_file:
+        with open(positions_file, "r") as f:
             positions = json.load(f)
 
     # Initialize the Metrics object if metrics collection is enabled in the configuration
     # This object will track various performance metrics throughout the simulation
     metrics = None
     if cfg.get('simulation', 'enable_metrics'):
-        metrics = Metrics(density=args.density)
+        metrics = Metrics(density=density)
         multihop_mode = cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
         
         metrics.set_simulation_info(
-            scheduler_type=args.mode,
-            world_width=args.world_width,
-            world_height=args.world_height,
-            mobile_count=args.mobile_buoy_count,
-            fixed_count=args.fixed_buoy_count,
-            duration=args.duration,
+            scheduler_type=mode,
+            world_width=world_width,
+            world_height=world_height,
+            mobile_count=mobile_buoy_count,
+            fixed_count=fixed_buoy_count,
+            duration=duration,
             multihop_mode=multihop_mode
         )
 
     # Settin up the communication channel for the simulation
-    channel = Channel(metrics=metrics, ideal_channel=args.ideal)
-    default_battery = cfg.get('buoys', 'default_battery')
-    default_velocity = cfg.get('buoys', 'default_velocity')
-    # mobile_buoys = []
-    # for i in range(args.mobile_buoy_count):
-    #     pos = positions[i] if positions else random_position(args.world_width, args.world_height)
-    #     buoy = Buoy(
-    #         channel=channel,
-    #         position=pos,
-    #         is_mobile=True,
-    #         battery=default_battery,
-    #         velocity=random_velocity(default_velocity),
-    #         metrics=metrics
-    #     )
-    #     buoy.scheduler.scheduler_type = args.mode
-    #     buoy.scheduler.static_interval = args.static_interval
-    #     buoy.scheduler.min_interval = args.static_interval
-    #     mobile_buoys.append(buoy)
-
-    # static_buoys = []
-    # for i in range(args.fixed_buoy_count):
-    #     pos = positions[i] if positions else random_position(args.world_width, args.world_height)
-    #     buoy = Buoy(
-    #         channel=channel,
-    #         position=pos,
-    #         is_mobile=False,
-    #         battery=default_battery,
-    #         metrics=metrics
-    #     )
-    #     buoy.scheduler.scheduler_type = args.mode
-    #     buoy.scheduler.static_interval = args.static_interval
-    #     buoy.scheduler.min_interval = args.static_interval
-    #     static_buoys.append(buoy)
+    channel = Channel(metrics=metrics, ideal_channel=ideal)
 
     buoys = []
-    for i in range(args.mobile_buoy_count + args.fixed_buoy_count):
+    default_battery = cfg.get('buoys', 'default_battery')
+    default_velocity = cfg.get('buoys', 'default_velocity')
+    for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
-        mobile = i < args.mobile_buoy_count
+        mobile = i < mobile_buoy_count
         # Get the position for this buoy from the positions file if provided, otherwise generate a random position
-        pos = positions[i] if positions else random_position(args.world_width, args.world_height)
+        pos = positions[i] if positions else random_position(world_width, world_height)
         
         # Buoy initialization
         buoy = Buoy(
@@ -194,27 +179,23 @@ def main():
         )
 
         # Set the scheduler type: ['static', 'dynamic_adab', 'dynamic_acab']
-        buoy.scheduler.scheduler_type = args.mode
+        buoy.scheduler.scheduler_type = mode
 
         # ??? Why set both static and min interval to the same value?
-        buoy.scheduler.static_interval = args.static_interval
-        buoy.scheduler.min_interval = args.static_interval
+        buoy.scheduler.static_interval = static_interval
+        buoy.scheduler.min_interval = static_interval
         
         buoys.append(buoy)
-
-    # Setting the buoys in the channel so that it can manage their transmissions and interactions
-    channel.set_buoys(buoys)
-
     
-    simulator = Simulator(buoys, channel, metrics, args.ramp, args.duration)
+    simulator = Simulator(buoys, channel, metrics, ramp, duration)
     simulator.start()
 
     if metrics:
-        if not args.ramp:
+        if not ramp:
             summary = metrics.summary(simulator.simulated_time)
-            metrics.export_metrics_to_csv(summary, filename=args.result_file)
+            metrics.export_metrics_to_csv(summary, filename=result_file)
         else:
-            metrics.export_time_series(args.result_file)
+            metrics.export_time_series(result_file)
 
 if __name__ == "__main__":
     main()

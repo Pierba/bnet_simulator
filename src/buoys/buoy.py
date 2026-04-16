@@ -66,7 +66,7 @@ class Buoy:
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
         self.forwarded_beacons = set()
         
-    def handle_event(self, event, sim_time: float):
+    def handle_event(self, event: EventType, sim_time: float) -> None:
         # Dispatch event to the appropriate handler based on event type
         handlers = {
             EventType.SCHEDULER_CHECK:      self._handle_scheduler_check,
