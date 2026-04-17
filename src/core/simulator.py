@@ -24,7 +24,7 @@ class Simulator:
         self.ramp: bool = ramp
         self.all_buoys: List[Buoy] = buoys
         # In ramp mode, we start with only 2 buoys and add the rest gradually. In non-ramp mode, we start with all buoys active.
-        self.buoys = self.all_buoys.copy()[:2] if ramp else buoys
+        self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if ramp else buoys
         self.channel: Channel = channel
         self.metrics: Metrics = metrics
         
@@ -41,7 +41,7 @@ class Simulator:
         self.simulated_time: float = 0.0
         
         # Making all buoys able to access the schedule_event method of the simulator for scheduling their own events
-        for buoy in self.buoys:
+        for buoy in self.all_buoys:
             buoy.schedule_callback = self.schedule_event
 
         # Event variables for managing the event queue
@@ -49,7 +49,7 @@ class Simulator:
         self.event_counter: int = 0
 
     # Adding event to event_queue with a small epsilon to ensure correct ordering of events scheduled at the same time
-    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel | Metrics, data: Optional[Dict] = None) -> None:
+    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel | Metrics, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
         epsilon: float = self.event_counter * 1e-10
         self.event_counter += 1
@@ -87,11 +87,17 @@ class Simulator:
         # Recalculate avg_neighbors after buoy array changes
         self.calculate_and_record_avg_neighbors()
 
+    # This method randomly adds or removes buoys from the active buoy array while ensuring that we don't go below a 
+    # minimum number of buoys or above the total number of buoys
+    # It also ensures that the first change is a significant removal
     def _update_buoy_array_random(self, sim_time: float):
+        
+        # Determine active and inactive buoys
         active_buoys = self.buoys.copy()
         inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
         total_buoys = len(self.all_buoys)
 
+        # Ensure we don't remove too many buoys and maintain a minimum number of active buoys
         if self.first_change or (random.random() >= 0.5 and len(active_buoys) > max(3, int(total_buoys * 0.2))):
             min_buoys = max(3, int(total_buoys * 0.2))
 
@@ -100,39 +106,41 @@ class Simulator:
                 max_to_remove = min(len(active_buoys) - min_buoys, 
                                   max(2, int(total_buoys * remove_percentage)))
                 
-                num_to_remove = max_to_remove if max_to_remove <= 2 else random.randint(1, max_to_remove)
+                num_to_remove = random.randint(1, max_to_remove)
                 buoys_to_remove = random.sample(active_buoys, num_to_remove)
-                
-                for buoy in buoys_to_remove:
-                    if buoy in self.buoys:
-                        self.buoys.remove(buoy)
-                        logging.log_info(f"Removed buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
 
+                # Remove the selected buoys from the active list and log the removals                
+                for buoy in buoys_to_remove:
+                    self.buoys.remove(buoy)
+                    logging.log_info(f"Removed buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
+
+                # Update the channel with the new buoy array and log the change
                 self.channel.set_buoys(self.buoys)
                 logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
-
-                if self.first_change:
-                    logging.log_info("First buoy change: forced major removal operation")
-                    self.first_change = False
+        
+        # If we didn't remove buoys, we have a chance to add some back in, but we won't add too many
         elif inactive_buoys:
             max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))
             
-            num_to_add = max_to_add if max_to_add <= 2 else random.randint(1, max_to_add)
+            num_to_add = random.randint(1, max_to_add)
             buoys_to_add = random.sample(inactive_buoys, num_to_add)
             
             for buoy in buoys_to_add:
                 self.buoys.append(buoy)
-                buoy.schedule_callback = self.schedule_event
                 initial_offset = random.uniform(0, 1.0) 
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                 self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-                if hasattr(buoy, 'is_mobile') and buoy.is_mobile:
+                if buoy.is_mobile:
                     self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
                 
                 logging.log_info(f"Added buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
                 
             self.channel.set_buoys(self.buoys)
             logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+
+        if self.first_change:
+            # Turning off the first change flag after the first buoy change to ensure the next changes are more balanced
+            logging.log_info("First buoy change: forced major removal operation finished")
             self.first_change = False
 
         next_change_time = sim_time + random.uniform(15, 20)
@@ -144,14 +152,13 @@ class Simulator:
         current_count = len(active_buoys)
         total_buoys = len(self.all_buoys)
         buoys_to_add = total_buoys - 2
-        add_interval = self.duration / buoys_to_add if buoys_to_add > 0 else self.duration
+        add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
     
         if current_count < total_buoys:
             if inactive_buoys:
                 buoy = inactive_buoys[0]
                 self.buoys.append(buoy)
-                buoy.schedule_callback = self.schedule_event
-                initial_offset = random.uniform(0, 0.01)
+                initial_offset = random.uniform(0, 1.0)
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                 self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
             self.channel.set_buoys(self.buoys)
@@ -172,7 +179,8 @@ class Simulator:
     def start(self):
         self.running = True
         real_time_start = time.time()
-        
+        logging.reset() # Resetting metrics and logs at the start of the simulation
+
         # Calculate initial avg_neighbors and schedule initial events
         self.calculate_and_record_avg_neighbors()
         self._schedule_initial_events()
