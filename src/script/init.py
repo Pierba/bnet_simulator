@@ -1,4 +1,5 @@
 import os
+from typing import List, Tuple
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 from core.simulator import Simulator
@@ -133,11 +134,13 @@ def main():
     else:
         random.seed(time.time())
 
-    # Load buoy positions from file if provided, otherwise they will be generated randomly in the simulation
-    positions = None
+    # Load buoy positions from file if provided, otherwise they will be generated randomly
+    positions: List[Tuple[float, float]] = None
     if positions_file:
         with open(positions_file, "r") as f:
             positions = json.load(f)
+    else:
+        positions = [random_position(world_width, world_height) for _ in range(mobile_buoy_count + fixed_buoy_count)]
 
     # Initialize the Metrics object if metrics collection is enabled in the configuration
     # This object will track various performance metrics throughout the simulation
@@ -165,13 +168,11 @@ def main():
     for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
         mobile = i < mobile_buoy_count
-        # Get the position for this buoy from the positions file if provided, otherwise generate a random position
-        pos = positions[i] if positions else random_position(world_width, world_height)
-        
+                
         # Buoy initialization
         buoy = Buoy(
             channel=channel,
-            position=pos,
+            position=positions[i],
             is_mobile=mobile,
             battery=default_battery,
             velocity=random_velocity(default_velocity) if mobile else default_velocity,

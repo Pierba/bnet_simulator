@@ -5,17 +5,10 @@ import random
 from utils.metrics import Metrics
 from buoys.buoy import Buoy
 from core.channel import Channel
-from core.events import EventType
+from core.events import EventType, Event
 from config.config_handler import ConfigHandler
 from utils import logging
 from scipy.spatial import cKDTree
-
-class Event:
-    def __init__(self, time: float, event_type: EventType, target_obj: Buoy | Channel | Metrics, data: Optional[Dict] = None):
-        self.time: float = time
-        self.event_type: EventType = event_type
-        self.target_obj: Buoy | Channel | Metrics = target_obj
-        self.data: bool = data or {}
 
 class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, ramp: bool = False, duration: float = None):
@@ -49,7 +42,7 @@ class Simulator:
         self.event_counter: int = 0
 
     # Adding event to event_queue with a small epsilon to ensure correct ordering of events scheduled at the same time
-    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel | Metrics, data: Optional[Dict] = None):
+    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
         epsilon: float = self.event_counter * 1e-10
         self.event_counter += 1

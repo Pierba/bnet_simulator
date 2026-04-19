@@ -35,7 +35,7 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
     mobile_percentage = cfg.get('buoys', 'mobile_percentage')
 
     # Calculate the number of mobile and fixed buoys based on the total and the mobile percentage
-    mobile_count = max(1, int(total_buoys * mobile_percentage)) if mobile_percentage > 0 else 0
+    mobile_count = min(total_buoys, max(1, int(total_buoys * mobile_percentage))) if mobile_percentage > 0 else 0
     fixed_count = total_buoys - mobile_count
 
     # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters

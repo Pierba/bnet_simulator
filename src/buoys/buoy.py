@@ -2,12 +2,14 @@ import uuid
 import random
 import math
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, List
+
 from protocols.scheduler import BeaconScheduler
 from protocols.beacon import Beacon
-from core.events import EventType
+from core.events import EventType, Event
 from config.config_handler import ConfigHandler
 from utils import logging
+from core.channel import Channel
 
 class BuoyState(Enum):
     SLEEPING = 0
@@ -19,7 +21,7 @@ class Buoy:
     # Initialization of a buoy with its properties
     def __init__(
         self,
-        channel,
+        channel: Channel,
         position: Tuple[float, float] = (0.0, 0.0),
         is_mobile: bool = False,
         battery: float = None,
@@ -28,45 +30,45 @@ class Buoy:
     ):
         cfg = ConfigHandler()
         
-        self.id = uuid.uuid4()
-        self.position = position
-        self.is_mobile = is_mobile
-        self.battery = battery if battery is not None else cfg.get('buoys', 'default_battery')
-        self.velocity = velocity
-        self.neighbors = []  # Direct neighbors (1-hop, beacons we received directly)
-        self.scheduler = BeaconScheduler()
-        self.channel = channel
-        self.state = BuoyState.RECEIVING
-        self.metrics = metrics
-        self.schedule_callback = None
+        self.id: uuid.UUID = uuid.uuid4()
+        self.position: Tuple[float, float] = position
+        self.is_mobile: bool = is_mobile
+        self.battery: float = battery if battery is not None else cfg.get('buoys', 'default_battery')
+        self.velocity: Tuple[float, float] = velocity
+        self.neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = []  # Direct neighbors (1-hop, beacons we received directly)
+        self.scheduler: BeaconScheduler = BeaconScheduler()
+        self.channel: Channel = channel
+        self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
+        self.metrics: dict = metrics
+        self.schedule_callback: callable = None
 
-        self.difs_time = cfg.get('csma', 'difs_time')
-        self.slot_time = cfg.get('csma', 'slot_time')
-        self.cw = cfg.get('csma', 'cw')
-        
-        self.neighbor_timeout = cfg.get('scheduler', 'neighbor_timeout')
-        self.world_width = cfg.get('world', 'width')
-        self.world_height = cfg.get('world', 'height')
-        self.speed_of_light = cfg.get('network', 'speed_of_light')
-        self.comm_range_max = cfg.get('network', 'communication_range_max')
-        
-        self.multihop_mode = cfg.get('simulation', 'multihop_mode')
-        self.multihop_limit = cfg.get('simulation', 'multihop_limit')
+        self.difs_time: float = cfg.get('csma', 'difs_time')
+        self.slot_time: float = cfg.get('csma', 'slot_time')
+        self.cw: int = cfg.get('csma', 'cw')
 
-        self.backoff_time = 0.0
-        self.backoff_remaining = 0.0
-        self.next_try_time = 0.0
-        self.want_to_send = False
-        self.scheduler_decision_time = 0.0
-        
+        self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
+        self.world_width: float = cfg.get('world', 'width')
+        self.world_height: float = cfg.get('world', 'height')
+        self.speed_of_light: float = cfg.get('network', 'speed_of_light')
+        self.comm_range_max: float = cfg.get('network', 'communication_range_max')
+
+        self.multihop_mode: bool = cfg.get('simulation', 'multihop_mode')
+        self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
+
+        self.backoff_time: float = 0.0
+        self.backoff_remaining: float = 0.0
+        self.next_try_time: float = 0.0
+        self.want_to_send: bool = False
+        self.scheduler_decision_time: float = 0.0
+
         # Multihop append mode: store discovered nodes (node_id, timestamp, position)
         # These are nodes we learned about from other beacons' neighbor lists
-        self.discovered_nodes = []  # [(node_id, timestamp, position), ...]
+        self.discovered_nodes: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = []  # [(node_id, timestamp, position), ...]
         
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
-        self.forwarded_beacons = set()
+        self.forwarded_beacons: set[uuid.UUID] = set()
         
-    def handle_event(self, event: EventType, sim_time: float) -> None:
+    def handle_event(self, event: EventType, sim_time: float):
         # Dispatch event to the appropriate handler based on event type
         handlers = {
             EventType.SCHEDULER_CHECK:      self._handle_scheduler_check,
@@ -80,16 +82,19 @@ class Buoy:
         }
         
         handler = handlers.get(event.event_type)
-        if handler:
-            handler(event, sim_time)
-        else:
+        if not handler:
             logging.log_error(f"Buoy {str(self.id)[:6]} received unhandled event: {event.event_type}")
+            return
+                
+        handler(event, sim_time)
 
-    def _handle_scheduler_check(self, event, sim_time: float):
+    def _handle_scheduler_check(self, event: Event, sim_time: float):
+        # Ask the scheduler if we should send a beacon based on current conditions
         should_send = self.scheduler.should_send(
             self.battery, self.velocity, self.neighbors, sim_time
         )
         
+        # If scheduler decides we should send, set want_to_send and schedule a channel sense to attempt transmission
         if should_send:
             self.want_to_send = True
             self.scheduler_decision_time = sim_time
@@ -102,7 +107,7 @@ class Buoy:
             sim_time + next_check_interval, EventType.SCHEDULER_CHECK, self
         )
 
-    def _handle_channel_sense(self, event, sim_time: float):
+    def _handle_channel_sense(self, event: Event, sim_time: float):
         # Check if this is a forwarding request
         forward_beacon = event.data.get("forward_beacon")
         
@@ -129,7 +134,7 @@ class Buoy:
                     sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
                 )
 
-    def _handle_difs_completion(self, event, sim_time: float):
+    def _handle_difs_completion(self, event: Event, sim_time: float):
         if not self.want_to_send or self.state != BuoyState.WAITING_DIFS:
             return
             
@@ -154,7 +159,7 @@ class Buoy:
                 {"backoff_start_time": sim_time}
             )
 
-    def _handle_backoff_completion(self, event, sim_time: float):
+    def _handle_backoff_completion(self, event: Event, sim_time: float):
         if not self.want_to_send or self.state != BuoyState.BACKOFF:
             return
             
@@ -176,7 +181,7 @@ class Buoy:
                 sim_time, EventType.TRANSMISSION_START, self
             )
 
-    def _handle_transmission_start(self, event, sim_time: float):
+    def _handle_transmission_start(self, event: Event, sim_time: float):
         if not self.want_to_send:
             return
         
@@ -193,7 +198,7 @@ class Buoy:
             latency = sim_time - self.scheduler_decision_time
             self.metrics.record_scheduler_latency(latency)
 
-    def _handle_reception(self, event, sim_time: float):
+    def _handle_reception(self, event: Event, sim_time: float):
         beacon = event.data.get("beacon")
         if not beacon:
             return
