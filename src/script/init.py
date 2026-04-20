@@ -89,6 +89,18 @@ def parse_args():
         help="Interval for static scheduler in seconds"
     )
     parser.add_argument(
+        "--min-interval",
+        type=float,
+        default=cfg.get('scheduler', 'beacon_min_interval'),
+        help="Minimum interval for dynamic schedulers in seconds"
+    )
+    parser.add_argument(
+        "--max-interval",
+        type=float,
+        default=cfg.get('scheduler', 'beacon_max_interval'),
+        help="Maximum interval for dynamic schedulers in seconds"
+    )
+    parser.add_argument(
         "--ramp",
         action='store_true',
         help="Use ramp scenario"
@@ -126,6 +138,8 @@ def main():
     density: int = args.density
     ideal: bool = args.ideal
     static_interval: float = args.static_interval
+    min_interval: float = args.min_interval
+    max_interval: float = args.max_interval
     ramp: bool = args.ramp
 
     # Set the random seed if provided, otherwise use the current time    
@@ -182,10 +196,11 @@ def main():
         # Set the scheduler type: ['static', 'dynamic_adab', 'dynamic_acab']
         buoy.scheduler.scheduler_type = mode
 
-        # ??? Why set both static and min interval to the same value?
+        # Set scheduler intervals based on command-line arguments or configuration values
         buoy.scheduler.static_interval = static_interval
-        buoy.scheduler.min_interval = static_interval
-        
+        buoy.scheduler.min_interval = min_interval
+        buoy.scheduler.max_interval = max_interval
+
         buoys.append(buoy)
     
     simulator = Simulator(buoys, channel, metrics, ramp, duration)

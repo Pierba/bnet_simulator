@@ -8,9 +8,9 @@ class BeaconScheduler:
     def __init__(self):
         cfg = ConfigHandler()
         
+        self.static_interval: float = cfg.get('scheduler', 'static_interval')
         self.min_interval: float = cfg.get('scheduler', 'beacon_min_interval')
         self.max_interval: float = cfg.get('scheduler', 'beacon_max_interval')
-        self.static_interval: float = cfg.get('scheduler', 'static_interval')
         self.scheduler_type: str = None
         self.default_velocity: float = cfg.get('buoys', 'default_velocity')
 

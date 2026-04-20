@@ -30,6 +30,7 @@ class Buoy:
     ):
         cfg = ConfigHandler()
         
+        # Buoy properties
         self.id: uuid.UUID = uuid.uuid4()
         self.position: Tuple[float, float] = position
         self.is_mobile: bool = is_mobile
@@ -40,26 +41,30 @@ class Buoy:
         self.channel: Channel = channel
         self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
         self.metrics: dict = metrics
-        self.schedule_callback: callable = None
+        self.schedule_callback: callable = None # To be set by simulator for event scheduling
 
+        # CSMA parameters
         self.difs_time: float = cfg.get('csma', 'difs_time')
         self.slot_time: float = cfg.get('csma', 'slot_time')
         self.cw: int = cfg.get('csma', 'cw')
 
+        # Network parameters for distance calculations
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
         self.world_width: float = cfg.get('world', 'width')
         self.world_height: float = cfg.get('world', 'height')
         self.speed_of_light: float = cfg.get('network', 'speed_of_light')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
 
+        # Multihop mode configuration
         self.multihop_mode: bool = cfg.get('simulation', 'multihop_mode')
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
 
-        self.backoff_time: float = 0.0
+        # State variables for CSMA and scheduling
         self.backoff_remaining: float = 0.0
         self.next_try_time: float = 0.0
         self.want_to_send: bool = False
         self.scheduler_decision_time: float = 0.0
+        self.pending_forward_beacon = None  # Beacon queued for forwarding through CSMA
 
         # Multihop append mode: store discovered nodes (node_id, timestamp, position)
         # These are nodes we learned about from other beacons' neighbor lists
@@ -74,7 +79,7 @@ class Buoy:
             EventType.SCHEDULER_CHECK:      self._handle_scheduler_check,
             EventType.CHANNEL_SENSE:        self._handle_channel_sense,
             EventType.DIFS_COMPLETION:      self._handle_difs_completion,
-            EventType.BACKOFF_COMPLETION:   self._handle_backoff_completion,
+            EventType.BACKOFF_SLOT:         self._handle_backoff_slot,
             EventType.TRANSMISSION_START:   self._handle_transmission_start,
             EventType.RECEPTION:            self._handle_reception,
             EventType.NEIGHBOR_CLEANUP:     self._handle_neighbor_cleanup,
@@ -88,6 +93,7 @@ class Buoy:
                 
         handler(event, sim_time)
 
+    # Scheduler check handler: asks the scheduler if we should send a beacon and schedules next check
     def _handle_scheduler_check(self, event: Event, sim_time: float):
         # Ask the scheduler if we should send a beacon based on current conditions
         should_send = self.scheduler.should_send(
@@ -107,96 +113,109 @@ class Buoy:
             sim_time + next_check_interval, EventType.SCHEDULER_CHECK, self
         )
 
+    # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
     def _handle_channel_sense(self, event: Event, sim_time: float):
-        # Check if this is a forwarding request
+        # Check if this is a forwarding request — queue it for CSMA processing
         forward_beacon = event.data.get("forward_beacon")
-        
         if forward_beacon:
-            # Forward mode: create forwarded beacon
+            self.pending_forward_beacon = forward_beacon
+    
+        if self.want_to_send or self.pending_forward_beacon:
             if self.channel.is_busy(self.position, sim_time):
+                # Channel is busy => wait one slot and check again
                 self.schedule_callback(
-                    sim_time + 0.01, EventType.CHANNEL_SENSE, self, {"forward_beacon": forward_beacon}
+                    sim_time + self.slot_time, EventType.CHANNEL_SENSE, self
                 )
             else:
-                # Create and broadcast forwarded beacon
-                forwarded = self.forward_beacon(forward_beacon, sim_time)
-                self.channel.broadcast(forwarded, sim_time)
-                logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
-        elif self.want_to_send:
-            # Normal transmission
-            if self.channel.is_busy(self.position, sim_time):
-                self.schedule_callback(
-                    sim_time + 0.01, EventType.CHANNEL_SENSE, self
-                )
-            else:
+                # Channel is idle => proceed with DIFS and backoff as needed
                 self.state = BuoyState.WAITING_DIFS
+                # Simulate DIFS delay before checking channel again for backoff decision
                 self.schedule_callback(
                     sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
                 )
 
+    # DIFS completion handler: after DIFS time completition, checks channel again and either transmit immediately or enter backoff
     def _handle_difs_completion(self, event: Event, sim_time: float):
-        if not self.want_to_send or self.state != BuoyState.WAITING_DIFS:
+        # If the buoy no longer wants to send/forward or state has changed, do nothing
+        if not(self.want_to_send or self.pending_forward_beacon) or self.state != BuoyState.WAITING_DIFS:
             return
             
+        # After DIFS, check channel again to decide if we can transmit immediately or need to backoff
         if self.channel.is_busy(self.position, sim_time):
             self.state = BuoyState.RECEIVING
             self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
-        else:
-            # Only generate new random backoff if we don't have remaining backoff
-            if self.backoff_remaining <= 0:
-                backoff_slots = random.randint(0, self.cw - 1)
-                backoff_time = backoff_slots * self.slot_time
-                self.backoff_time = backoff_time
-                self.backoff_remaining = backoff_time
-            # Otherwise, use the remaining backoff from previous interruption
-            
-            self.state = BuoyState.BACKOFF
-            
-            self.schedule_callback(
-                sim_time + self.backoff_remaining, 
-                EventType.BACKOFF_COMPLETION, 
-                self,
-                {"backoff_start_time": sim_time}
-            )
+            return    
 
-    def _handle_backoff_completion(self, event: Event, sim_time: float):
-        if not self.want_to_send or self.state != BuoyState.BACKOFF:
+        # Only generate new random backoff if we don't have remaining backoff
+        if self.backoff_remaining <= 0:
+            backoff_slots = random.randint(0, self.cw - 1)
+            self.backoff_remaining = backoff_slots * self.slot_time
+            # If backoff is zero, we can transmit immediately without waiting for a slot
+            if self.backoff_remaining <= 0:
+                self.schedule_callback(sim_time, EventType.TRANSMISSION_START, self)
+                return
+
+        # Start or resume slot-by-slot backoff countdown
+        self.state = BuoyState.BACKOFF     
+        self.schedule_callback(
+            sim_time + self.slot_time, 
+            EventType.BACKOFF_SLOT, 
+            self
+        )
+
+    # Backoff slot handler: checks channel status each slot and either decrements backoff or transmits if backoff is complete
+    def _handle_backoff_slot(self, event: Event, sim_time: float):
+        if not(self.want_to_send or self.pending_forward_beacon) or self.state != BuoyState.BACKOFF:
             return
             
         if self.channel.is_busy(self.position, sim_time):
-            # Calculate how much backoff time we actually consumed
-            backoff_start = event.data.get("backoff_start_time", sim_time - self.backoff_remaining)
-            elapsed = sim_time - backoff_start
-            self.backoff_remaining = max(0, self.backoff_remaining - elapsed)
+            # Channel is busy then pause backoff and wait for channel to be clean before resuming
             self.state = BuoyState.RECEIVING
-            
-            # Wait for channel to become idle, then resume with DIFS (which will resume backoff)
             self.schedule_callback(
-                sim_time + 0.01, EventType.CHANNEL_SENSE, self
+                sim_time + self.slot_time, EventType.CHANNEL_SENSE, self
             )
-        else:
-            # Backoff completed successfully, transmit
-            self.backoff_remaining = 0.0  # Reset for next transmission
+        else:    
+            # When channel is idle one slot of backoff gets decremented
+            self.backoff_remaining -= self.slot_time
+        
+        
+        if self.backoff_remaining <= 0:
+            # If Backoff time completed successfully then transmit
             self.schedule_callback(
                 sim_time, EventType.TRANSMISSION_START, self
             )
+        else:
+            # Otherwise more slots are remaining
+            self.schedule_callback(
+                sim_time + self.slot_time,
+                EventType.BACKOFF_SLOT,
+                self
+            )
 
+    # Transmission start handler: creates a beacon or forwards one and attempts to transmit it in broadcast through the channel
     def _handle_transmission_start(self, event: Event, sim_time: float):
-        if not self.want_to_send:
+        if not (self.want_to_send or self.pending_forward_beacon):
             return
         
-        beacon = self.create_beacon(sim_time)
-        success = self.channel.broadcast(beacon, sim_time)
+        if self.pending_forward_beacon:
+            # Forwarding a received beacon through CSMA
+            forwarded = self.forward_beacon(self.pending_forward_beacon, sim_time)
+            self.channel.broadcast(forwarded, sim_time)
+            logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(self.pending_forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
+            self.pending_forward_beacon = None
+        else:
+            # Normal beacon transmission
+            beacon = self.create_beacon(sim_time)
+            success = self.channel.broadcast(beacon, sim_time)
+            self.want_to_send = False # Reset want_to_send flag after attempting transmission
+            
+            # Don't clear discovered_nodes - they persist like neighbors
+            if success and self.metrics:
+                latency = sim_time - self.scheduler_decision_time
+                self.metrics.record_scheduler_latency(latency)
         
-        self.want_to_send = False
         self.backoff_remaining = 0.0  # Reset backoff for next transmission cycle
         self.state = BuoyState.RECEIVING
-        
-        # Don't clear discovered_nodes - they persist like neighbors
-        
-        if success and self.metrics:
-            latency = sim_time - self.scheduler_decision_time
-            self.metrics.record_scheduler_latency(latency)
 
     def _handle_reception(self, event: Event, sim_time: float):
         beacon = event.data.get("beacon")
@@ -347,13 +366,23 @@ class Buoy:
         new_x = x + vx * dt
         new_y = y + vy * dt
         
-        if new_x < 0 or new_x > self.world_width:
-            self.velocity = (-vx, vy)
-        if new_y < 0 or new_y > self.world_height:
-            self.velocity = (vx, -vy)
+        # Reflect velocity and clamp position at boundaries
+        if new_x < 0:
+            new_x = -new_x
+            vx = -vx
+        elif new_x > self.world_width:
+            new_x = 2 * self.world_width - new_x
+            vx = -vx
+        
+        if new_y < 0:
+            new_y = -new_y
+            vy = -vy
+        elif new_y > self.world_height:
+            new_y = 2 * self.world_height - new_y
+            vy = -vy
             
-        vx, vy = self.velocity
-        self.position = (x + vx * dt, y + vy * dt)
+        self.velocity = (vx, vy)
+        self.position = (new_x, new_y)
         
         self.schedule_callback(
             sim_time + dt, EventType.BUOY_MOVEMENT, self
