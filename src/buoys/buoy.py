@@ -54,6 +54,7 @@ class Buoy:
         self.world_height: float = cfg.get('world', 'height')
         self.speed_of_light: float = cfg.get('network', 'speed_of_light')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
+        self.comm_range_max_sq: float = self.comm_range_max * self.comm_range_max
 
         # Multihop mode configuration
         self.multihop_mode: bool = cfg.get('simulation', 'multihop_mode')
@@ -206,11 +207,11 @@ class Buoy:
         else:
             # Normal beacon transmission
             beacon = self.create_beacon(sim_time)
-            success = self.channel.broadcast(beacon, sim_time)
+            self.channel.broadcast(beacon, sim_time)
             self.want_to_send = False # Reset want_to_send flag after attempting transmission
             
             # Don't clear discovered_nodes - they persist like neighbors
-            if success and self.metrics:
+            if self.metrics:
                 latency = sim_time - self.scheduler_decision_time
                 self.metrics.record_scheduler_latency(latency)
         
@@ -237,11 +238,12 @@ class Buoy:
                 
                 dx = self.position[0] - tx_beacon.position[0]
                 dy = self.position[1] - tx_beacon.position[1]
-                distance = math.hypot(dx, dy)
+                distance_sq = (dx * dx) + (dy * dy)
             
-                if distance > self.comm_range_max:
+                if distance_sq > self.comm_range_max_sq:
                     continue
                 
+                distance = math.sqrt(distance_sq)
                 propagation_delay = distance / self.speed_of_light
                 arrival_time = end + propagation_delay
             

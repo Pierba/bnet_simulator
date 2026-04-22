@@ -94,7 +94,7 @@ class BeaconScheduler:
                     contact_score = 0.0
 
                 vx, vy = velocity
-                speed = math.hypot(vx, vy)
+                speed = math.sqrt(vx * vx + vy * vy)
                 mobility_score = min(1.0, speed / (self.default_velocity if self.default_velocity > 0 else 0.001))
 
                 w_density = 0.4

@@ -190,7 +190,7 @@ class Simulator:
                 self.simulated_time = event.time
                 
                 if event.event_type in [EventType.TRANSMISSION_START, EventType.RECEPTION]:
-                    logging.log_info(f"Processing {event}")
+                    logging.log_info(f"Processing {event.event_type.name} event")
                     
                 if self.simulated_time > 0 and int(self.simulated_time) % 10 == 0:
                     logging.log_info(f"Time: {self.simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
