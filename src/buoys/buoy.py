@@ -2,7 +2,7 @@ import uuid
 import random
 import math
 from enum import Enum
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 from protocols.scheduler import BeaconScheduler
 from protocols.beacon import Beacon
@@ -36,7 +36,7 @@ class Buoy:
         self.is_mobile: bool = is_mobile
         self.battery: float = battery if battery is not None else cfg.get('buoys', 'default_battery')
         self.velocity: Tuple[float, float] = velocity
-        self.neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = []  # Direct neighbors (1-hop, beacons we received directly)
+        self.neighbors: Dict[uuid.UUID, Tuple[uuid.UUID, float, Tuple[float, float]]] = {}  # Direct neighbors (1-hop, beacons we received directly)
         self.scheduler: BeaconScheduler = BeaconScheduler()
         self.channel: Channel = channel
         self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
@@ -69,10 +69,10 @@ class Buoy:
 
         # Multihop append mode: store discovered nodes (node_id, timestamp, position)
         # These are nodes we learned about from other beacons' neighbor lists
-        self.discovered_nodes: List[Tuple[uuid.UUID, float, Tuple[float, float]]] = []  # [(node_id, timestamp, position), ...]
+        self.discovered_nodes: Dict[uuid.UUID, Tuple[uuid.UUID, float, Tuple[float, float]]] = {}
         
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
-        self.forwarded_beacons: set[uuid.UUID] = set()
+        self.forwarded_beacons: Dict[Tuple[uuid.UUID, float], float] = {}
         
     def handle_event(self, event: EventType, sim_time: float):
         # Dispatch event to the appropriate handler based on event type
@@ -97,8 +97,9 @@ class Buoy:
     # Scheduler check handler: asks the scheduler if we should send a beacon and schedules next check
     def _handle_scheduler_check(self, event: Event, sim_time: float):
         # Ask the scheduler if we should send a beacon based on current conditions
+        neighbor_timestamps = [data[1] for data in self.neighbors.values()]
         should_send = self.scheduler.should_send(
-            self.battery, self.velocity, self.neighbors, sim_time
+            self.battery, self.velocity, neighbor_timestamps, sim_time
         )
         
         # If scheduler decides we should send, set want_to_send and schedule a channel sense to attempt transmission
@@ -210,7 +211,7 @@ class Buoy:
             self.channel.broadcast(beacon, sim_time)
             self.want_to_send = False # Reset want_to_send flag after attempting transmission
             
-            # Don't clear discovered_nodes - they persist like neighbors
+            # Log transmission for latency tracking
             if self.metrics:
                 latency = sim_time - self.scheduler_decision_time
                 self.metrics.record_scheduler_latency(latency)
@@ -222,64 +223,9 @@ class Buoy:
         beacon = event.data.get("beacon")
         if not beacon:
             return
-    
-        collision = False
-        collision_checked = event.data.get("collision_checked", False)
-    
-        if not collision_checked:
-            COLLISION_WINDOW = 1e-5
-            
-            for tx_beacon, start, end, _, _ in self.channel.active_transmissions:
-                if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
-                    continue
-            
-                if sim_time < start:
-                    continue
-                
-                dx = self.position[0] - tx_beacon.position[0]
-                dy = self.position[1] - tx_beacon.position[1]
-                distance_sq = (dx * dx) + (dy * dy)
-            
-                if distance_sq > self.comm_range_max_sq:
-                    continue
-                
-                distance = math.sqrt(distance_sq)
-                propagation_delay = distance / self.speed_of_light
-                arrival_time = end + propagation_delay
-            
-                if abs(arrival_time - sim_time) < COLLISION_WINDOW:
-                    logging.log_error(f"Collision detected at receiver {str(self.id)[:6]} between {str(beacon.sender_id)[:6]} and {str(tx_beacon.sender_id)[:6]}")
-                    collision = True
-                    break
-    
-        if collision:
-            return
-        
-        # Track all unique nodes discovered from this beacon (for metrics)
-        discovered_nodes = set()
-        
-        # 1. Always discover the direct sender
-        discovered_nodes.add(beacon.sender_id)
-        
-        # 2. In forward mode, also discover the origin if different
-        if self.multihop_mode == 'forwarded' and beacon.origin_id is not None:
-            if beacon.origin_id != self.id and beacon.origin_id != beacon.sender_id:
-                discovered_nodes.add(beacon.origin_id)
-        
-        # 3. Discover all nodes from the beacon's neighbor list
-        for neighbor_id, neighbor_ts, neighbor_pos in beacon.neighbors:
-            if neighbor_id != self.id:  # Don't count self
-                discovered_nodes.add(neighbor_id)
-        
-        # Update direct neighbors (by sender_id) - this is 1-hop connectivity
-        updated = False
-        for i, (nid, _, _) in enumerate(self.neighbors):
-            if nid == beacon.sender_id:
-                self.neighbors[i] = (nid, sim_time, beacon.position)
-                updated = True
-                break
-        if not updated:
-            self.neighbors.append((beacon.sender_id, sim_time, beacon.position))
+  
+        # Update direct neighbors of this buoy with the sender of the beacon (1-hop neighbor)
+        self.neighbors[beacon.sender_id] = (beacon.sender_id, sim_time, beacon.position)
         
         # Multihop append mode: collect discovered nodes from beacon's neighbor list
         # These are NOT direct neighbors, but nodes we learned about indirectly
@@ -289,22 +235,17 @@ class Buoy:
                     continue
                 
                 # Update or add to discovered_nodes list with metadata
-                updated = False
-                for i, (nid, _, _) in enumerate(self.discovered_nodes):
-                    if nid == neighbor_id:
-                        # Update with latest timestamp and position
-                        self.discovered_nodes[i] = (neighbor_id, neighbor_ts, neighbor_pos)
-                        updated = True
-                        break
-                
-                if not updated:
-                    self.discovered_nodes.append((neighbor_id, neighbor_ts, neighbor_pos))
+                # We always take the newest information (assuming neighbor_ts is useful or simply latest received)
+                # However, we should only overwrite if the new timestamp is newer or we don't have it.
+                if neighbor_id not in self.neighbors:
+                    if neighbor_id not in self.discovered_nodes or neighbor_ts > self.discovered_nodes[neighbor_id][1]:
+                        self.discovered_nodes[neighbor_id] = (neighbor_id, neighbor_ts, neighbor_pos)
         
         # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
         if self.multihop_mode == 'forwarded' and beacon.hop_limit > 0:
             beacon_key = (beacon.origin_id, beacon.timestamp)
             if beacon_key not in self.forwarded_beacons:
-                self.forwarded_beacons.add(beacon_key)
+                self.forwarded_beacons[beacon_key] = sim_time
                 # Schedule forwarding immediately
                 self.schedule_callback(
                     sim_time + 0.001,
@@ -313,45 +254,56 @@ class Buoy:
                     {"forward_beacon": beacon}
                 )
         
-        key = (self.id, beacon.sender_id, beacon.timestamp)
-        if key not in self.channel.seen_attempts:
-            self.channel.seen_attempts.add(key)
-        
-            for i, (tx_beacon, start, end, potential_count, processed_count) in enumerate(self.channel.active_transmissions):
-                if tx_beacon.sender_id == beacon.sender_id and tx_beacon.timestamp == beacon.timestamp:
-                    self.channel.active_transmissions[i] = (tx_beacon, start, end, potential_count, processed_count + 1)
-                    break
-        
-            if self.metrics:
-                # Track all unique nodes discovered from this beacon
-                if self.id not in self.metrics.unique_nodes_per_buoy:
-                    self.metrics.unique_nodes_per_buoy[self.id] = set()
-                self.metrics.unique_nodes_per_buoy[self.id].update(discovered_nodes)
-                
-                # Log reception for latency tracking
-                self.metrics.log_received(
-                    sender_id=beacon.sender_id,
-                    timestamp=beacon.timestamp,
-                    receive_time=sim_time,
-                    receiver_id=None
-                )
-                
-                # Track for delivery ratio
-                self.metrics.log_actually_received(beacon.sender_id)
+        if self.metrics:
+            # Track all unique nodes discovered from this beacon starting with the sender
+            discovered_nodes = {beacon.sender_id}
+            
+            # In forward mode, also discover the origin if different
+            if self.multihop_mode == 'forwarded' and beacon.origin_id is not None:
+                if beacon.origin_id != self.id and beacon.origin_id != beacon.sender_id:
+                    discovered_nodes.add(beacon.origin_id)
+            
+            # Discover all nodes from the beacon's neighbor list
+            neighbor_ids = {neighbor_id for neighbor_id, _, _ in beacon.neighbors}
+            discovered_nodes.update(neighbor_ids)
+            discovered_nodes.discard(self.id)  # Don't count self as discovered
+
+            # Track all unique nodes discovered from this beacon
+            if self.id not in self.metrics.unique_nodes_per_buoy:
+                self.metrics.unique_nodes_per_buoy[self.id] = set()
+            self.metrics.unique_nodes_per_buoy[self.id].update(discovered_nodes)
+            
+            # Log reception for latency tracking
+            self.metrics.log_received(
+                sender_id=beacon.sender_id,
+                timestamp=beacon.timestamp,
+                receive_time=sim_time,
+                receiver_id=None
+            )
+            
+            # Track for delivery ratio
+            self.metrics.log_actually_received(beacon.sender_id)
 
     def _handle_neighbor_cleanup(self, event, sim_time: float):
         # Cleanup direct neighbors
-        self.neighbors = [
-            (nid, ts, pos) for nid, ts, pos in self.neighbors
-            if sim_time - ts <= self.neighbor_timeout
-        ]
+        self.neighbors = {
+            nid: data for nid, data in self.neighbors.items()
+            if sim_time - data[1] <= self.neighbor_timeout
+        }
         
-        # In append mode, cleanup old discovered nodes
+        # In append mode => cleanup old discovered nodes
         if self.multihop_mode == 'append':
-            self.discovered_nodes = [
-                (nid, ts, pos) for nid, ts, pos in self.discovered_nodes
+            self.discovered_nodes = {
+                nid: data for nid, data in self.discovered_nodes.items()
+                if sim_time - data[1] <= self.neighbor_timeout
+            }
+            
+        # In forwarded mode => cleanup old forwarded beacons
+        if self.multihop_mode == 'forwarded':
+            self.forwarded_beacons = {
+                key: ts for key, ts in self.forwarded_beacons.items()
                 if sim_time - ts <= self.neighbor_timeout
-            ]
+            }
         
         self.schedule_callback(
             sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self
@@ -361,14 +313,14 @@ class Buoy:
         if not self.is_mobile:
             return
             
-        dt = 0.1
+        dt = 0.1    # update too frequently
         x, y = self.position
         vx, vy = self.velocity
         
         new_x = x + vx * dt
         new_y = y + vy * dt
         
-        # Reflect velocity and clamp position at boundaries
+        # World boundries checks
         if new_x < 0:
             new_x = -new_x
             vx = -vx
@@ -383,24 +335,24 @@ class Buoy:
             new_y = 2 * self.world_height - new_y
             vy = -vy
             
+        # Updating velocity and position
         self.velocity = (vx, vy)
         self.position = (new_x, new_y)
         
+        # Schedule next movement update
         self.schedule_callback(
             sim_time + dt, EventType.BUOY_MOVEMENT, self
         )
     
     def create_beacon(self, sim_time: float) -> Beacon:
-        all_neighbors = self.neighbors.copy()
+        all_neighbors = list(self.neighbors.values())
         
         # In append mode, add discovered nodes to the neighbor list
         # These are nodes learned from other beacons (not direct 1-hop neighbors)
         if self.multihop_mode == 'append':
-            for node_id, node_ts, node_pos in self.discovered_nodes:
-                # Check if not already in neighbors (direct or discovered)
-                if not any(nid == node_id for nid, _, _ in all_neighbors):
-                    # Add with the metadata we have (timestamp and position from when we learned about them)
-                    all_neighbors.append((node_id, node_ts, node_pos))
+            for node_id, data in self.discovered_nodes.items():
+                if node_id not in self.neighbors:
+                    all_neighbors.append(data)
         
         # Set origin and hop_limit for forwarded mode
         origin_id = None

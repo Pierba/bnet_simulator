@@ -1,7 +1,7 @@
 import random
 import uuid
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from config.config_handler import ConfigHandler
 
 class BeaconScheduler:
@@ -32,7 +32,7 @@ class BeaconScheduler:
     def should_send(self, 
             battery: float, 
             velocity: Tuple[float, float], 
-            neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]], 
+            neighbor_timestamps: List[float], 
             current_time: float
         ) -> bool:
 
@@ -40,7 +40,7 @@ class BeaconScheduler:
             case "static":
                 return self.should_send_static(current_time)
             case "dynamic_adab" | "dynamic_acab":
-                return self.should_send_dynamic(battery, velocity, neighbors, current_time)
+                return self.should_send_dynamic(battery, velocity, neighbor_timestamps, current_time)
             case _:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -57,37 +57,37 @@ class BeaconScheduler:
         self,
         battery: float,
         velocity: Tuple[float, float],
-        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
+        neighbor_timestamps: List[float],
         current_time: float,
     ) -> bool:
         
         if not self.next_dynamic_interval:
-            self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time)
+            self.next_dynamic_interval = self.compute_interval(velocity, neighbor_timestamps, current_time)
         
         time_since_last = current_time - self.last_dynamic_send_time
         
         if time_since_last >= self.next_dynamic_interval:
             self.last_dynamic_send_time = current_time
-            self.next_dynamic_interval = self.compute_interval(velocity, neighbors, current_time)
+            self.next_dynamic_interval = self.compute_interval(velocity, neighbor_timestamps, current_time)
             return True
         return False
 
     def compute_interval(
         self,
         velocity: Tuple[float, float],
-        neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]],
+        neighbor_timestamps: List[float],
         current_time: float,
     ) -> float:
         
         match self.scheduler_type:
             case "dynamic_acab":
-                n_neighbors = len(neighbors)
+                n_neighbors = len(neighbor_timestamps)
                 NEIGHBORS_THRESHOLD = 10
                 density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
 
                 CONTACT_THRESHOLD = 20.0
-                if neighbors:
-                    last_contact = max((ts for _, ts, _ in neighbors), default=current_time)
+                if neighbor_timestamps:
+                    last_contact = max(neighbor_timestamps, default=current_time)
                     delta = current_time - last_contact
                     contact_score = max(0.0, 1.0 - (delta / CONTACT_THRESHOLD))
                 else:
@@ -106,7 +106,7 @@ class BeaconScheduler:
                         w_mobility * (1.0 - mobility_score))
                 
             case "dynamic_adab":
-                n_neighbors = len(neighbors)
+                n_neighbors = len(neighbor_timestamps)
                 NEIGHBORS_THRESHOLD = 15
                 density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
                 combined = density_score

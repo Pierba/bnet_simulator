@@ -13,11 +13,10 @@ class Channel:
         cfg = ConfigHandler()
         
         # Channel parameters
-        self.active_transmissions: list[Tuple[Beacon, float, float, int, int]] = []
+        self.active_transmissions: list[Tuple[Beacon, float, float, int]] = []
         self.metrics: Metrics = metrics
         self.buoys: list = []
         self.schedule_callback: callable = None
-        self.seen_attempts = set()
         self.collision_beacons = set()
         
         # Setting up network parameters from configuration
@@ -62,23 +61,10 @@ class Channel:
         max_delay = self.comm_range_max / self.speed_of_light
         grace_period = max_delay + 1e-6
         
-        for i, (beacon, start, end, potential_count, processed_count) in enumerate(self.active_transmissions):
+        for i, (beacon, start, end, potential_count) in enumerate(self.active_transmissions):
             if end + grace_period > sim_time:
                 continue
             expired_indices.append(i)
-            
-            if not self.ideal_channel:
-                continue
-            beacon_key = (beacon.sender_id, beacon.timestamp)
-            
-            if beacon_key in self.collision_beacons:
-                continue
-
-            unprocessed = potential_count - processed_count
-            for _ in range(unprocessed):
-                if self.metrics:
-                    self.metrics.log_actually_received(beacon.sender_id)
-                    logging.log_info(f"Ideal channel: marking {unprocessed} unreached as received for {str(beacon.sender_id)[:6]}")
 
         for idx in sorted(expired_indices, reverse=True):
             self.active_transmissions.pop(idx)
@@ -109,7 +95,7 @@ class Channel:
         beacon_key = (beacon.sender_id, beacon.timestamp)
         receiver_ids = {r.id for r in receivers_in_range}
 
-        for existing, start, end, _, _ in self.active_transmissions:
+        for existing, start, end, _ in self.active_transmissions:
             if beacon.sender_id == existing.sender_id:
                 continue
             
@@ -156,7 +142,7 @@ class Channel:
         successful_receivers = n_receivers - len(receivers_with_collisions)
 
         # Log the calculated transmission informations
-        self.active_transmissions.append((beacon, new_start_time, new_end_time, n_receivers, successful_receivers))
+        self.active_transmissions.append((beacon, new_start_time, new_end_time, n_receivers))
         
         # Schedule the end of transmission event
         self.schedule_callback(
@@ -215,7 +201,7 @@ class Channel:
                 logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
-        for beacon, start, end, _, _ in self.active_transmissions:
+        for beacon, start, end, _ in self.active_transmissions:
             if start <= sim_time <= end:
                 sender_position = beacon.position
                 
