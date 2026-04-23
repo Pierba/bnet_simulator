@@ -163,11 +163,10 @@ class Simulator:
                 self.update_buoy_array(sim_time)
             case EventType.AVG_NEIGHBORS_CALCULATION:
                 self.calculate_and_record_avg_neighbors()
+                # Schedule next calculation only for AVG_NEIGHBORS events
+                self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
             case _:
                 logging.log_error(f"Simulator received unhandled event: {event.event_type}")
-            
-        # Schedule next calculation
-        self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def start(self):
         self.running = True

@@ -278,7 +278,7 @@ class Buoy:
                 sender_id=beacon.sender_id,
                 timestamp=beacon.timestamp,
                 receive_time=sim_time,
-                receiver_id=None
+                receiver_id=self.id
             )
             
             # Track for delivery ratio

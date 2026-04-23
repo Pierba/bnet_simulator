@@ -141,7 +141,7 @@ class Metrics:
             "Fixed Buoys": self.fixed_buoy_count or 0,
             "Simulation Duration": self.simulation_duration or sim_time,
             "Sent": self.beacons_sent,
-            "Received": self.beacons_received,
+            "Unique Beacons Received": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
@@ -153,7 +153,7 @@ class Metrics:
                 if self.reaction_latencies else 0
             ),
             "Throughput (beacons/sec)": (
-                self.beacons_received / sim_time
+                self.actually_received / sim_time
                 if sim_time > 0 else 0
             ),
             "Potentially Sent": self.potentially_sent,
