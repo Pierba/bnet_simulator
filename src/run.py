@@ -7,7 +7,7 @@ from multiprocessing import Pool
 from config.config_handler import ConfigHandler
 
 # Arrange buoys randomly within the world boundaries, ensuring they are not too close to the edges
-def arrange_buoys_randomly(n_buoys, world_width, world_height):
+def arrange_buoys_randomly(n_buoys, world_width, world_height) -> list[tuple[float, float]]:
     positions = []
     random.seed(time.time())
     for _ in range(n_buoys):
@@ -26,6 +26,7 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
         json.dump(positions, f)
     
     ramp = cfg.get('simulation', 'ramp_scenario')
+    result_file = None
     if ramp:
         result_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
     else:
@@ -142,8 +143,8 @@ def main():
                 run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
         else:
             # Density of buoys within the specified range and step size
-            tasks = []
             densities = list(range(min_buoys, max_buoys + 1, step_buoys))
+            tasks = []
             for density in densities:
                 positions = arrange_buoys_randomly(density, world_width, world_height)
                 for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols

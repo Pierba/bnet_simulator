@@ -57,17 +57,15 @@ class Channel:
             logging.log_info(f"Transmission completed at {sim_time} for beacon from {str(beacon.sender_id)[:6]}")
 
     def update(self, sim_time: float):
-        expired_indices = []
         max_delay = self.comm_range_max / self.speed_of_light
         grace_period = max_delay + 1e-6
         
-        for i, (beacon, start, end, potential_count) in enumerate(self.active_transmissions):
-            if end + grace_period > sim_time:
-                continue
-            expired_indices.append(i)
-
-        for idx in sorted(expired_indices, reverse=True):
-            self.active_transmissions.pop(idx)
+        # Keep only the transmissions that are still active
+        self.active_transmissions = [
+            (beacon, start, end, receivers) 
+            for (beacon, start, end, receivers) in self.active_transmissions
+            if end + grace_period > sim_time
+        ]
 
     def broadcast(self, beacon: Beacon, sim_time: float):
         logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
@@ -202,18 +200,25 @@ class Channel:
 
     def is_busy(self, position: Tuple[float, float], sim_time: float) -> bool:
         for beacon, start, end, _ in self.active_transmissions:
-            if start <= sim_time <= end:
-                sender_position = beacon.position
+            sender_position = beacon.position
+            dx = position[0] - sender_position[0]
+            dy = position[1] - sender_position[1]
+            distance_sq = (dx * dx) + (dy * dy)
+            
+            # Skip if outside of detection range
+            if distance_sq > self.comm_range_high_prob_sq:
+                continue
                 
-                dx = position[0] - sender_position[0]
-                dy = position[1] - sender_position[1]
-                distance_sq = (dx * dx) + (dy * dy)
-                
-                wavefront_radius = self.speed_of_light * (sim_time - start)
-                wavefront_radius_sq = wavefront_radius * wavefront_radius
-                
-                if distance_sq <= wavefront_radius_sq and distance_sq <= self.comm_range_high_prob_sq:
-                    return True
+            # Calculate when the signal starts and stops passing through this specific position
+            distance = math.sqrt(distance_sq)
+            propagation_delay = distance / self.speed_of_light
+            
+            arrival_time = start + propagation_delay
+            cleared_time = end + propagation_delay
+            
+            # The channel is busy if the wave is currently passing over this position
+            if arrival_time <= sim_time <= cleared_time:
+                return True
                 
         return False
 

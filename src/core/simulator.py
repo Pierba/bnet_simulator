@@ -25,9 +25,11 @@ class Simulator:
         self.next_buoy_change: float = 0
         self.duration: float = duration if duration is not None else cfg.get('simulation', 'duration')
         
+        # Neighbor settings
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
 
+        # Channel settings
         self.channel.set_buoys(self.buoys)
         self.channel.schedule_callback = self.schedule_event
         self.running: bool = False
@@ -42,12 +44,10 @@ class Simulator:
         self.event_queue: list = []
         self.event_counter: int = 0
 
-    # Adding event to event_queue with a small epsilon to ensure correct ordering of events scheduled at the same time
     def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
-        epsilon: float = self.event_counter * 1e-10
         self.event_counter += 1
-        heapq.heappush(self.event_queue, (event.time + epsilon, self.event_counter, event))
+        heapq.heappush(self.event_queue, (event.time, self.event_counter, event))
     
     def _get_next_event(self) -> Optional[Event]:
         if not self.event_queue:
@@ -59,8 +59,10 @@ class Simulator:
         # Schedule initial events for all buoys
         for buoy in self.buoys:
             initial_offset = random.uniform(0, 1.0)
+
+            # Scheduling first events that will trigger themself periodically along the simulation
             self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy)
-            self.schedule_event(self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+            self.schedule_event(initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
             
             if buoy.is_mobile:
                 self.schedule_event(0.1, EventType.BUOY_MOVEMENT, buoy)
@@ -69,8 +71,9 @@ class Simulator:
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
         self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
         
-        # Schedule periodic avg_neighbors calculation every 30 seconds
-        self.schedule_event(30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
+        # Schedule periodic avg_neighbors calculation every 30 seconds if metrics are enabled
+        if self.metrics:
+            self.schedule_event(30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def update_buoy_array(self, sim_time: float):
         if self.ramp:
@@ -81,6 +84,37 @@ class Simulator:
         # Recalculate avg_neighbors after buoy array changes
         self.calculate_and_record_avg_neighbors()
 
+    def handle_event(self, event: Event, sim_time: float):
+        match event.event_type:
+            case EventType.BUOY_ARRAY_UPDATE:
+                self.update_buoy_array(sim_time)
+            case EventType.AVG_NEIGHBORS_CALCULATION:
+                self.calculate_and_record_avg_neighbors()
+                # Schedule next calculation only for AVG_NEIGHBORS events
+                self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
+            case _:
+                logging.log_error(f"Simulator received unhandled event: {event.event_type}")
+    
+    def _update_buoy_array_ramp(self, sim_time: float):
+        active_buoys = self.buoys.copy()
+        active_set = set(active_buoys)
+        inactive_buoys = [b for b in self.all_buoys if b not in active_set]
+        current_count = len(active_buoys)
+        total_buoys = len(self.all_buoys)
+        buoys_to_add = total_buoys - 2
+        add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
+    
+        if current_count < total_buoys:
+            if inactive_buoys:
+                buoy = inactive_buoys[0]
+                self.buoys.append(buoy)
+                initial_offset = random.uniform(0, 1.0)
+                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+            self.channel.set_buoys(self.buoys)
+            self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+
+                
     # This method randomly adds or removes buoys from the active buoy array while ensuring that we don't go below a 
     # minimum number of buoys or above the total number of buoys
     # It also ensures that the first change is a significant removal
@@ -88,7 +122,8 @@ class Simulator:
         
         # Determine active and inactive buoys
         active_buoys = self.buoys.copy()
-        inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
+        active_set = set(active_buoys)
+        inactive_buoys = [b for b in self.all_buoys if b not in active_set]
         total_buoys = len(self.all_buoys)
 
         # Ensure we don't remove too many buoys and maintain a minimum number of active buoys
@@ -123,7 +158,7 @@ class Simulator:
                 self.buoys.append(buoy)
                 initial_offset = random.uniform(0, 1.0) 
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+                self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
                 if buoy.is_mobile:
                     self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
                 
@@ -140,34 +175,6 @@ class Simulator:
         next_change_time = sim_time + random.uniform(15, 20)
         self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
 
-    def _update_buoy_array_ramp(self, sim_time: float):
-        active_buoys = self.buoys.copy()
-        inactive_buoys = [b for b in self.all_buoys if b not in active_buoys]
-        current_count = len(active_buoys)
-        total_buoys = len(self.all_buoys)
-        buoys_to_add = total_buoys - 2
-        add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
-    
-        if current_count < total_buoys:
-            if inactive_buoys:
-                buoy = inactive_buoys[0]
-                self.buoys.append(buoy)
-                initial_offset = random.uniform(0, 1.0)
-                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-            self.channel.set_buoys(self.buoys)
-            self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-
-    def handle_event(self, event: Event, sim_time: float):
-        match event.event_type:
-            case EventType.BUOY_ARRAY_UPDATE:
-                self.update_buoy_array(sim_time)
-            case EventType.AVG_NEIGHBORS_CALCULATION:
-                self.calculate_and_record_avg_neighbors()
-                # Schedule next calculation only for AVG_NEIGHBORS events
-                self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
-            case _:
-                logging.log_error(f"Simulator received unhandled event: {event.event_type}")
 
     def start(self):
         self.running = True
@@ -239,7 +246,7 @@ class Simulator:
     def calculate_and_record_avg_neighbors(self) -> Optional[float]:
         if not self.metrics:
             return None
-        
+            
         avg_neighbors: float = self.calculate_avg_neighbors()
         self.metrics.record_avg_neighbors_sample(avg_neighbors)
-        return avg_neighbors 
+        return avg_neighbors

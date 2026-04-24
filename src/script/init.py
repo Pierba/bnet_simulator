@@ -110,12 +110,12 @@ def parse_args():
     return parser.parse_args()
 
 # Get random position within the world boundaries
-def random_position(world_width, world_height):
+def random_position(world_width, world_height) -> Tuple[float, float]:
     x = random.uniform(10, world_width - 10)
     y = random.uniform(10, world_height - 10)
     return (x, y)
 
-def random_velocity(default_velocity):
+def random_velocity(default_velocity) -> Tuple[float, float]:
     return (
         random.uniform(-1, 1) * default_velocity,
         random.uniform(-1, 1) * default_velocity
@@ -176,13 +176,14 @@ def main():
     # Settin up the communication channel for the simulation
     channel = Channel(metrics=metrics, ideal_channel=ideal)
 
+    # Initialization of buoys based on the parameters provided
     buoys = []
     default_battery = cfg.get('buoys', 'default_battery')
     default_velocity = cfg.get('buoys', 'default_velocity')
     for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
         mobile = i < mobile_buoy_count
-                
+                    
         # Buoy initialization
         buoy = Buoy(
             channel=channel,
