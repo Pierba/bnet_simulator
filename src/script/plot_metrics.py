@@ -4,6 +4,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 
+def resample_timeseries(df, time_col="time", num_points=200):
+    """Resample a time series DataFrame to a fixed number of evenly-spaced points.
+    
+    Deduplicates timestamps (keeping last value) and interpolates to create
+    uniform time sampling across all protocols.
+    """
+    # Drop duplicate timestamps, keeping the last value at each time
+    df = df.drop_duplicates(subset=[time_col], keep="last").sort_values(time_col).reset_index(drop=True)
+    
+    if len(df) <= num_points:
+        return df
+    
+    # Create evenly-spaced time points
+    t_min, t_max = df[time_col].min(), df[time_col].max()
+    new_times = np.linspace(t_min, t_max, num_points)
+    
+    # Interpolate each numeric column at the new time points
+    result = pd.DataFrame({time_col: new_times})
+    for col in df.columns:
+        if col == time_col:
+            continue
+        result[col] = np.interp(new_times, df[time_col].values, df[col].values)
+    
+    return result
+
 def plot_block_by_density(results_dir, plot_dir, interval=None):
     files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
     data = []
@@ -360,15 +385,16 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
                 print(f"Warning: No B-PDR or delivery_ratio column in {csv_file}")
                 continue
             label = mode_labels.get(mode, mode.capitalize())
-            plt.plot(df["time"], df[y_col], label=label, color=color)
+            df_resampled = resample_timeseries(df, time_col="time")
+            plt.plot(df_resampled["time"], df_resampled[y_col], label=label, color=color)
             found = True
             
-            if time_buoy is None and "n_buoys" in df.columns:
-                time_buoy = (df["time"], df["n_buoys"])
-                max_buoys = df["n_buoys"].max()
+            if time_buoy is None and "n_buoys" in df_resampled.columns:
+                time_buoy = (df_resampled["time"], df_resampled["n_buoys"])
+                max_buoys = df_resampled["n_buoys"].max()
             
-            if time_neighbors is None and "avg_neighbors" in df.columns:
-                time_neighbors = (df["time"], df["avg_neighbors"])
+            if time_neighbors is None and "avg_neighbors" in df_resampled.columns:
+                time_neighbors = (df_resampled["time"], df_resampled["avg_neighbors"])
             
             # Try to get multihop mode from main CSV
             main_csv = csv_file.replace("_timeseries.csv", ".csv")
@@ -577,12 +603,13 @@ def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None):
             df = pd.read_csv(csv_file)
             if "avg_unique_nodes" in df.columns:
                 label = mode_labels.get(mode, mode.capitalize())
-                plt.plot(df["time"], df["avg_unique_nodes"], label=label, color=color)
+                df_resampled = resample_timeseries(df, time_col="time")
+                plt.plot(df_resampled["time"], df_resampled["avg_unique_nodes"], label=label, color=color)
                 found = True
                 
-                if time_buoy is None and "n_buoys" in df.columns:
-                    time_buoy = (df["time"], df["n_buoys"])
-                    max_buoys = df["n_buoys"].max()
+                if time_buoy is None and "n_buoys" in df_resampled.columns:
+                    time_buoy = (df_resampled["time"], df_resampled["n_buoys"])
+                    max_buoys = df_resampled["n_buoys"].max()
 
             # Try to get multihop mode from main CSV
             main_csv = csv_file.replace("_timeseries.csv", ".csv")

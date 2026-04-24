@@ -189,7 +189,7 @@ def main():
             position=positions[i],
             is_mobile=mobile,
             battery=default_battery,
-            velocity=random_velocity(default_velocity) if mobile else default_velocity,
+            velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
             metrics=metrics
         )
 

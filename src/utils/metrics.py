@@ -64,18 +64,6 @@ class Metrics:
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
                 
-                # Track unique node discovery (direct sender)
-                if receiver_id not in self.unique_nodes_per_buoy:
-                    self.unique_nodes_per_buoy[receiver_id] = set()
-                self.unique_nodes_per_buoy[receiver_id].add(sender_id)
-    
-    def log_nodes_discovered_from_neighbors(self, receiver_id, neighbor_ids):
-        if receiver_id not in self.unique_nodes_per_buoy:
-            self.unique_nodes_per_buoy[receiver_id] = set()
-        
-        for node_id in neighbor_ids:
-            if node_id != receiver_id:  # Don't add self
-                self.unique_nodes_per_buoy[receiver_id].add(node_id)
 
     def log_lost(self, count: int = 1):
         self.beacons_lost += count

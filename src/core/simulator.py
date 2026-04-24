@@ -32,6 +32,7 @@ class Simulator:
         self.channel.schedule_callback = self.schedule_event
         self.running: bool = False
         self.simulated_time: float = 0.0
+        self.last_timepoint_log: int = -1  # Track last 5s interval logged to avoid duplicate timepoints
         
         # Making all buoys able to access the schedule_event method of the simulator for scheduling their own events
         for buoy in self.all_buoys:
@@ -200,9 +201,12 @@ class Simulator:
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                 
-                if self.ramp and self.simulated_time > 0 and int(self.simulated_time) % 5 == 0:
-                    avg_neighbors_sample = self.calculate_avg_neighbors()
-                    self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
+                if self.ramp and self.simulated_time > 0:
+                    current_interval = int(self.simulated_time) // 5
+                    if current_interval != self.last_timepoint_log:
+                        self.last_timepoint_log = current_interval
+                        avg_neighbors_sample = self.calculate_avg_neighbors()
+                        self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
