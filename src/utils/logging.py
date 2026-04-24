@@ -1,3 +1,4 @@
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -13,12 +14,16 @@ COLORS = {
     'RESET': '\033[0m',
 }
 
-# Default log file path, root of the project
-LOG_FILE = Path("simulator.log")
+# Default log file path
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+LOG_FILE = Path("logs/simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
-    if not ConfigHandler().get('simulation', 'enable_logging'):
+    # Errors and critical messages are always logged regardless of enable_logging setting
+    if level not in ["ERROR", "CRITICAL"] and not ConfigHandler().get('simulation', 'enable_logging'):
         return
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = COLORS.get(level, '')
     reset = COLORS['RESET']
@@ -31,12 +36,19 @@ def _log(level: str, message: str, to_console: bool = True, to_file: bool = Fals
         print(output, file=sys.stderr if level in ["ERROR", "CRITICAL"] else sys.stdout)
 
     # Optionally write to file
-    if to_file:
+    file_logging_enabled = ConfigHandler().get('simulation', 'enable_file_logging')
+    if file_logging_enabled and to_file:
         with LOG_FILE.open("a") as f:
             f.write(formatted + "\n")
 
-def log_info(msg: str, to_console: bool = True, to_file: bool = False): _log("INFO", msg, to_console, to_file)
-def log_debug(msg: str, to_console: bool = True, to_file: bool = False): _log("DEBUG", msg, to_console, to_file)
-def log_warning(msg: str, to_console: bool = True, to_file: bool = False): _log("WARNING", msg, to_console, to_file)
-def log_error(msg: str, to_console: bool = True, to_file: bool = False): _log("ERROR", msg, to_console, to_file)
-def log_critical(msg: str, to_console: bool = True, to_file: bool = False): _log("CRITICAL", msg, to_console, to_file)
+# Wrapper functions for different log levels
+def log_info(msg: str, to_console: bool = True, to_file: bool = True): _log("INFO", msg, to_console, to_file)
+def log_debug(msg: str, to_console: bool = True, to_file: bool = True): _log("DEBUG", msg, to_console, to_file)
+def log_warning(msg: str, to_console: bool = True, to_file: bool = True): _log("WARNING", msg, to_console, to_file)
+def log_error(msg: str, to_console: bool = True, to_file: bool = True): _log("ERROR", msg, to_console, to_file)
+def log_critical(msg: str, to_console: bool = True, to_file: bool = True): _log("CRITICAL", msg, to_console, to_file)
+
+# Clear the log file at the start of a new simulation run
+def reset():
+    if LOG_FILE.exists():
+        os.remove(LOG_FILE)

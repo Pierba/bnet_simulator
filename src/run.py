@@ -6,6 +6,7 @@ import random
 from multiprocessing import Pool
 from config.config_handler import ConfigHandler
 
+# Arrange buoys randomly within the world boundaries, ensuring they are not too close to the edges
 def arrange_buoys_randomly(n_buoys, world_width, world_height):
     positions = []
     random.seed(time.time())
@@ -15,9 +16,12 @@ def arrange_buoys_randomly(n_buoys, world_width, world_height):
         positions.append((x, y))
     return positions
 
+# Function to run a single simulation with given parameters
 def run_simulation(mode, interval, density, positions, results_dir, cfg):
     unique_id = f"{mode}_{density}_{int(time.time() * 1000) % 10000}"
-    positions_file = f"positions_{unique_id}.json"
+    positions_file = f"positions_{unique_id}.json"  # Name of simulation output file
+    
+    # Position written in json format
     with open(positions_file, "w") as f:
         json.dump(positions, f)
     
@@ -27,16 +31,14 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
     else:
         result_file = os.path.join(results_dir, f"{mode}_density{density}.csv")
     
-    mobile = cfg.get('buoys', 'mobile_percentage') > 0
-    if mobile:
-        total_buoys = len(positions)
-        mobile_percentage = cfg.get('buoys', 'mobile_percentage')
-        mobile_count = max(1, int(total_buoys * mobile_percentage))
-        fixed_count = total_buoys - mobile_count
-    else:
-        mobile_count = 0
-        fixed_count = len(positions)
-    
+    total_buoys = len(positions)
+    mobile_percentage = cfg.get('buoys', 'mobile_percentage')
+
+    # Calculate the number of mobile and fixed buoys based on the total and the mobile percentage
+    mobile_count = min(total_buoys, max(1, int(total_buoys * mobile_percentage))) if mobile_percentage > 0 else 0
+    fixed_count = total_buoys - mobile_count
+
+    # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters
     cmd = ["uv", "run", "src/script/init.py",
            "--mode", mode,
            "--seed", str(int(time.time())),
@@ -56,15 +58,20 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
         cmd.append("--ideal")
     
     print(f"Running {mode} simulation with interval={interval}s and {density} density")
-    subprocess.run(cmd)
+
+    # Run the simulation as a subprocess and wait for it to complete
+    subprocess.run(cmd) # -> script/init.py
     
+    # Clean up the positions file after the simulation is done
     if os.path.exists(positions_file):
         os.remove(positions_file)
 
+# Subpocesses worker function for parallel execution of simulations
 def simulation_worker(args):
     mode, interval, density, positions, results_dir, cfg = args
     run_simulation(mode, interval, density, positions, results_dir, cfg)
 
+# Dispatch simulations in parallel using multiprocessing Pool
 def run_simulations_parallel(tasks, num_processes):
     with Pool(processes=num_processes) as pool:
         pool.map(simulation_worker, tasks)
@@ -76,38 +83,54 @@ def plot_results(results_dir, plots_dir, interval):
                 "--interval", str(interval)]
     subprocess.run(plot_cmd)
 
+# Naming system for results and plots directories based on the interval value.
+def get_interval_str(interval: float) -> str:
+    interval_str = None
+    if interval < 1:
+        interval_str = str(int(interval * 100))
+        if interval * 100 % 10 == 0: # 0.5
+            interval_str = str(int(interval * 10))
+        else: # 0.25
+            interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
+    else:
+        interval_str = str(int(interval))
+    return interval_str
+
 def main():
     cfg = ConfigHandler()
     
-    schedulers = cfg.get('simulation', 'schedulers')
-    min_buoys = cfg.get('simulation', 'min_buoys')
-    max_buoys = cfg.get('simulation', 'max_buoys')
-    step_buoys = cfg.get('simulation', 'step_buoys')
-    intervals = cfg.get('simulation', 'intervals')
-    num_processes = cfg.get('simulation', 'num_processes')
-    ideal = cfg.get('simulation', 'ideal_channel')
-    ramp = cfg.get('simulation', 'ramp_scenario')
-    world_width = cfg.get('world', 'width')
-    world_height = cfg.get('world', 'height')
+    # Extracting configuration parameters
+
+    #======================
+    # PROTOCOLS 
+    #======================
+    schedulers = cfg.get('simulation', 'schedulers')    # List of protocols to simulate
+
+    #======================
+    # BUOYS DISTRIBUTION 
+    #======================
+    min_buoys = cfg.get('simulation', 'min_buoys')      # Minimum number of buoys to simulate
+    max_buoys = cfg.get('simulation', 'max_buoys')      # Maximum number of buoys to simulate
+    step_buoys = cfg.get('simulation', 'step_buoys')    # Step size for buoy density
     
-    densities = list(range(min_buoys, max_buoys + 1, step_buoys))
+    #=======================
+    # SIMULATION PARAMETERS
+    #=======================
+    intervals: list[float] = cfg.get('simulation', 'intervals')     # List of beacon intervals to simulate
+    num_processes: int = cfg.get('simulation', 'num_processes')     # Number of parallel processes to use for parallel simulations
+    ideal: bool = cfg.get('simulation', 'ideal_channel')            # Whether to simulate with an ideal channel (no collisions)
+    ramp: bool = cfg.get('simulation', 'ramp_scenario')             # Whether to run the ramp scenario (increasing density over time)
+    world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
+    world_height: float = cfg.get('world', 'height')                # Height of the simulation world
     
-    for interval in intervals:
-        if interval < 1:
-            interval_str = str(int(interval * 100))
-            if interval * 100 % 10 == 0:
-                interval_str = str(int(interval * 10))
-            else:
-                interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
-        else:
-            interval_str = str(int(interval))
-            
+    
+    for interval in intervals: # [1.0, 0.5, 0.25]
+        interval_str = get_interval_str(interval)
         ideal_suffix = "_ideal" if ideal else ""
         ramp_suffix = "_ramp" if ramp else ""
         
         results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
         plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-        
         os.makedirs(results_dir, exist_ok=True)
         os.makedirs(plots_dir, exist_ok=True)
         
@@ -115,13 +138,16 @@ def main():
         
         if ramp:
             positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
-            for mode in schedulers:
+            for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
                 run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
         else:
+            # Density of buoys within the specified range and step size
             tasks = []
+            densities = list(range(min_buoys, max_buoys + 1, step_buoys))
             for density in densities:
                 positions = arrange_buoys_randomly(density, world_width, world_height)
-                for mode in schedulers:
+                for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols
+                    # Each task is a tuple of arguments for the simulation_worker function
                     tasks.append((mode, interval, density, positions, results_dir, cfg))
             
             print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")

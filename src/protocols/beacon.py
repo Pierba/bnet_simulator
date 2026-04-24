@@ -3,6 +3,7 @@ from typing import Tuple, List, Optional
 import uuid
 
 @dataclass
+# Represents a beacon message sent by a buoy in the network
 class Beacon:
     sender_id: uuid.UUID # 16 bytes
     mobile: bool # 1 byte

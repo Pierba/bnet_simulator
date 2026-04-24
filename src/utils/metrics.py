@@ -2,39 +2,41 @@ import os
 import csv
 from utils import logging
 
+# Class to track and summarize metrics for the BNet simulation
 class Metrics:
     def __init__(self, density=None):
-        self.beacons_sent = 0
-        self.beacons_received = 0
-        self.beacons_lost = 0
-        self.beacons_collided = 0
-        self.total_latency = 0.0
-        self.discovery_times = {}
-        self.reaction_latencies = []
-        self.delivered_beacons = set()
-        self.scheduler_latencies = []
-        self.potentially_sent = 0
-        self.actually_received = 0
-        self.potentially_sent_per_sender = {}
-        self.actually_received_per_sender = {}
-        self.avg_neighbors = 0
-        self.density = density
-        self.time_series = []
+        self.beacons_sent: int = 0
+        self.beacons_received: int = 0
+        self.beacons_lost: int = 0
+        self.beacons_collided: int = 0
+        self.total_latency: float = 0.0
+        self.discovery_times: dict = {}
+        self.reaction_latencies: list[float] = []
+        self.delivered_beacons: set = set()
+        self.scheduler_latencies: list[float] = []
+        self.potentially_sent: int = 0
+        self.actually_received: int = 0
+        self.potentially_sent_per_sender: dict = {}
+        self.actually_received_per_sender: dict = {}
+        self.avg_neighbors: float = 0.0
+        self.density: float = density
+        self.time_series: list = []
         
-        self.scheduler_type = None
-        self.world_width = None
-        self.world_height = None
-        self.mobile_buoy_count = None
-        self.fixed_buoy_count = None
-        self.simulation_duration = None
-        self.multihop_mode = None
+        self.scheduler_type: str = None
+        self.world_width: float = None
+        self.world_height: float = None
+        self.mobile_buoy_count: int = None
+        self.fixed_buoy_count: int = None
+        self.simulation_duration: float = None
+        self.multihop_mode: str = None
         
         # Track unique nodes discovered per buoy
-        self.unique_nodes_per_buoy = {}  # {buoy_id: set(node_ids)}
+        self.unique_nodes_per_buoy: dict = {}  # {buoy_id: set(node_ids)}
         
         # Track avg_neighbors samples over time
-        self.avg_neighbors_samples = []
+        self.avg_neighbors_samples: list[float] = []
 
+    # Method to set simulation info for context in metrics
     def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration, multihop_mode=None):
         self.scheduler_type = scheduler_type
         self.world_width = world_width
@@ -62,24 +64,12 @@ class Metrics:
                     self.reaction_latencies.append(latency)
                     self.discovery_times[receiver_id][sender_id] = receive_time
                 
-                # Track unique node discovery (direct sender)
-                if receiver_id not in self.unique_nodes_per_buoy:
-                    self.unique_nodes_per_buoy[receiver_id] = set()
-                self.unique_nodes_per_buoy[receiver_id].add(sender_id)
-    
-    def log_nodes_discovered_from_neighbors(self, receiver_id, neighbor_ids):
-        if receiver_id not in self.unique_nodes_per_buoy:
-            self.unique_nodes_per_buoy[receiver_id] = set()
-        
-        for node_id in neighbor_ids:
-            if node_id != receiver_id:  # Don't add self
-                self.unique_nodes_per_buoy[receiver_id].add(node_id)
 
-    def log_lost(self, count=1):
+    def log_lost(self, count: int = 1):
         self.beacons_lost += count
 
-    def log_collision(self):
-        self.beacons_collided += 1
+    def log_collision(self, count: int = 1):
+        self.beacons_collided += count
 
     def record_scheduler_latency(self, latency: float):
         self.scheduler_latencies.append(latency)
@@ -139,7 +129,7 @@ class Metrics:
             "Fixed Buoys": self.fixed_buoy_count or 0,
             "Simulation Duration": self.simulation_duration or sim_time,
             "Sent": self.beacons_sent,
-            "Received": self.beacons_received,
+            "Unique Beacons Received": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
             "Avg Latency": avg_latency,
@@ -151,7 +141,7 @@ class Metrics:
                 if self.reaction_latencies else 0
             ),
             "Throughput (beacons/sec)": (
-                self.beacons_received / sim_time
+                self.actually_received / sim_time
                 if sim_time > 0 else 0
             ),
             "Potentially Sent": self.potentially_sent,
