@@ -1,7 +1,15 @@
 import os
+import sys
+
+# Suppress traceback on KeyboardInterrupt during imports or anywhere else
+def sigint_handler(exctype, value, traceback):
+    if issubclass(exctype, KeyboardInterrupt):
+        sys.exit(0)
+    sys.__excepthook__(exctype, value, traceback)
+sys.excepthook = sigint_handler
+
 from typing import List, Tuple
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-
 from core.simulator import Simulator
 from core.channel import Channel
 from buoys.buoy import Buoy

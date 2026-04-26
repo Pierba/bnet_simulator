@@ -110,6 +110,7 @@ class Buoy:
                 sim_time, EventType.CHANNEL_SENSE, self
             )
         
+        # Schedule the next scheduler check
         next_check_interval = self.scheduler.get_next_check_interval()
         self.schedule_callback(
             sim_time + next_check_interval, EventType.SCHEDULER_CHECK, self
@@ -117,11 +118,12 @@ class Buoy:
 
     # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
     def _handle_channel_sense(self, event: Event, sim_time: float):
-        # Check if this is a forwarding request — queue it for CSMA processing
+        # Check if this is a forwarding request and in case it is queue it 
         forward_beacon = event.data.get("forward_beacon")
         if forward_beacon:
             self.pending_forward_beacon = forward_beacon
     
+        # If it is ready to send or there is a forwarded beacon to send start the CSMA processs
         if self.want_to_send or self.pending_forward_beacon:
             if self.channel.is_busy(self.position, sim_time):
                 # Channel is busy => wait one slot and check again
@@ -176,11 +178,10 @@ class Buoy:
             self.schedule_callback(
                 sim_time + self.slot_time, EventType.CHANNEL_SENSE, self
             )
-        else:    
-            # When channel is idle one slot of backoff gets decremented
-            self.backoff_remaining -= self.slot_time
-        
-        
+            return
+
+        # When channel is idle one slot of backoff gets decremented
+        self.backoff_remaining -= self.slot_time
         if self.backoff_remaining <= 0:
             # If Backoff time completed successfully then transmit
             self.schedule_callback(

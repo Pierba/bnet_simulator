@@ -104,17 +104,18 @@ class Simulator:
         buoys_to_add = total_buoys - 2
         add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
     
-        if current_count < total_buoys:
-            if inactive_buoys:
-                buoy = inactive_buoys[0]
-                self.buoys.append(buoy)
-                initial_offset = random.uniform(0, 1.0)
-                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-            self.channel.set_buoys(self.buoys)
-            self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
-
-                
+        if current_count >= total_buoys:
+            return
+        
+        buoy = inactive_buoys[0]
+        self.buoys.append(buoy)
+        self.channel.set_buoys(self.buoys)
+        
+        initial_offset = random.uniform(0, 1.0)
+        self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+        self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+        self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+   
     # This method randomly adds or removes buoys from the active buoy array while ensuring that we don't go below a 
     # minimum number of buoys or above the total number of buoys
     # It also ensures that the first change is a significant removal
@@ -127,9 +128,8 @@ class Simulator:
         total_buoys = len(self.all_buoys)
 
         # Ensure we don't remove too many buoys and maintain a minimum number of active buoys
-        if self.first_change or (random.random() >= 0.5 and len(active_buoys) > max(3, int(total_buoys * 0.2))):
-            min_buoys = max(3, int(total_buoys * 0.2))
-
+        min_buoys = max(3, int(total_buoys * 0.2))
+        if self.first_change or (random.random() >= 0.5 and len(active_buoys) > min_buoys):
             if len(active_buoys) > min_buoys:
                 remove_percentage = 0.5 if self.first_change else 0.4
                 max_to_remove = min(len(active_buoys) - min_buoys, 
@@ -174,7 +174,6 @@ class Simulator:
 
         next_change_time = sim_time + random.uniform(15, 20)
         self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
-
 
     def start(self):
         self.running = True
