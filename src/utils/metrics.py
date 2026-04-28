@@ -4,7 +4,17 @@ from utils import logging
 
 # Class to track and summarize metrics for the BNet simulation
 class Metrics:
-    def __init__(self, density=None):
+    def __init__(
+        self,
+        density=None,
+        scheduler_type=None,
+        world_width=None,
+        world_height=None,
+        mobile_count=None,
+        fixed_count=None,
+        duration=None,
+        multihop_mode=None,
+    ):
         self.beacons_sent: int = 0
         self.beacons_received: int = 0
         self.beacons_lost: int = 0
@@ -22,13 +32,13 @@ class Metrics:
         self.density: float = density
         self.time_series: list = []
         
-        self.scheduler_type: str = None
-        self.world_width: float = None
-        self.world_height: float = None
-        self.mobile_buoy_count: int = None
-        self.fixed_buoy_count: int = None
-        self.simulation_duration: float = None
-        self.multihop_mode: str = None
+        self.scheduler_type: str = scheduler_type
+        self.world_width: float = world_width
+        self.world_height: float = world_height
+        self.mobile_buoy_count: int = mobile_count
+        self.fixed_buoy_count: int = fixed_count
+        self.simulation_duration: float = duration
+        self.multihop_mode: str = multihop_mode
         
         # Track unique nodes discovered per buoy
         self.unique_nodes_per_buoy: dict = {}  # {buoy_id: set(node_ids)}
@@ -36,33 +46,25 @@ class Metrics:
         # Track avg_neighbors samples over time
         self.avg_neighbors_samples: list[float] = []
 
-    # Method to set simulation info for context in metrics
-    def set_simulation_info(self, scheduler_type, world_width, world_height, mobile_count, fixed_count, duration, multihop_mode=None):
-        self.scheduler_type = scheduler_type
-        self.world_width = world_width
-        self.world_height = world_height
-        self.mobile_buoy_count = mobile_count
-        self.fixed_buoy_count = fixed_count
-        self.simulation_duration = duration
-        self.multihop_mode = multihop_mode
-
     def log_sent(self):
         self.beacons_sent += 1
 
     def log_received(self, sender_id, timestamp, receive_time, receiver_id=None):
         key = (sender_id, timestamp)
-        if key not in self.delivered_beacons:
-            self.beacons_received += 1
-            self.delivered_beacons.add(key)
-            self.total_latency += receive_time - timestamp
+        if key in self.delivered_beacons:
+            return
+        
+        self.beacons_received += 1
+        self.delivered_beacons.add(key)
+        self.total_latency += receive_time - timestamp
 
-            if receiver_id is not None:
-                if receiver_id not in self.discovery_times:
-                    self.discovery_times[receiver_id] = {}
-                if sender_id not in self.discovery_times[receiver_id]:
-                    latency = receive_time - timestamp
-                    self.reaction_latencies.append(latency)
-                    self.discovery_times[receiver_id][sender_id] = receive_time
+        if receiver_id is not None:
+            if receiver_id not in self.discovery_times:
+                self.discovery_times[receiver_id] = {}
+            if sender_id not in self.discovery_times[receiver_id]:
+                latency = receive_time - timestamp
+                self.reaction_latencies.append(latency)
+                self.discovery_times[receiver_id][sender_id] = receive_time
                 
 
     def log_lost(self, count: int = 1):

@@ -168,17 +168,16 @@ def main():
     # This object will track various performance metrics throughout the simulation
     metrics = None
     if cfg.get('simulation', 'enable_metrics'):
-        metrics = Metrics(density=density)
         multihop_mode = cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
-        
-        metrics.set_simulation_info(
+        metrics = Metrics(
+            density=density,
             scheduler_type=mode,
             world_width=world_width,
             world_height=world_height,
             mobile_count=mobile_buoy_count,
             fixed_count=fixed_buoy_count,
             duration=duration,
-            multihop_mode=multihop_mode
+            multihop_mode=multihop_mode,
         )
 
     # Settin up the communication channel for the simulation
@@ -216,11 +215,11 @@ def main():
     simulator.start()
 
     if metrics:
-        if not ramp:
+        if ramp:
+            metrics.export_time_series(result_file)
+        else:
             summary = metrics.summary(simulator.simulated_time)
             metrics.export_metrics_to_csv(summary, filename=result_file)
-        else:
-            metrics.export_time_series(result_file)
 
 if __name__ == "__main__":
     main()

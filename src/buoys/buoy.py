@@ -228,33 +228,36 @@ class Buoy:
         # Update direct neighbors of this buoy with the sender of the beacon (1-hop neighbor)
         self.neighbors[beacon.sender_id] = (beacon.sender_id, sim_time, beacon.position)
         
-        # Multihop append mode: collect discovered nodes from beacon's neighbor list
-        # These are NOT direct neighbors, but nodes we learned about indirectly
-        if self.multihop_mode == 'append':
-            for neighbor_id, neighbor_ts, neighbor_pos in beacon.neighbors:
-                if neighbor_id == self.id or neighbor_id == beacon.sender_id:
-                    continue
+        match self.multihop_mode:
+            case 'append':
+                # Multihop append mode: collect discovered nodes from beacon's neighbor list
+                # These are NOT direct neighbors, but nodes we learned about indirectly
+                for neighbor_id, neighbor_ts, neighbor_pos in beacon.neighbors:
+                    if neighbor_id == self.id or neighbor_id == beacon.sender_id:
+                        continue
                 
-                # Update or add to discovered_nodes list with metadata
-                # We always take the newest information (assuming neighbor_ts is useful or simply latest received)
-                # However, we should only overwrite if the new timestamp is newer or we don't have it.
-                if neighbor_id not in self.neighbors:
-                    if neighbor_id not in self.discovered_nodes or neighbor_ts > self.discovered_nodes[neighbor_id][1]:
-                        self.discovered_nodes[neighbor_id] = (neighbor_id, neighbor_ts, neighbor_pos)
-        
-        # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
-        if self.multihop_mode == 'forwarded' and beacon.hop_limit > 0:
-            beacon_key = (beacon.origin_id, beacon.timestamp)
-            if beacon_key not in self.forwarded_beacons:
-                self.forwarded_beacons[beacon_key] = sim_time
-                # Schedule forwarding immediately
-                self.schedule_callback(
-                    sim_time + 0.001,
-                    EventType.CHANNEL_SENSE,
-                    self,
-                    {"forward_beacon": beacon}
-                )
-        
+                    # Update or add to discovered_nodes list with metadata
+                    # We always take the newest information (assuming neighbor_ts is useful or simply latest received)
+                    # However, we should only overwrite if the new timestamp is newer or we don't have it.
+                    if neighbor_id not in self.neighbors:
+                        if neighbor_id not in self.discovered_nodes or neighbor_ts > self.discovered_nodes[neighbor_id][1]:
+                            self.discovered_nodes[neighbor_id] = (neighbor_id, neighbor_ts, neighbor_pos)
+
+            case 'forwarded' if beacon.hop_limit > 0:
+                # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
+                beacon_key = (beacon.origin_id, beacon.timestamp)
+                if beacon_key not in self.forwarded_beacons:
+                    self.forwarded_beacons[beacon_key] = sim_time
+                    # Schedule forwarding immediately
+                    self.schedule_callback(
+                        sim_time + 0.001,
+                        EventType.CHANNEL_SENSE,
+                        self,
+                        {"forward_beacon": beacon}
+                    )         
+            case _:
+                pass
+
         if self.metrics:
             # Track all unique nodes discovered from this beacon starting with the sender
             discovered_nodes = {beacon.sender_id}
@@ -347,21 +350,23 @@ class Buoy:
     
     def create_beacon(self, sim_time: float) -> Beacon:
         all_neighbors = list(self.neighbors.values())
-        
-        # In append mode, add discovered nodes to the neighbor list
-        # These are nodes learned from other beacons (not direct 1-hop neighbors)
-        if self.multihop_mode == 'append':
-            for node_id, data in self.discovered_nodes.items():
-                if node_id not in self.neighbors:
-                    all_neighbors.append(data)
-        
-        # Set origin and hop_limit for forwarded mode
         origin_id = None
         hop_limit = 0
         
-        if self.multihop_mode == 'forwarded':
-            origin_id = self.id
-            hop_limit = self.multihop_limit
+        match self.multihop_mode:
+            case 'append':
+                # In append mode, add discovered nodes to the neighbor list
+                # These are nodes learned from other beacons (not direct 1-hop neighbors)
+                if self.multihop_mode == 'append':
+                    for node_id, data in self.discovered_nodes.items():
+                        if node_id not in self.neighbors: 
+                            all_neighbors.append(data)
+            case 'forwarded':
+                # Set origin and hop_limit for forwarded mode
+                origin_id = self.id
+                hop_limit = self.multihop_limit
+            case _:
+                pass
         
         return Beacon(
             sender_id=self.id,
