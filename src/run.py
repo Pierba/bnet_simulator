@@ -129,9 +129,11 @@ def main():
             interval_str = get_interval_str(interval)
             ideal_suffix = "_ideal" if ideal else ""
             ramp_suffix = "_ramp" if ramp else ""
-            
-            results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-            plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
+            multihop_mode = cfg.get('simulation', 'multihop_mode')
+            multihop_suffix = f"_{multihop_mode}" if multihop_mode else ""
+
+            results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}{multihop_suffix}")
+            plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}{multihop_suffix}")
             os.makedirs(results_dir, exist_ok=True)
             os.makedirs(plots_dir, exist_ok=True)
             

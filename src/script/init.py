@@ -218,7 +218,7 @@ def main():
         if ramp:
             metrics.export_time_series(result_file)
         else:
-            summary = metrics.summary(simulator.simulated_time)
+            summary = metrics.summary(sim_time=simulator.simulated_time)
             metrics.export_metrics_to_csv(summary, filename=result_file)
 
 if __name__ == "__main__":

@@ -277,16 +277,14 @@ class Buoy:
                 self.metrics.unique_nodes_per_buoy[self.id] = set()
             self.metrics.unique_nodes_per_buoy[self.id].update(discovered_nodes)
             
-            # Log reception for latency tracking
+            # Log reception for latency tracking (include hop count for multihop analysis)
             self.metrics.log_received(
                 sender_id=beacon.sender_id,
                 timestamp=beacon.timestamp,
                 receive_time=sim_time,
-                receiver_id=self.id
+                receiver_id=self.id,
+                hop_count=beacon.current_hop
             )
-            
-            # Track for delivery ratio
-            self.metrics.log_actually_received(beacon.sender_id)
 
     def _handle_neighbor_cleanup(self, event, sim_time: float):
         # Cleanup direct neighbors
@@ -357,10 +355,9 @@ class Buoy:
             case 'append':
                 # In append mode, add discovered nodes to the neighbor list
                 # These are nodes learned from other beacons (not direct 1-hop neighbors)
-                if self.multihop_mode == 'append':
-                    for node_id, data in self.discovered_nodes.items():
-                        if node_id not in self.neighbors: 
-                            all_neighbors.append(data)
+                for node_id, data in self.discovered_nodes.items():
+                    if node_id not in self.neighbors: 
+                        all_neighbors.append(data)
             case 'forwarded':
                 # Set origin and hop_limit for forwarded mode
                 origin_id = self.id
@@ -376,7 +373,8 @@ class Buoy:
             neighbors=all_neighbors,
             timestamp=sim_time,
             origin_id=origin_id,
-            hop_limit=hop_limit
+            hop_limit=hop_limit,
+            current_hop=0  # Direct message from originator
         )
     
     def forward_beacon(self, original_beacon: Beacon, sim_time: float) -> Beacon:
@@ -390,5 +388,6 @@ class Buoy:
             neighbors=original_beacon.neighbors,    # KEEP ORIGINAL NEIGHBORS - NO MODIFICATION
             timestamp=original_beacon.timestamp,    # Keep original timestamp
             origin_id=original_beacon.origin_id,    # Keep origin ID
-            hop_limit=original_beacon.hop_limit - 1 # Only decrement hop limit
+            hop_limit=original_beacon.hop_limit - 1, # Only decrement hop limit
+            current_hop=original_beacon.current_hop + 1  # Increment hop count
         )

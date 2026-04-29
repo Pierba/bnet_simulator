@@ -86,7 +86,7 @@ class Channel:
         n_receivers = len(receivers_in_range)
         
         if self.metrics:
-            self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
+            self.metrics.log_potentially_sent(beacon.sender_id, n_receivers, hop_count=beacon.current_hop)
 
         # Check for collisions with active transmissions
         receivers_with_collisions = set()
