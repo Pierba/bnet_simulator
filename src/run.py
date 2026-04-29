@@ -7,7 +7,7 @@ from multiprocessing import Pool
 from config.config_handler import ConfigHandler
 
 # Arrange buoys randomly within the world boundaries, ensuring they are not too close to the edges
-def arrange_buoys_randomly(n_buoys, world_width, world_height):
+def arrange_buoys_randomly(n_buoys, world_width, world_height) -> list[tuple[float, float]]:
     positions = []
     random.seed(time.time())
     for _ in range(n_buoys):
@@ -20,12 +20,13 @@ def arrange_buoys_randomly(n_buoys, world_width, world_height):
 def run_simulation(mode, interval, density, positions, results_dir, cfg):
     unique_id = f"{mode}_{density}_{int(time.time() * 1000) % 10000}"
     positions_file = f"positions_{unique_id}.json"  # Name of simulation output file
-    
+
     # Position written in json format
     with open(positions_file, "w") as f:
         json.dump(positions, f)
     
     ramp = cfg.get('simulation', 'ramp_scenario')
+    result_file = None
     if ramp:
         result_file = os.path.join(results_dir, f"{mode}_ramp_timeseries.csv")
     else:
@@ -123,43 +124,56 @@ def main():
     world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
     world_height: float = cfg.get('world', 'height')                # Height of the simulation world
     
-    
-    for interval in intervals: # [1.0, 0.5, 0.25]
-        interval_str = get_interval_str(interval)
-        ideal_suffix = "_ideal" if ideal else ""
-        ramp_suffix = "_ramp" if ramp else ""
-        
-        results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-        plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}")
-        os.makedirs(results_dir, exist_ok=True)
-        os.makedirs(plots_dir, exist_ok=True)
-        
-        print(f"Running simulations with interval = {interval}s")
-        
-        if ramp:
-            positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
-            for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
-                run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
-        else:
-            # Density of buoys within the specified range and step size
-            tasks = []
-            densities = list(range(min_buoys, max_buoys + 1, step_buoys))
-            for density in densities:
-                positions = arrange_buoys_randomly(density, world_width, world_height)
-                for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols
-                    # Each task is a tuple of arguments for the simulation_worker function
-                    tasks.append((mode, interval, density, positions, results_dir, cfg))
-            
-            print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
-            run_simulations_parallel(tasks, num_processes)
-        
-        print(f"Plotting results for interval = {interval}s")
-        plot_results(results_dir, plots_dir, interval)
-        
-    print("\nAll simulations complete!")
-    print("Check the metrics directory for results and plots.")
+    try:
+        for interval in intervals: # [1.0, 0.5, 0.25]
+            interval_str = get_interval_str(interval)
+            ideal_suffix = "_ideal" if ideal else ""
+            ramp_suffix = "_ramp" if ramp else ""
+            multihop_mode = cfg.get('simulation', 'multihop_mode')
+            multihop_suffix = f"_{multihop_mode}" if multihop_mode else ""
 
-    subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
+            results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{ramp_suffix}{multihop_suffix}")
+            plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{ramp_suffix}{multihop_suffix}")
+            os.makedirs(results_dir, exist_ok=True)
+            os.makedirs(plots_dir, exist_ok=True)
+            
+            print(f"Running simulations with interval = {interval}s")
+            
+            if ramp:
+                positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
+                for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
+                    run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
+            else:
+                # Density of buoys within the specified range and step size
+                densities = list(range(min_buoys, max_buoys + 1, step_buoys))
+                tasks = []
+                for density in densities:
+                    positions = arrange_buoys_randomly(density, world_width, world_height)
+                    for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols
+                        # Each task is a tuple of arguments for the simulation_worker function
+                        tasks.append((mode, interval, density, positions, results_dir, cfg))
+                
+                print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
+                run_simulations_parallel(tasks, num_processes)
+            
+            print(f"Plotting results for interval = {interval}s")
+            plot_results(results_dir, plots_dir, interval)
+            
+        print("\nAll simulations complete!")
+        print("Check the metrics directory for results and plots.")
+
+        subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
+
+    except KeyboardInterrupt:
+        print("\n\n[!] Simulation batch interrupted by user. Exiting cleanly...")
+        
+        # Clean up any leftover position files in the current directory
+        for f in os.listdir('.'):
+            if f.endswith('.json'):
+                try:
+                    os.remove(f)
+                except OSError as e:
+                    print(f"Error removing file {f}: {e}")
 
 if __name__ == "__main__":
     main()

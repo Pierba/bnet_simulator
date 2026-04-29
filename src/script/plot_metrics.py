@@ -274,31 +274,79 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
     
     group_edges = np.linspace(min_buoys, max_buoys + 1, num_groups + 1).astype(int)
     group_edges[0] = int(min_buoys)
-    group_labels = [f"{group_edges[i]}-{group_edges[i+1]-1}" for i in range(len(group_edges)-1)]
+    # If bin edges are not unique (e.g., min==max), create a single group covering the whole range
+    unique_edges = np.unique(group_edges)
+    if len(unique_edges) <= 2:
+        group_labels = [f"{int(min_buoys)}-{int(max_buoys)}"]
+        single_group = True
+    else:
+        group_labels = [f"{group_edges[i]}-{group_edges[i+1]-1}" for i in range(len(group_edges)-1)]
+        single_group = False
     
-    grouped_data = {}
+    # Build a mapping mode -> {label: value} and collect all labels across modes
+    grouped_map = {}
+    all_labels = set()
     valid_modes = []
-    
+
     for mode, color in modes:
-        if mode in all_data:
-            df = all_data[mode]
-            
-            if "B-PDR" in df.columns:
-                y_col = "B-PDR"
-            elif "delivery_ratio" in df.columns:
-                y_col = "delivery_ratio"
-            else:
-                print(f"Warning: No B-PDR or delivery_ratio column in data for {mode}")
-                continue
-            
-            df["group"] = pd.cut(df["n_buoys"], bins=group_edges, labels=group_labels, right=False)
-            grouped = df.groupby("group", observed=False)[y_col].mean().reindex(group_labels)
-            
-            if not grouped.empty and len(grouped.values) > 0:
-                grouped_data[mode] = grouped.values
-                valid_modes.append((mode, color))
-            else:
-                print(f"Warning: No valid grouped data for {mode}")
+        if mode not in all_data:
+            continue
+        df = all_data[mode]
+
+        if "B-PDR" in df.columns:
+            y_col = "B-PDR"
+        elif "delivery_ratio" in df.columns:
+            y_col = "delivery_ratio"
+        else:
+            print(f"Warning: No B-PDR or delivery_ratio column in data for {mode}")
+            continue
+
+        label_values = {}
+        if single_group:
+            label = group_labels[0]
+            label_values[label] = df[y_col].mean()
+            all_labels.add(label)
+        else:
+            # Bin without providing labels; derive labels from intervals present
+            binned = pd.cut(df["n_buoys"], bins=group_edges, right=False, duplicates='drop')
+            df2 = df.copy()
+            df2["group"] = binned
+            grp = df2.groupby("group")[y_col].mean()
+            for interval, val in grp.items():
+                if pd.isna(interval):
+                    continue
+                left = int(interval.left)
+                right = int(interval.right) - 1
+                label = f"{left}-{right}"
+                label_values[label] = val
+                all_labels.add(label)
+
+        if label_values:
+            grouped_map[mode] = label_values
+            valid_modes.append((mode, color))
+        else:
+            print(f"Warning: No valid grouped data for {mode}")
+
+    if not valid_modes:
+        print("No valid data to plot for any mode")
+        return
+
+    # Create a sorted list of all labels by numeric lower bound
+    def label_key(lbl):
+        parts = lbl.split('-')
+        try:
+            return int(parts[0])
+        except Exception:
+            return 0
+
+    group_labels = sorted(list(all_labels), key=label_key)
+    x = np.arange(len(group_labels))
+    bar_width = 0.25
+    fig, ax = plt.subplots(figsize=(10, 6))
+    grouped_data = {}
+    for mode, color in valid_modes:
+        values = [grouped_map.get(mode, {}).get(lbl, 0) for lbl in group_labels]
+        grouped_data[mode] = values
     
     if not valid_modes:
         print("No valid data to plot for any mode")

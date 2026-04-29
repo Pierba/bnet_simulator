@@ -1,7 +1,15 @@
 import os
+import sys
+
+# Suppress traceback on KeyboardInterrupt during imports or anywhere else
+def sigint_handler(exctype, value, traceback):
+    if issubclass(exctype, KeyboardInterrupt):
+        sys.exit(0)
+    sys.__excepthook__(exctype, value, traceback)
+sys.excepthook = sigint_handler
+
 from typing import List, Tuple
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-
 from core.simulator import Simulator
 from core.channel import Channel
 from buoys.buoy import Buoy
@@ -110,12 +118,12 @@ def parse_args():
     return parser.parse_args()
 
 # Get random position within the world boundaries
-def random_position(world_width, world_height):
+def random_position(world_width, world_height) -> Tuple[float, float]:
     x = random.uniform(10, world_width - 10)
     y = random.uniform(10, world_height - 10)
     return (x, y)
 
-def random_velocity(default_velocity):
+def random_velocity(default_velocity) -> Tuple[float, float]:
     return (
         random.uniform(-1, 1) * default_velocity,
         random.uniform(-1, 1) * default_velocity
@@ -160,29 +168,29 @@ def main():
     # This object will track various performance metrics throughout the simulation
     metrics = None
     if cfg.get('simulation', 'enable_metrics'):
-        metrics = Metrics(density=density)
         multihop_mode = cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
-        
-        metrics.set_simulation_info(
+        metrics = Metrics(
+            density=density,
             scheduler_type=mode,
             world_width=world_width,
             world_height=world_height,
             mobile_count=mobile_buoy_count,
             fixed_count=fixed_buoy_count,
             duration=duration,
-            multihop_mode=multihop_mode
+            multihop_mode=multihop_mode,
         )
 
     # Settin up the communication channel for the simulation
     channel = Channel(metrics=metrics, ideal_channel=ideal)
 
+    # Initialization of buoys based on the parameters provided
     buoys = []
     default_battery = cfg.get('buoys', 'default_battery')
     default_velocity = cfg.get('buoys', 'default_velocity')
     for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
         mobile = i < mobile_buoy_count
-                
+                    
         # Buoy initialization
         buoy = Buoy(
             channel=channel,
@@ -207,11 +215,11 @@ def main():
     simulator.start()
 
     if metrics:
-        if not ramp:
-            summary = metrics.summary(simulator.simulated_time)
-            metrics.export_metrics_to_csv(summary, filename=result_file)
-        else:
+        if ramp:
             metrics.export_time_series(result_file)
+        else:
+            summary = metrics.summary(sim_time=simulator.simulated_time)
+            metrics.export_metrics_to_csv(summary, filename=result_file)
 
 if __name__ == "__main__":
     main()
