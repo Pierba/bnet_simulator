@@ -13,7 +13,7 @@ class Beacon:
     timestamp: float # 4 bytes
     origin_id: Optional[uuid.UUID] = None  # 16 bytes (only in forwarded mode)
     hop_limit: int = 0  # 4 bytes (only in forwarded mode)
-    current_hop: int = 0  # Current hop count (0 = direct, 1 = forwarded once, etc.)
+
 
     def size_bytes(self) -> int:
         # Base size: sender_id(16) + mobile(1) + position(8) + battery(4) + timestamp(4) = 37 bytes

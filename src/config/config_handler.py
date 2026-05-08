@@ -21,8 +21,9 @@ class ConfigHandler:
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
-            'multihop_mode': 'none',  # Options: none, append, forwarded
-            'multihop_limit': 2,      # Maximum hops for forwarded mode
+            'multihop_mode': 'none',    # Options: none, append, forwarded
+            'multihop_limit': 2,        # Maximum hops for forwarded mode
+            'pending_queue_limit': 20,  # Maximum number of beacons that can be stored in pending queue
         },
         'world': {
             'width': 800.0,

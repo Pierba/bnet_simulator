@@ -3,29 +3,30 @@ simulation:
   - static
   - dynamic_adab
   - dynamic_acab
-  min_buoys: 10
-  max_buoys: 10
-  step_buoys: 10
+  min_buoys: 20
+  max_buoys: 80
+  step_buoys: 20
   intervals:
-  - 1.0
-  - 0.5
-  - 0.25
-  duration: 600
-  num_processes: 4
+   - 1.0
+   - 0.5
+   - 0.25
+  duration: 200
+  num_processes: 10
   ideal_channel: true
   ramp_scenario: false
-  enable_metrics: false
-  enable_logging: true
+  enable_metrics: true
+  enable_logging: false
   enable_file_logging: true
-  multihop_mode: none  # Options: none, append, forwarded
-  multihop_limit: 2    # Maximum hops for forwarded mode
+  multihop_mode: forwarded   # Options: none, append, forwarded
+  multihop_limit: 2          # Maximum hops for forwarded mode
+  pending_queue_limit: 20    # Maximum number of beacons that can be stored in pending queue
 
 world:
-  width: 800.0
-  height: 800.0
+  width: 500.0
+  height: 500.0
 
 buoys:
-  mobile_percentage: 0.2
+  mobile_percentage: 0.0
   default_battery: 100.0
   default_velocity: 15.0
 

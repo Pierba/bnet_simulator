@@ -109,7 +109,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     
     # Create B-PDR by density plot
     df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
-    grouped = df.groupby(["Density", "Scheduler"]).mean().reset_index()
+    grouped = df.groupby(["Density", "Scheduler"], observed=False).mean().reset_index()
     densities = sorted(df["Density"].unique())
     schedulers = ["dynamic_acab", "dynamic_adab", "static"]
     scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
@@ -199,7 +199,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     
     # Create collision rate by density plot
     coll_df = pd.DataFrame(collision_data, columns=["Density", "CollisionRate", "Scheduler"])
-    grouped_coll = coll_df.groupby(["Density", "Scheduler"]).mean().reset_index()
+    grouped_coll = coll_df.groupby(["Density", "Scheduler"], observed=False).mean().reset_index()
     densities = sorted(coll_df["Density"].unique())
     
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -311,7 +311,7 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
             binned = pd.cut(df["n_buoys"], bins=group_edges, right=False, duplicates='drop')
             df2 = df.copy()
             df2["group"] = binned
-            grp = df2.groupby("group")[y_col].mean()
+            grp = df2.groupby("group", observed=False)[y_col].mean()
             for interval, val in grp.items():
                 if pd.isna(interval):
                     continue
@@ -550,7 +550,7 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
     # density - 1 because we exclude self from potential discoveries
     df["PercentageDiscovered"] = (df["AvgUniqueNodes"] / (df["Density"] - 1)) * 100
     
-    grouped = df.groupby(["Density", "Scheduler", "MultihopMode"]).mean().reset_index()
+    grouped = df.groupby(["Density", "Scheduler", "MultihopMode"], observed=False).mean().reset_index()
     
     densities = sorted(df["Density"].unique())
     schedulers = ["dynamic_acab", "dynamic_adab", "static"]

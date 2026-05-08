@@ -1,3 +1,4 @@
+from email import message
 import os
 import sys
 from datetime import datetime
@@ -14,6 +15,9 @@ COLORS = {
     'RESET': '\033[0m',
 }
 
+LOGGING_ENABLED = ConfigHandler().get('simulation', 'enable_logging')
+FILE_LOGGING_ENABLED = ConfigHandler().get('simulation', 'enable_file_logging')
+
 # Default log file path
 if not os.path.exists("logs"):
     os.makedirs("logs")
@@ -21,23 +25,24 @@ LOG_FILE = Path("logs/simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
     # Errors and critical messages are always logged regardless of enable_logging setting
-    if not(level in ["ERROR", "CRITICAL"] or ConfigHandler().get('simulation', 'enable_logging')):
+    if not LOGGING_ENABLED:
         return
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = COLORS.get(level, '')
     reset = COLORS['RESET']
 
-    formatted = f"[{ConfigHandler().get('scheduler', 'type')}] [{timestamp}] [{level}] {message}"
-
+    # scheduler_type = ConfigHandler().get('scheduler', 'type')
+    # formatted = f"[{scheduler_type}] [{timestamp}] [{level}] {message}"
+    formatted = f"[{timestamp}] [{level}] {message}"
+        
     # Print to console with color
     output = f"{color}{formatted}{reset}"
     if to_console:
         print(output, file=sys.stderr if level in ["ERROR", "CRITICAL"] else sys.stdout)
 
     # Optionally write to file
-    file_logging_enabled = ConfigHandler().get('simulation', 'enable_file_logging')
-    if file_logging_enabled and to_file:
+    if FILE_LOGGING_ENABLED and to_file:
         with LOG_FILE.open("a") as f:
             f.write(formatted + "\n")
 

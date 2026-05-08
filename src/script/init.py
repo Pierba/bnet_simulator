@@ -198,9 +198,8 @@ def main():
             is_mobile=mobile,
             battery=default_battery,
             velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
-            metrics=metrics
+            metrics=metrics is not None
         )
-
         # Set the scheduler type: ['static', 'dynamic_adab', 'dynamic_acab']
         buoy.scheduler.scheduler_type = mode
 
@@ -209,8 +208,14 @@ def main():
         buoy.scheduler.min_interval = min_interval
         buoy.scheduler.max_interval = max_interval
 
+        if metrics:
+            buoy.record_scheduler_latency_callback = metrics.record_scheduler_latency
+            buoy.set_unique_nodes_per_buoy_callback = metrics.set_unique_nodes_per_buoy
+            buoy.log_received_callback = metrics.log_received
+
         buoys.append(buoy)
-    
+
+
     simulator = Simulator(buoys, channel, metrics, ramp, duration)
     simulator.start()
 
