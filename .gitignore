@@ -65,3 +65,6 @@ wheels/
 *.upage
 *.upages
 *.xdy
+
+# Ghost files
+/src/script/plot_mode_comparison.py

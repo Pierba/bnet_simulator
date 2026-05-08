@@ -47,7 +47,8 @@ class Simulator:
     def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
         self.event_counter += 1
-        heapq.heappush(self.event_queue, (event.time, self.event_counter, event))
+        epsilon = self.event_counter * 1e-10
+        heapq.heappush(self.event_queue, (event.time + epsilon, self.event_counter, event))
     
     def _get_next_event(self) -> Optional[Event]:
         if not self.event_queue:
@@ -81,8 +82,9 @@ class Simulator:
         else:
             self._update_buoy_array_random(sim_time)
         
-        # Recalculate avg_neighbors after buoy array changes
-        self.calculate_and_record_avg_neighbors()
+        if self.metrics:
+            # Recalculate avg_neighbors after buoy array changes
+            self.calculate_and_record_avg_neighbors()
 
     def handle_event(self, event: Event, sim_time: float):
         match event.event_type:
@@ -183,7 +185,8 @@ class Simulator:
         # Calculate initial avg_neighbors and schedule initial events
         self.calculate_and_record_avg_neighbors()
         self._schedule_initial_events()
-        
+
+        last_time_log = -1
         try:
             # Main simulation loop: process events until the simulation time exceeds the duration or there are no more events
             while self.running and self.simulated_time < self.duration:
@@ -197,10 +200,13 @@ class Simulator:
                 
                 if event.event_type in [EventType.TRANSMISSION_START, EventType.RECEPTION]:
                     logging.log_info(f"Processing {event.event_type.name} event")
-                    
-                if self.simulated_time > 0 and int(self.simulated_time) % 10 == 0:
-                    logging.log_info(f"Time: {self.simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
+                # logging.log_info(f"Processing {event.event_type.name} event")
                 
+                time_log = int(self.simulated_time)
+                if last_time_log != time_log and time_log > 0 and time_log % 10 == 0:
+                    logging.log_info(f"Time: {self.simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
+                    last_time_log = time_log
+
                 # Handle the event and catch any exceptions to prevent the simulation from crashing
                 try:
                     event.target_obj.handle_event(event, self.simulated_time)
@@ -208,11 +214,12 @@ class Simulator:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                 
                 if self.ramp and self.simulated_time > 0:
-                    current_interval = int(self.simulated_time) // 5
+                    current_interval = int(self.simulated_time) // 5 # Should it be this the interval?
                     if current_interval != self.last_timepoint_log:
                         self.last_timepoint_log = current_interval
                         avg_neighbors_sample = self.calculate_avg_neighbors()
-                        self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
+                        if self.metrics:
+                            self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
@@ -242,10 +249,9 @@ class Simulator:
         return total_neighbors / len(self.buoys)
     
     # This method calculates the average number of neighbors and records it if metrics collection is enabled
-    def calculate_and_record_avg_neighbors(self) -> Optional[float]:
+    def calculate_and_record_avg_neighbors(self):
         if not self.metrics:
-            return None
+            return
             
         avg_neighbors: float = self.calculate_avg_neighbors()
         self.metrics.record_avg_neighbors_sample(avg_neighbors)
-        return avg_neighbors

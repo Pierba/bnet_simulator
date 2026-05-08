@@ -12,13 +12,24 @@ class BeaconScheduler:
         self.min_interval: float = cfg.get('scheduler', 'beacon_min_interval')
         self.max_interval: float = cfg.get('scheduler', 'beacon_max_interval')
         self.scheduler_type: str = None
-        self.default_velocity: float = cfg.get('buoys', 'default_velocity')
+        default_velocity = cfg.get('buoys', 'default_velocity')
+        self.velocity_divisor: float = max(default_velocity, 0.001)  # Avoid div-by-zero checks later
 
         self.last_static_send_time: float = -random.uniform(0, self.static_interval)
         self.last_dynamic_send_time: float = -random.uniform(0, self.min_interval)
 
         self.next_static_interval: float = self.static_interval
         self.next_dynamic_interval: float = None
+        
+        # Cache interval range and jitter scale
+        self.interval_range: float = self.max_interval - self.min_interval
+        self.jitter_scale: float = self.interval_range * 0.1
+        
+        # Cache scheduler-specific thresholds and weights
+        self.acab_neighbors_threshold: float = 10.0
+        self.acab_contact_threshold: float = 20.0
+        self.acab_weights: Tuple[float, float, float] = (0.4, 0.3, 0.3)  # density, contact, mobility
+        self.adab_neighbors_threshold: float = 15.0
 
     def get_next_check_interval(self) -> float:
         match self.scheduler_type:
@@ -32,7 +43,8 @@ class BeaconScheduler:
     def should_send(self, 
             battery: float, 
             velocity: Tuple[float, float], 
-            neighbor_timestamps: List[float], 
+            n_neighbors: int, 
+            last_contact_ts: float, 
             current_time: float
         ) -> bool:
 
@@ -40,7 +52,7 @@ class BeaconScheduler:
             case "static":
                 return self.should_send_static(current_time)
             case "dynamic_adab" | "dynamic_acab":
-                return self.should_send_dynamic(battery, velocity, neighbor_timestamps, current_time)
+                return self.should_send_dynamic(battery, velocity, n_neighbors, last_contact_ts, current_time)
             case _:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
@@ -57,70 +69,61 @@ class BeaconScheduler:
         self,
         battery: float,
         velocity: Tuple[float, float],
-        neighbor_timestamps: List[float],
+        n_neighbors: int,
+        last_contact_ts: float,
         current_time: float,
     ) -> bool:
         
-        if not self.next_dynamic_interval:
-            self.next_dynamic_interval = self.compute_interval(velocity, neighbor_timestamps, current_time)
+        if self.next_dynamic_interval is None:
+            self.next_dynamic_interval = self.compute_interval(velocity, n_neighbors, last_contact_ts, current_time)
         
         time_since_last = current_time - self.last_dynamic_send_time
         
         if time_since_last >= self.next_dynamic_interval:
             self.last_dynamic_send_time = current_time
-            self.next_dynamic_interval = self.compute_interval(velocity, neighbor_timestamps, current_time)
+            self.next_dynamic_interval = self.compute_interval(velocity, n_neighbors, last_contact_ts, current_time)
             return True
+        
         return False
 
     def compute_interval(
         self,
         velocity: Tuple[float, float],
-        neighbor_timestamps: List[float],
+        n_neighbors: int,
+        last_contact_ts: float,
         current_time: float,
     ) -> float:
         
         match self.scheduler_type:
             case "dynamic_acab":
-                n_neighbors = len(neighbor_timestamps)
-                NEIGHBORS_THRESHOLD = 10
-                density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
+                density_score = min(1.0, n_neighbors / self.acab_neighbors_threshold)
 
-                CONTACT_THRESHOLD = 20.0
-                if neighbor_timestamps:
-                    last_contact = max(neighbor_timestamps, default=current_time)
-                    delta = current_time - last_contact
-                    contact_score = max(0.0, 1.0 - (delta / CONTACT_THRESHOLD))
+                if n_neighbors > 0 and last_contact_ts is not None:
+                    delta = current_time - last_contact_ts
+                    contact_score = max(0.0, 1.0 - (delta / self.acab_contact_threshold))
                 else:
                     contact_score = 0.0
 
                 vx, vy = velocity
-                speed = math.sqrt(vx * vx + vy * vy)
-                mobility_score = min(1.0, speed / (self.default_velocity if self.default_velocity > 0 else 0.001))
+                speed = math.hypot(vx, vy)
+                mobility_score = min(1.0, speed / self.velocity_divisor)
 
-                w_density = 0.4
-                w_contact = 0.3
-                w_mobility = 0.3
-
+                w_density, w_contact, w_mobility = self.acab_weights
                 combined = (w_density * density_score + 
-                        w_contact * contact_score + 
-                        w_mobility * (1.0 - mobility_score))
-                
+                            w_contact * contact_score + 
+                            w_mobility * (1.0 - mobility_score))
+            
             case "dynamic_adab":
-                n_neighbors = len(neighbor_timestamps)
-                NEIGHBORS_THRESHOLD = 15
-                density_score = min(1.0, n_neighbors / NEIGHBORS_THRESHOLD)
+                density_score = min(1.0, n_neighbors / self.adab_neighbors_threshold)
                 combined = density_score
                 
             case _:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
         fq = combined * combined
-        bi_min = self.min_interval
-        bi = bi_min + fq * (self.max_interval - bi_min)
+        bi = self.min_interval + fq * self.interval_range
 
-        jitter_amount = (self.max_interval - self.min_interval) * 0.1 
-
-        max_positive_jitter = min(jitter_amount, self.max_interval - bi)
-        max_negative_jitter = min(jitter_amount, bi - self.min_interval)
+        max_positive_jitter = min(self.jitter_scale, self.max_interval - bi)
+        max_negative_jitter = min(self.jitter_scale, bi - self.min_interval)
 
         return bi + random.uniform(-max_negative_jitter, max_positive_jitter)
