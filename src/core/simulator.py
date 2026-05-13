@@ -11,15 +11,16 @@ from utils import logging
 from scipy.spatial import cKDTree
 
 class Simulator:
-    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, ramp: bool = False, duration: float = None):
+    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str = "static", duration: float = None):
         cfg = ConfigHandler()
         
-        self.ramp: bool = ramp
+        self.scenario = scenario
         self.all_buoys: List[Buoy] = buoys
-        # In ramp mode, we start with only 2 buoys and add the rest gradually. In non-ramp mode, we start with all buoys active.
-        self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if ramp else buoys
         self.channel: Channel = channel
         self.metrics: Metrics = metrics
+
+        # In ramp mode, we start with only 2 buoys and add the rest gradually. In static/random mode, we start with all buoys active.
+        self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if self.scenario == "ramp" else buoys
         
         self.first_change: bool = True
         self.next_buoy_change: float = 0
@@ -70,18 +71,24 @@ class Simulator:
         
         # Schedule initial channel update event
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
-        self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
+        
+        # Schedule first buoy array update for dynamic scenarios
+        if self.scenario != "static":
+            self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
         
         # Schedule periodic avg_neighbors calculation every 30 seconds if metrics are enabled
         if self.metrics:
             self.schedule_event(30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
     def update_buoy_array(self, sim_time: float):
-        if self.ramp:
-            self._update_buoy_array_ramp(sim_time)
-        else:
-            self._update_buoy_array_random(sim_time)
-        
+        match self.scenario:
+            case "ramp":
+                self._update_buoy_array_ramp(sim_time)
+            case "random":
+                self._update_buoy_array_random(sim_time)
+            case _:
+                pass
+
         if self.metrics:
             # Recalculate avg_neighbors after buoy array changes
             self.calculate_and_record_avg_neighbors()
@@ -213,7 +220,7 @@ class Simulator:
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                 
-                if self.ramp and self.simulated_time > 0:
+                if self.scenario == "ramp" and self.simulated_time > 0:
                     current_interval = int(self.simulated_time) // 5 # Should it be this the interval?
                     if current_interval != self.last_timepoint_log:
                         self.last_timepoint_log = current_interval

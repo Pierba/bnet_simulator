@@ -109,9 +109,10 @@ def parse_args():
         help="Maximum interval for dynamic schedulers in seconds"
     )
     parser.add_argument(
-        "--ramp",
-        action='store_true',
-        help="Use ramp scenario"
+        "--scenario",
+        choices=["static", "ramp", "random"],
+        default="static",
+        help="Scenario type: static, ramp, or random (default: static)"
     )
 
     # Parse the command-line arguments and return them as a namespace object 
@@ -148,7 +149,7 @@ def main():
     static_interval: float = args.static_interval
     min_interval: float = args.min_interval
     max_interval: float = args.max_interval
-    ramp: bool = args.ramp
+    scenario: str = args.scenario
 
     # Set the random seed if provided, otherwise use the current time    
     if seed is not None:
@@ -216,15 +217,16 @@ def main():
         buoys.append(buoy)
 
 
-    simulator = Simulator(buoys, channel, metrics, ramp, duration)
+    simulator = Simulator(buoys, channel, metrics, scenario, duration)
     simulator.start()
 
     if metrics:
-        if ramp:
-            metrics.export_time_series(result_file)
-        else:
-            summary = metrics.summary(sim_time=simulator.simulated_time)
-            metrics.export_metrics_to_csv(summary, filename=result_file)
+        match scenario:
+            case "ramp":
+                metrics.export_time_series(result_file)
+            case "random" | "static":
+                summary = metrics.summary(sim_time=simulator.simulated_time)
+                metrics.export_metrics_to_csv(summary, filename=result_file)
 
 if __name__ == "__main__":
     main()

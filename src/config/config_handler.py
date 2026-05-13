@@ -17,7 +17,7 @@ class ConfigHandler:
             'duration': 600,
             'num_processes': 4,
             'ideal_channel': True,
-            'ramp_scenario': False,
+            'scenario': 'static',  # Options: static, ramp, random
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
