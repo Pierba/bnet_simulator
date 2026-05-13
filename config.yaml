@@ -12,28 +12,28 @@ simulation:
    - 0.25
   duration: 200
   num_processes: 10
-  ideal_channel: true
-  scenario: static           # Options: static, ramp, random
+  ideal_channel: false
+  scenario: random           # Options: static, ramp, random
   enable_metrics: true
-  enable_logging: true
+  enable_logging: false
   enable_file_logging: true
-  multihop_mode: forwarded   # Options: none, append, forwarded
+  multihop_mode: none        # Options: none, append, forwarded
   multihop_limit: 2          # Maximum hops for forwarded mode
   pending_queue_limit: 20    # Maximum number of beacons that can be stored in pending queue
 
 world:
-  width: 500.0
-  height: 500.0
+  width: 200.0
+  height: 200.0
 
 buoys:
-  mobile_percentage: 0.0
+  mobile_percentage: 0.5
   default_battery: 100.0
   default_velocity: 15.0
 
 network:
   bit_rate: 1000000
   speed_of_light: 300000000.0
-  communication_range_max: 120.0
+  communication_range_max: 80.0
   communication_range_high_prob: 70.0
   delivery_prob_high: 0.9
   delivery_prob_low: 0.15
