@@ -107,8 +107,7 @@ class Buoy:
     # Scheduler check handler: asks the scheduler if we should send a beacon and schedules next check
     def _handle_scheduler_check(self, event: Event, sim_time: float):
         # Schedule the next scheduler check
-        next_check_interval = self.scheduler.get_next_check_interval()
-        self.next_scheduler_time = sim_time + next_check_interval
+        self.next_scheduler_time = sim_time + self.scheduler.get_next_check_interval()
         self.schedule_callback(
             self.next_scheduler_time, EventType.SCHEDULER_CHECK, self
         )
@@ -132,7 +131,6 @@ class Buoy:
             )
         elif self.pending_forward_beacons:
             # Scheduler doesn't need to send, but there are pending forwards to resume
-            # (e.g. after the drain loop yielded at the scheduler check deadline)
             self.processing = True
             self.schedule_callback(
                 sim_time, EventType.CHANNEL_SENSE, self
@@ -221,7 +219,7 @@ class Buoy:
                 latency = sim_time - self.scheduler_decision_time
                 self.record_scheduler_latency_callback(latency)
 
-        # Delegate forwarding: piggyback after own tx or forward-only (CSMA already done)
+        # Delegate forwarding: piggyback after own transmission or forward-only
         if self.pending_forward_beacons:
             self.schedule_callback(
                 end_time, EventType.FORWARD_TRANSMISSION_START, self
@@ -387,7 +385,8 @@ class Buoy:
     def _handle_buoy_movement(self, event, sim_time: float):
         if not self.is_mobile:
             return
-            
+        
+        # Random way point mobility model?
         dt = 0.5    # update too frequently?
         x, y = self.position
         vx, vy = self.velocity

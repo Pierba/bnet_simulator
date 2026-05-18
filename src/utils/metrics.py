@@ -93,14 +93,13 @@ class Metrics:
         
         return sum(self.scheduler_latencies) / len(self.scheduler_latencies)
 
-    def log_potentially_sent(self, sender_id: UUID, n_receivers: int):
+    def log_potentially_sent(self, n_receivers: int):
         self.potentially_sent += n_receivers
 
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
 
     def packet_delivery_ratio(self) -> float:
-        """PDR = total successful receivers / total potential receivers across all broadcasts."""
         return self.total_successful_receivers / self.potentially_sent if self.potentially_sent else 0.0
 
     def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: float = None):
@@ -140,10 +139,6 @@ class Metrics:
         return sum(self.avg_neighbors_samples) / len(self.avg_neighbors_samples)  
     
     def summary(self, sim_time: float) -> dict[str]:
-        avg_latency = self.total_latency / self.beacons_received if self.beacons_received else 0
-        avg_unique_nodes = self.avg_unique_nodes_discovered()
-        final_avg_neighbors = self.get_final_avg_neighbors()
-        
         summary = {
             "Scheduler Type": self.scheduler_type or "unknown",
             "Multihop Mode": self.multihop_mode or "none",
@@ -155,7 +150,7 @@ class Metrics:
             "Unique Beacons Received": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
-            "Avg Latency": avg_latency,
+            "Avg Latency": self.total_latency / self.beacons_received if self.beacons_received else 0,
             "Avg Scheduler Latency": self.avg_scheduler_latency(),
             "Delivery Ratio": self.delivery_ratio(),
             "PDR": self.packet_delivery_ratio(),
@@ -171,8 +166,8 @@ class Metrics:
             "Potentially Sent": self.potentially_sent,
             "Actually Received": self.actually_received,
             "Successful Receivers": self.total_successful_receivers,
-            "Average Neighbors": final_avg_neighbors,
-            "Avg Unique Nodes Discovered": avg_unique_nodes,
+            "Average Neighbors": self.get_final_avg_neighbors(),
+            "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
         }
 
         if self.density is not None:

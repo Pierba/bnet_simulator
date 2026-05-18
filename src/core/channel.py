@@ -189,7 +189,7 @@ class Channel:
         
         if self.metrics:
             self.metrics.log_sent()
-            self.metrics.log_potentially_sent(beacon.sender_id, n_receivers)
+            self.metrics.log_potentially_sent(n_receivers)
             self.metrics.log_successful_receivers(actual_successful)
             self.metrics.log_collision(collision_lost)
             
