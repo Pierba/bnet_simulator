@@ -1,5 +1,6 @@
 import uuid
 import random
+import math
 from collections import deque
 from enum import Enum
 
@@ -43,6 +44,7 @@ class Buoy:
         self.channel: Channel = channel
         self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
         self.metrics: bool = metrics
+        self.active: bool = True  # Flag for discarding scheduled events when disabled
         
         # Callbacks to be set by the simulator for event scheduling and metrics tracking
         self.schedule_callback: callable = None     
@@ -62,6 +64,20 @@ class Buoy:
         self.world_height: float = cfg.get('world', 'height')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
         self.comm_range_max_sq: float = self.comm_range_max * self.comm_range_max
+
+        # Random Waypoint mobility model state
+        # Speed is drawn uniformly from [rwp_speed_min, rwp_speed_max] per leg
+        # Pause is drawn uniformly from [rwp_pause_min, rwp_pause_max] on waypoint arrival
+        self.rwp_speed_min: float = cfg.get('buoys', 'rwp_speed_min')
+        self.rwp_speed_max: float = cfg.get('buoys', 'rwp_speed_max')
+        self.rwp_pause_min: float = cfg.get('buoys', 'rwp_pause_min')
+        self.rwp_pause_max: float = cfg.get('buoys', 'rwp_pause_max')
+        self.rwp_dt: float = 0.5  # Movement update interval (seconds)
+
+        # Randomly pick initial waypoint and speed when first spawned
+        self.rwp_waypoint: tuple[float, float] = self._pick_rwp_waypoint()
+        self.rwp_speed: float = random.uniform(self.rwp_speed_min, self.rwp_speed_max)
+        self.rwp_pause_until: float = 0.0  # sim_time before which this buoy is paused
 
         # Multihop mode configuration
         self.multihop_mode: bool = cfg.get('simulation', 'multihop_mode')
@@ -84,6 +100,10 @@ class Buoy:
         self.pending_queue_limit: int = cfg.get('simulation', 'pending_queue_limit')
 
     def handle_event(self, event: EventType, sim_time: float):
+        # Lazy cancellation: discard stale events for inactive buoys in O(1)
+        if not self.active:
+            return
+
         # Dispatch event to the appropriate handler based on event type
         handlers = {
             EventType.SCHEDULER_CHECK:              self._handle_scheduler_check,
@@ -382,41 +402,62 @@ class Buoy:
             sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self
         )
 
+    # Picks a random waypoint within the world boundaries
+    def _pick_rwp_waypoint(self) -> tuple[float, float]:
+        x = random.uniform(0.0, self.world_width)
+        y = random.uniform(0.0, self.world_height)
+        return (x, y)
+
     def _handle_buoy_movement(self, event, sim_time: float):
         if not self.is_mobile:
             return
-        
-        # Random way point mobility model?
-        dt = 0.5    # update too frequently?
+
+        # If the buoy is still paused at the previous waypoint it stays still and wakes up exactly when the pause expires
+        if sim_time < self.rwp_pause_until:
+            self.velocity = (0.0, 0.0)
+            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self)
+            return
+
+        # Moving toward the waypoint
         x, y = self.position
-        vx, vy = self.velocity
-        
-        new_x = x + vx * dt
-        new_y = y + vy * dt
-        
-        # World boundries checks
-        if new_x < 0:
-            new_x = -new_x
-            vx = -vx
-        elif new_x > self.world_width:
-            new_x = 2 * self.world_width - new_x
-            vx = -vx
-        
-        if new_y < 0:
-            new_y = -new_y
-            vy = -vy
-        elif new_y > self.world_height:
-            new_y = 2 * self.world_height - new_y
-            vy = -vy
-            
-        # Updating velocity and position
+        wx, wy = self.rwp_waypoint
+        dx, dy = wx - x, wy - y
+        dist = math.hypot(dx, dy)
+        step = self.rwp_speed * self.rwp_dt
+
+        if dist <= step:
+            # The buoy reached its destination and stop itself
+            self.position = self.rwp_waypoint
+            self.velocity = (0.0, 0.0)
+
+            # Calculating the pause time before next movement
+            pause = random.uniform(self.rwp_pause_min, self.rwp_pause_max)
+            self.rwp_pause_until = sim_time + pause
+
+            # Picking a new waypoint and speed for the next movement
+            self.rwp_waypoint = self._pick_rwp_waypoint()
+            self.rwp_speed = random.uniform(self.rwp_speed_min, self.rwp_speed_max)
+
+            logging.log_info(
+                f"Buoy {str(self.id)[:6]} reached waypoint, pausing {pause:.2f}s, \
+                    next waypoint ({self.rwp_waypoint[0]:.1f}, {self.rwp_waypoint[1]:.1f}) \
+                    at speed {self.rwp_speed:.1f}"
+            )
+
+            # Resume after the pause
+            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self)
+            return
+
+        # Moving toward waypoint
+        nx, ny = dx / dist, dy / dist
+        vx, vy = nx * self.rwp_speed, ny * self.rwp_speed
+
+        # Update velocity and position
         self.velocity = (vx, vy)
-        self.position = (new_x, new_y)
-        
-        # Schedule next movement update
-        self.schedule_callback(
-            sim_time + dt, EventType.BUOY_MOVEMENT, self
-        )
+        self.position = (x + vx * self.rwp_dt, y + vy * self.rwp_dt)
+
+        # Schedule next movement
+        self.schedule_callback(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT, self)
     
     def create_beacon(self, sim_time: float) -> Beacon:
         all_neighbors = [(id, ts, pos) for id, (ts, pos) in self.neighbors.items()]

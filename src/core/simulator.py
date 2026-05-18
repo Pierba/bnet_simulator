@@ -149,6 +149,7 @@ class Simulator:
 
                 # Remove the selected buoys from the active list and log the removals                
                 for buoy in buoys_to_remove:
+                    buoy.active = False  # Block scheduled events from being processed
                     self.buoys.remove(buoy)
                     logging.log_info(f"Removed buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
 
@@ -164,6 +165,7 @@ class Simulator:
             buoys_to_add = random.sample(inactive_buoys, num_to_add)
             
             for buoy in buoys_to_add:
+                buoy.active = True  # Re-activate buoy to process new events
                 self.buoys.append(buoy)
                 initial_offset = random.uniform(0, 1.0) 
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
