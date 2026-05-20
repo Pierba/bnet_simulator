@@ -22,13 +22,16 @@ class Simulator:
         # In ramp mode, we start with only 2 buoys and add the rest gradually. In static/random mode, we start with all buoys active.
         self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if self.scenario == "ramp" else buoys
         
-        self.first_change: bool = True
+        
         self.next_buoy_change: float = 0
         self.duration: float = duration if duration is not None else cfg.get('simulation', 'duration')
         
         # Neighbor settings
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
+
+        # Random scenario settings
+        self.random_variability: float = cfg.get('simulation', 'random_variability')
 
         # Channel settings
         self.channel.set_buoys(self.buoys)
@@ -73,8 +76,10 @@ class Simulator:
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
         
         # Schedule first buoy array update for dynamic scenarios
-        if self.scenario != "static":
-            self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
+        if self.scenario == "static":
+            return
+        
+        self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
         
         # Schedule periodic avg_neighbors calculation every 30 seconds if metrics are enabled
         if self.metrics:
@@ -86,8 +91,6 @@ class Simulator:
                 self._update_buoy_array_ramp(sim_time)
             case "random":
                 self._update_buoy_array_random(sim_time)
-            case _:
-                pass
 
         if self.metrics:
             # Recalculate avg_neighbors after buoy array changes
@@ -99,16 +102,14 @@ class Simulator:
                 self.update_buoy_array(sim_time)
             case EventType.AVG_NEIGHBORS_CALCULATION:
                 self.calculate_and_record_avg_neighbors()
-                # Schedule next calculation only for AVG_NEIGHBORS events
                 self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
             case _:
                 logging.log_error(f"Simulator received unhandled event: {event.event_type}")
     
     def _update_buoy_array_ramp(self, sim_time: float):
-        active_buoys = self.buoys.copy()
-        active_set = set(active_buoys)
+        active_set = set(self.buoys)
         inactive_buoys = [b for b in self.all_buoys if b not in active_set]
-        current_count = len(active_buoys)
+        current_count = len(self.buoys)
         total_buoys = len(self.all_buoys)
         buoys_to_add = total_buoys - 2
         add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
@@ -125,64 +126,54 @@ class Simulator:
         self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
         self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
    
-    # This method randomly adds or removes buoys from the active buoy array while ensuring that we don't go below a 
-    # minimum number of buoys or above the total number of buoys
-    # It also ensures that the first change is a significant removal
     def _update_buoy_array_random(self, sim_time: float):
-        
-        # Determine active and inactive buoys
-        active_buoys = self.buoys.copy()
-        active_set = set(active_buoys)
+        # Get all buoys that are currently active and inactive
+        active_set = set(self.buoys)
         inactive_buoys = [b for b in self.all_buoys if b not in active_set]
-        total_buoys = len(self.all_buoys)
-
-        # Ensure we don't remove too many buoys and maintain a minimum number of active buoys
-        min_buoys = max(3, int(total_buoys * 0.2))
-        if self.first_change or (random.random() >= 0.5 and len(active_buoys) > min_buoys):
-            if len(active_buoys) > min_buoys:
-                remove_percentage = 0.5 if self.first_change else 0.4
-                max_to_remove = min(len(active_buoys) - min_buoys, 
-                                  max(2, int(total_buoys * remove_percentage)))
-                
-                num_to_remove = random.randint(1, max_to_remove)
-                buoys_to_remove = random.sample(active_buoys, num_to_remove)
-
-                # Remove the selected buoys from the active list and log the removals                
-                for buoy in buoys_to_remove:
-                    buoy.active = False  # Block scheduled events from being processed
-                    self.buoys.remove(buoy)
-                    logging.log_info(f"Removed buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
-
-                # Update the channel with the new buoy array and log the change
-                self.channel.set_buoys(self.buoys)
-                logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
         
-        # If we didn't remove buoys, we have a chance to add some back in, but we won't add too many
-        elif inactive_buoys:
-            max_to_add = min(len(inactive_buoys), max(2, int(total_buoys * 0.4)))
-            
-            num_to_add = random.randint(1, max_to_add)
+        # Get current count of active buoys and total buoys
+        total_buoys = len(self.all_buoys)
+        current_count = len(self.buoys)
+
+        # Maximum number of buoys to change per update 
+        max_change = max(1, int(total_buoys * self.random_variability))
+        
+        # Minimum number of buoys to keep active
+        min_buoys = max(3, int(total_buoys * 0.2))
+
+        # Check if it can add or remove buoys
+        can_remove = current_count > min_buoys
+        can_add = len(inactive_buoys) > 0
+
+        # Remove buoys if possible, otherwise add buoys if possible
+        if can_remove and (not can_add or random.random() >= 0.5):
+            num_to_remove = min(max_change, current_count - min_buoys)
+            buoys_to_remove = random.sample(self.buoys, num_to_remove)
+
+            for buoy in buoys_to_remove:
+                buoy.active = False
+                self.buoys.remove(buoy)
+
+            logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+
+        elif can_add:
+            # Add buoys
+            num_to_add = min(max_change, len(inactive_buoys))
             buoys_to_add = random.sample(inactive_buoys, num_to_add)
-            
+
             for buoy in buoys_to_add:
-                buoy.active = True  # Re-activate buoy to process new events
+                buoy.active = True
                 self.buoys.append(buoy)
-                initial_offset = random.uniform(0, 1.0) 
+                initial_offset = random.uniform(0, 1.0)
+                
                 self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                 self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
                 if buoy.is_mobile:
                     self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
-                
-                logging.log_info(f"Added buoy {str(buoy.id)[:6]} at {sim_time:.2f}s")
-                
-            self.channel.set_buoys(self.buoys)
+
             logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
 
-        if self.first_change:
-            # Turning off the first change flag after the first buoy change to ensure the next changes are more balanced
-            logging.log_info("First buoy change: forced major removal operation finished")
-            self.first_change = False
-
+        self.channel.set_buoys(self.buoys)
         next_change_time = sim_time + random.uniform(15, 20)
         self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
 
@@ -195,7 +186,7 @@ class Simulator:
         self.calculate_and_record_avg_neighbors()
         self._schedule_initial_events()
 
-        last_time_log = -1
+        last_time_log = None
         try:
             # Main simulation loop: process events until the simulation time exceeds the duration or there are no more events
             while self.running and self.simulated_time < self.duration:

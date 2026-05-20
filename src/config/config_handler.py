@@ -18,6 +18,7 @@ class ConfigHandler:
             'num_processes': 4,
             'ideal_channel': True,
             'scenario': 'static',  # Options: static, ramp, random
+            'random_variability': 0.05,  # Fraction of total buoys that can change per update in random scenario
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,

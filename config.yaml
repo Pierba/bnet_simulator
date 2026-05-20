@@ -14,6 +14,7 @@ simulation:
   num_processes: 10
   ideal_channel: false
   scenario: random           # Options: static, ramp, random
+  random_variability: 0.05   # Percentage of buoys that can change per update in random scenario
   enable_metrics: true
   enable_logging: false
   enable_file_logging: true
