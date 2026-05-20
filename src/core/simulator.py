@@ -30,8 +30,11 @@ class Simulator:
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
 
-        # Random scenario settings
+        # Random scenario settings — precompute constants that never change
         self.random_variability: float = cfg.get('simulation', 'random_variability')
+        total_buoys = len(self.all_buoys)
+        self.rnd_min_buoys: int = max(3, int(total_buoys * 0.2))
+        self.rnd_max_change: int = max(1, int(total_buoys * self.random_variability))
 
         # Channel settings
         self.channel.set_buoys(self.buoys)
@@ -127,55 +130,45 @@ class Simulator:
         self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
    
     def _update_buoy_array_random(self, sim_time: float):
-        # Get all buoys that are currently active and inactive
-        active_set = set(self.buoys)
-        inactive_buoys = [b for b in self.all_buoys if b not in active_set]
-        
-        # Get current count of active buoys and total buoys
-        total_buoys = len(self.all_buoys)
         current_count = len(self.buoys)
+        can_remove = current_count > self.rnd_min_buoys
 
-        # Maximum number of buoys to change per update 
-        max_change = max(1, int(total_buoys * self.random_variability))
-        
-        # Minimum number of buoys to keep active
-        min_buoys = max(3, int(total_buoys * 0.2))
+        if can_remove and random.random() < 0.5:
+            max_to_remove = min(self.rnd_max_change, current_count - self.rnd_min_buoys)
+            num_to_remove = random.randint(1, max_to_remove)
+            remove_set = set(random.sample(self.buoys, num_to_remove))
 
-        # Check if it can add or remove buoys
-        can_remove = current_count > min_buoys
-        can_add = len(inactive_buoys) > 0
-
-        # Remove buoys if possible, otherwise add buoys if possible
-        if can_remove and (not can_add or random.random() >= 0.5):
-            num_to_remove = min(max_change, current_count - min_buoys)
-            buoys_to_remove = random.sample(self.buoys, num_to_remove)
-
-            for buoy in buoys_to_remove:
+            for buoy in remove_set:
                 buoy.active = False
-                self.buoys.remove(buoy)
 
+            self.buoys = [b for b in self.buoys if b not in remove_set]
+
+            self.channel.set_buoys(self.buoys)
             logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
 
-        elif can_add:
-            # Add buoys
-            num_to_add = min(max_change, len(inactive_buoys))
-            buoys_to_add = random.sample(inactive_buoys, num_to_add)
+        else:
+            # Build inactive list only when the add branch is actually reached
+            active_set = set(self.buoys)
+            inactive_buoys = [b for b in self.all_buoys if b not in active_set]
 
-            for buoy in buoys_to_add:
-                buoy.active = True
-                self.buoys.append(buoy)
-                initial_offset = random.uniform(0, 1.0)
+            if inactive_buoys:
+                num_to_add = random.randint(1, min(self.rnd_max_change, len(inactive_buoys)))
+                buoys_to_add = random.sample(inactive_buoys, num_to_add)
+
+                for buoy in buoys_to_add:
+                    buoy.active = True
+                    self.buoys.append(buoy)
                 
-                self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-                if buoy.is_mobile:
-                    self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
+                    initial_offset = random.uniform(0, 1.0)
+                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
+                    self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+                    if buoy.is_mobile:
+                        self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
 
-            logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+                self.channel.set_buoys(self.buoys)
+                logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
 
-        self.channel.set_buoys(self.buoys)
-        next_change_time = sim_time + random.uniform(15, 20)
-        self.schedule_event(next_change_time, EventType.BUOY_ARRAY_UPDATE, self)
+        self.schedule_event(sim_time + random.uniform(15, 20), EventType.BUOY_ARRAY_UPDATE, self)
 
     def start(self):
         self.running = True
