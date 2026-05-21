@@ -213,7 +213,7 @@ class Channel:
             distance = math.hypot(dx, dy)
             
             # Skip if outside of detection range
-            if distance > self.comm_range_high_prob:
+            if distance > self.comm_range_max:
                 continue
                 
             # Calculate when the signal starts and stops passing through this specific position

@@ -1,7 +1,6 @@
 import uuid
 import random
 import math
-from collections import deque
 from enum import Enum
 
 from protocols.scheduler import BeaconScheduler
@@ -44,7 +43,8 @@ class Buoy:
         self.channel: Channel = channel
         self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
         self.metrics: bool = metrics
-        self.active: bool = True  # Flag for discarding scheduled events when disabled
+        self._active: bool = True
+        self._generation: int = 0  # Incremented on each deactivation; guards stale recurring events
         
         # Callbacks to be set by the simulator for event scheduling and metrics tracking
         self.schedule_callback: callable = None     
@@ -96,12 +96,30 @@ class Buoy:
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
         # self.information_timeout: float = cfg.get('simulation', 'information_timeout')  # Time after which a beacon is considered outdated for forwarding decisions
         self.forwarded_beacons: dict[uuid.UUID, float] = {}
-        self.pending_forward_beacons = deque()  # FIFO queue for forwarded beacons
+        self.pending_forward_beacons: dict[uuid.UUID, Beacon] = {}  # origin_id → Beacon, insertion-ordered FIFO
         self.pending_queue_limit: int = cfg.get('simulation', 'pending_queue_limit')
+
+    @property
+    def active(self) -> bool:
+        return self._active
+
+    @active.setter
+    def active(self, value: bool) -> None:
+        if self._active and not value:       # deactivation: invalidate pending recurring events
+            self._generation += 1
+        elif not self._active and value:     # reactivation: clear stale CSMA pipeline state
+            self.processing = False
+            self.want_to_send = False
+        self._active = value
 
     def handle_event(self, event: EventType, sim_time: float):
         # Lazy cancellation: discard stale events for inactive buoys in O(1)
         if not self.active:
+            return
+
+        # Discard recurring events that were scheduled before the last deactivation
+        event_gen = event.data.get('_gen')
+        if event_gen is not None and event_gen != self._generation:
             return
 
         # Dispatch event to the appropriate handler based on event type
@@ -129,7 +147,8 @@ class Buoy:
         # Schedule the next scheduler check
         self.next_scheduler_time = sim_time + self.scheduler.get_next_check_interval()
         self.schedule_callback(
-            self.next_scheduler_time, EventType.SCHEDULER_CHECK, self
+            self.next_scheduler_time, EventType.SCHEDULER_CHECK, self,
+            {'_gen': self._generation}
         )
 
         # Makes the transmission pipeline atomic by ignoring new scheduler decisions while processing a transmission
@@ -268,10 +287,11 @@ class Buoy:
             self.schedule_callback(next_try_time, EventType.FORWARD_TRANSMISSION_START, self)
             return
 
-        # Take the first valid beacon from the queue (lazy evaluation)
+        # Take the first valid beacon from the queue (lazy evaluation, insertion-ordered dict)
         forward_beacon = None
         while self.pending_forward_beacons:
-            b = self.pending_forward_beacons.popleft()
+            origin_id, b = next(iter(self.pending_forward_beacons.items()))
+            del self.pending_forward_beacons[origin_id]
             if sim_time - b.timestamp <= self.neighbor_timeout:
                 forward_beacon = b
                 break
@@ -317,29 +337,21 @@ class Buoy:
 
             # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
             case 'forwarded' if beacon.hop_limit > 0:
-                # Update forwarded beacons tracking avoiding duplicates
-                if len(self.pending_forward_beacons) >= self.pending_queue_limit:
-                    logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]} from {str(beacon.sender_id)[:6]}")
-                
-                elif beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
-                    self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
-                
-                    already_pending = False
-                    for idx, b in enumerate(self.pending_forward_beacons):
-                        if b.origin_id == beacon.origin_id:
-                            self.pending_forward_beacons[idx] = beacon  # Update with fresher beacon
-                            already_pending = True
-                            break
+                if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
+                    if beacon.origin_id in self.pending_forward_beacons:
+                        # Origin already queued: update in-place (preserves FIFO order, no size change)
+                        self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
+                        self.pending_forward_beacons[beacon.origin_id] = beacon
+                    elif len(self.pending_forward_beacons) >= self.pending_queue_limit:
+                        logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]} from {str(beacon.sender_id)[:6]}")
+                    else:
+                        self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
+                        self.pending_forward_beacons[beacon.origin_id] = beacon
 
-                    # If not present it needs to be added
-                    if not already_pending:
-                        self.pending_forward_beacons.append(beacon)
-
-                    # Start forward pipeline ONLY if no pipeline is currently active
-                    # - processing=True (own or fwd active): forward will be picked up
-                    #   by transmission_start (piggyback) or the active forward drain loop
-                    # - processing=False: start full CSMA for forwarding
-                    if not self.processing:
+                    # (Re)start pipeline if not active — covers both update and add paths
+                    # - processing=True: pipeline already running, beacon will be picked up
+                    # - processing=False: need to start full CSMA
+                    if self.pending_forward_beacons and not self.processing:
                         self.processing = True
                         self.scheduler_decision_time = sim_time
                         self.schedule_callback(
@@ -399,7 +411,8 @@ class Buoy:
                 pass
         
         self.schedule_callback(
-            sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self
+            sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self,
+            {'_gen': self._generation}
         )
 
     # Picks a random waypoint within the world boundaries
@@ -415,7 +428,7 @@ class Buoy:
         # If the buoy is still paused at the previous waypoint it stays still and wakes up exactly when the pause expires
         if sim_time < self.rwp_pause_until:
             self.velocity = (0.0, 0.0)
-            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self)
+            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
             return
 
         # Moving toward the waypoint
@@ -445,7 +458,7 @@ class Buoy:
             )
 
             # Resume after the pause
-            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self)
+            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
             return
 
         # Moving toward waypoint
@@ -457,7 +470,7 @@ class Buoy:
         self.position = (x + vx * self.rwp_dt, y + vy * self.rwp_dt)
 
         # Schedule next movement
-        self.schedule_callback(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT, self)
+        self.schedule_callback(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
     
     def create_beacon(self, sim_time: float) -> Beacon:
         all_neighbors = [(id, ts, pos) for id, (ts, pos) in self.neighbors.items()]

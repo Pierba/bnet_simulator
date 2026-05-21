@@ -78,12 +78,12 @@ class Simulator:
 
             # Scheduling first events that will trigger themself periodically along the simulation
             initial_offset = random.uniform(0, 1.0)
-            self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy)
-            self.schedule_event(initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-            
-            # Mobile buoys also update their position 
+            self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
+            self.schedule_event(initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
+
+            # Mobile buoys also update their position
             if buoy.is_mobile:
-                self.schedule_event(initial_offset, EventType.BUOY_MOVEMENT, buoy)
+                self.schedule_event(initial_offset, EventType.BUOY_MOVEMENT, buoy, {'_gen': buoy._generation})
         
         # Schedule first buoy array update for dynamic scenarios
         if self.scenario == "static":
@@ -134,8 +134,8 @@ class Simulator:
 
         # Scheduling initial events for the newly added buoy
         initial_offset = random.uniform(0, 1.0)
-        self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-        self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+        self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
+        self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
         self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
    
     def _update_buoy_array_random(self, sim_time: float):
@@ -158,11 +158,11 @@ class Simulator:
                     buoy.active = True
                     
                     initial_offset = random.uniform(0, 1.0)
-                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
-                    self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
-                    
+                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
+                    self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
+
                     if buoy.is_mobile:
-                        self.schedule_event(sim_time + initial_offset, EventType.BUOY_MOVEMENT, buoy)
+                        self.schedule_event(sim_time + initial_offset, EventType.BUOY_MOVEMENT, buoy, {'_gen': buoy._generation})
                 
                 self._active_count += num_to_add
                 logging.log_info(f"Added {num_to_add} buoys, now {self._active_count} active at {sim_time:.2f}s")

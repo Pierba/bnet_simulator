@@ -209,6 +209,8 @@ def main():
         buoy.scheduler.static_interval = static_interval
         buoy.scheduler.min_interval = min_interval
         buoy.scheduler.max_interval = max_interval
+        buoy.scheduler.interval_range = max_interval - min_interval
+        buoy.scheduler.jitter_scale = buoy.scheduler.interval_range * 0.1
 
         # Set callbacks for metrics data collection if metrics are enabled
         if metrics:
