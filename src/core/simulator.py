@@ -19,10 +19,15 @@ class Simulator:
         self.channel: Channel = channel
         self.metrics: Metrics = metrics
 
-        # In ramp mode, we start with only 2 buoys and add the rest gradually. In static/random mode, we start with all buoys active.
-        self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if self.scenario == "ramp" else buoys
-        
-        # Simulation duration time
+        # When on ramp scenario only the first 2 buoys are considered active (existing in the network)
+        if self.scenario == "ramp":
+            for b in self.all_buoys[2:]:
+                b.active = False
+            self._active_count: int = 2
+        else:
+            self._active_count: int = len(self.all_buoys)
+
+        # Durantion time of the simulation in seconds
         self.duration: float = duration
         
         # Neighbor settings
@@ -36,11 +41,11 @@ class Simulator:
         self.rnd_max_change: int = max(1, int(total_buoys * self.random_variability))
 
         # Channel settings
-        self.channel.set_buoys(self.buoys)
+        self.channel.set_buoys(self.all_buoys)
         self.channel.schedule_callback = self.schedule_event
         self.running: bool = False
         self.simulated_time: float = 0.0
-        self.last_timepoint_log: int = -1  # Track last 5s interval logged to avoid duplicate timepoints
+        self.last_timepoint_log: int = -1  # Track interval logged to avoid duplicate timepoints
         
         # Setting callback function for buoys to schedule their events
         for buoy in self.all_buoys:
@@ -66,7 +71,11 @@ class Simulator:
 
     # Schedule initial events for buoys, channel and simulator itself
     def _schedule_initial_events(self):
-        for buoy in self.buoys:
+        for buoy in self.all_buoys:
+            # If the buoy is not active at the start of the simulation, it skips scheduling its events.
+            if not buoy.active:
+                continue
+
             # Scheduling first events that will trigger themself periodically along the simulation
             initial_offset = random.uniform(0, 1.0)
             self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy)
@@ -76,10 +85,7 @@ class Simulator:
             if buoy.is_mobile:
                 self.schedule_event(initial_offset, EventType.BUOY_MOVEMENT, buoy)
         
-        # Schedule initial channel update event
-        self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
-        
-        # If scenario is static the update events end here
+        # Schedule first buoy array update for dynamic scenarios
         if self.scenario == "static":
             return
         
@@ -110,70 +116,56 @@ class Simulator:
                 self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
             case _:
                 logging.log_error(f"Simulator received unhandled event: {event.event_type}")
-
+    
     def _update_buoy_array_ramp(self, sim_time: float):
-        # If we already have all buoys active there is no need to add more
-        current_count = len(self.buoys)
-        if current_count >= total_buoys:
-            return
-        
-        active_set = set(self.buoys)
-        inactive_buoys = [b for b in self.all_buoys if b not in active_set]
+        # If buoys are all active then stop adding more
         total_buoys = len(self.all_buoys)
-        
+        if self._active_count >= total_buoys:
+            return
+
         # Calculate the interval at which to add buoys based on the total number of buoys and the simulation duration
         buoys_to_add = total_buoys - 2
         add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
-    
-        
-        buoy = inactive_buoys[0]
-        self.buoys.append(buoy)
-        self.channel.set_buoys(self.buoys)
-        
+
+        # With next() it finds the first inactive buoy without allocating a list
+        buoy = next(b for b in self.all_buoys if not b.active)
+        buoy.active = True
+        self._active_count += 1
+
+        # Scheduling initial events for the newly added buoy
         initial_offset = random.uniform(0, 1.0)
         self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
         self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
         self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
    
     def _update_buoy_array_random(self, sim_time: float):
-        current_count = len(self.buoys)
-        can_remove = current_count > self.rnd_min_buoys
-
-        if can_remove and random.random() < 0.5:
-            max_to_remove = min(self.rnd_max_change, current_count - self.rnd_min_buoys)
-            num_to_remove = random.randint(1, max_to_remove)
-            remove_set = set(random.sample(self.buoys, num_to_remove))
-
-            for buoy in remove_set:
+        # If there are more than minimum number of buoys active, randomly decide to remove some buoys with a 50% chance
+        if self._active_count > self.rnd_min_buoys and random.random() < 0.5:
+            active_buoys = [b for b in self.all_buoys if b.active]
+            num_to_remove = random.randint(1, min(self.rnd_max_change, self._active_count - self.rnd_min_buoys))
+            for buoy in random.sample(active_buoys, num_to_remove):
                 buoy.active = False
+            self._active_count -= num_to_remove
+            logging.log_info(f"Removed {num_to_remove} buoys, now {self._active_count} active at {sim_time:.2f}s")
 
-            self.buoys = [b for b in self.buoys if b not in remove_set]
-
-            self.channel.set_buoys(self.buoys)
-            logging.log_info(f"Removed {num_to_remove} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
-
+        # Otherwise deactivate some random buoys
         else:
-            # Build inactive list only when the add branch is actually reached
-            active_set = set(self.buoys)
-            inactive_buoys = [b for b in self.all_buoys if b not in active_set]
-
+            inactive_buoys = [b for b in self.all_buoys if not b.active]
             if inactive_buoys:
                 num_to_add = random.randint(1, min(self.rnd_max_change, len(inactive_buoys)))
-                buoys_to_add = random.sample(inactive_buoys, num_to_add)
 
-                for buoy in buoys_to_add:
+                for buoy in random.sample(inactive_buoys, num_to_add):
                     buoy.active = True
-                    self.buoys.append(buoy)
-                
+                    
                     initial_offset = random.uniform(0, 1.0)
                     self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                     self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
                     
                     if buoy.is_mobile:
                         self.schedule_event(sim_time + initial_offset, EventType.BUOY_MOVEMENT, buoy)
-
-                self.channel.set_buoys(self.buoys)
-                logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")
+                
+                self._active_count += num_to_add
+                logging.log_info(f"Added {num_to_add} buoys, now {self._active_count} active at {sim_time:.2f}s")
 
         self.schedule_event(sim_time + random.uniform(15, 20), EventType.BUOY_ARRAY_UPDATE, self)
 
@@ -219,7 +211,7 @@ class Simulator:
                         self.last_timepoint_log = current_interval
                         avg_neighbors_sample = self.calculate_avg_neighbors()
                         if self.metrics:
-                            self.metrics.log_timepoint(self.simulated_time, len(self.buoys), avg_neighbors_sample)
+                            self.metrics.log_timepoint(self.simulated_time, self._active_count, avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
@@ -232,21 +224,17 @@ class Simulator:
     
     # This method calculates the average number of neighbors for the current buoy array
     def calculate_avg_neighbors(self) -> float: # O(n log n) using k-d tree
-        if not self.buoys:
+        if not self._active_count:
             return 0.0
-            
-        # Build the k-d tree using the buoys' positions
-        points = [b.position for b in self.buoys]
+
+        # Build the k-d tree using only active buoys' positions
+        points = [b.position for b in self.all_buoys if b.active]
         tree = cKDTree(points)
-        
+
         # Finds all unique pairs of buoys within communication range
-        # This returns a set of (i, j) pairs
+        # Each pair (i, j) counts as two directed neighbor relationships
         pairs = tree.query_pairs(self.comm_range_max)
-        
-        # Each unique pair (i, j) means: i-buoy is a neighbor of j-buoy, and j-buoy is a neighbor of i-buoy
-        total_neighbors = len(pairs) * 2
-        
-        return total_neighbors / len(self.buoys)
+        return (len(pairs) * 2) / self._active_count
     
     # This method calculates the average number of neighbors and records it if metrics collection is enabled
     def calculate_and_record_avg_neighbors(self):

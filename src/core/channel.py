@@ -36,8 +36,8 @@ class Channel:
 
     def handle_event(self, event, sim_time: float):
         match event.event_type:
-            case EventType.CHANNEL_UPDATE:
-                self._handle_channel_update(event, sim_time)
+            # case EventType.CHANNEL_UPDATE:
+            #     self._handle_channel_update(event, sim_time)
             case EventType.TRANSMISSION_END:
                 self._handle_transmission_end(event, sim_time)
             case _:
@@ -80,7 +80,12 @@ class Channel:
 
         # Find all buoy receivers in range of the sender
         for buoy in self.buoys:
+            # Skip the sender itself, it cannot receive its own transmission
             if buoy.id == beacon.sender_id:
+                continue
+       
+            # Skip inactive buoys, they cannot receive or cause collisions
+            if not buoy.active:
                 continue
 
             bx, by = buoy.position
