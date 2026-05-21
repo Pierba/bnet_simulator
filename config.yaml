@@ -4,36 +4,45 @@ simulation:
   - dynamic_adab
   - dynamic_acab
   min_buoys: 20
-  max_buoys: 60
+  max_buoys: 100
   step_buoys: 20
   intervals:
    - 1.0
    - 0.5
    - 0.25
-  duration: 200
+  duration: 300
   num_processes: 10
   ideal_channel: false
-  scenario: random           # Options: static, ramp, random
-  random_variability: 0.05   # Percentage of buoys that can change per update in random scenario
+  # Options: static, ramp, random
+  scenario: ramp          
+  # Percentage of buoys that can change per update in random scenario 
+  random_variability: 0.10
   enable_metrics: true
   enable_logging: false
-  enable_file_logging: true
-  multihop_mode: none        # Options: none, append, forwarded
-  multihop_limit: 2          # Maximum hops for forwarded mode
-  pending_queue_limit: 20    # Maximum number of beacons that can be stored in pending queue
+  enable_file_logging: false
+  # Options: none, append, forwarded
+  multihop_mode: forwarded
+  # Maximum hops for forwarded mode
+  multihop_limit: 2
+  # Maximum number of beacons that can be stored in pending queue
+  pending_queue_limit: 20
 
 world:
-  width: 200.0
-  height: 200.0
+  width: 800.0
+  height: 800.0
 
 buoys:
-  mobile_percentage: 0.5
+  mobile_percentage: 0.4
   default_battery: 100.0
   default_velocity: 15.0
-  rwp_speed_min: 5.0    # m/s – lower bound per leg
-  rwp_speed_max: 20.0   # m/s – upper bound per leg (default_velocity: 15.0 sits in the middle)
-  rwp_pause_min: 0.0    # seconds – minimum pause at waypoint (0 = no pause)
-  rwp_pause_max: 10.0   # seconds – maximum pause at waypoint
+  # m/s – lower bound per leg
+  rwp_speed_min: 5.0 
+  # m/s – upper bound per leg   
+  rwp_speed_max: 20.0
+  # seconds – minimum pause at waypoint
+  rwp_pause_min: 0.0
+  # seconds – maximum pause at waypoint
+  rwp_pause_max: 10.0
 
 network:
   bit_rate: 1000000

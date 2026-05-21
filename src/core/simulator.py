@@ -11,7 +11,7 @@ from utils import logging
 from scipy.spatial import cKDTree
 
 class Simulator:
-    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str = "static", duration: float = None):
+    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str, duration: float):
         cfg = ConfigHandler()
         
         self.scenario = scenario
@@ -22,15 +22,14 @@ class Simulator:
         # In ramp mode, we start with only 2 buoys and add the rest gradually. In static/random mode, we start with all buoys active.
         self.buoys: List[Buoy] = self.all_buoys.copy()[:2] if self.scenario == "ramp" else buoys
         
-        
-        self.next_buoy_change: float = 0
-        self.duration: float = duration if duration is not None else cfg.get('simulation', 'duration')
+        # Simulation duration time
+        self.duration: float = duration
         
         # Neighbor settings
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
         self.comm_range_max: float = cfg.get('network', 'communication_range_max')
 
-        # Random scenario settings — precompute constants that never change
+        # Random scenario settings & precompute constants that never change
         self.random_variability: float = cfg.get('simulation', 'random_variability')
         total_buoys = len(self.all_buoys)
         self.rnd_min_buoys: int = max(3, int(total_buoys * 0.2))
@@ -43,7 +42,7 @@ class Simulator:
         self.simulated_time: float = 0.0
         self.last_timepoint_log: int = -1  # Track last 5s interval logged to avoid duplicate timepoints
         
-        # Making all buoys able to access the schedule_event method of the simulator for scheduling their own events
+        # Setting callback function for buoys to schedule their events
         for buoy in self.all_buoys:
             buoy.schedule_callback = self.schedule_event
 
@@ -51,37 +50,40 @@ class Simulator:
         self.event_queue: list = []
         self.event_counter: int = 0
 
+    # Scheduler of events ordered by their scheduled time
     def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
         self.event_counter += 1
         epsilon = self.event_counter * 1e-10
         heapq.heappush(self.event_queue, (event.time + epsilon, self.event_counter, event))
     
+    # Retrieves the next event from the event queue
     def _get_next_event(self) -> Optional[Event]:
         if not self.event_queue:
             return None
         _, _, event = heapq.heappop(self.event_queue)
         return event
 
+    # Schedule initial events for buoys, channel and simulator itself
     def _schedule_initial_events(self):
-        # Schedule initial events for all buoys
         for buoy in self.buoys:
-            initial_offset = random.uniform(0, 1.0)
-
             # Scheduling first events that will trigger themself periodically along the simulation
+            initial_offset = random.uniform(0, 1.0)
             self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy)
             self.schedule_event(initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
             
+            # Mobile buoys also update their position 
             if buoy.is_mobile:
-                self.schedule_event(0.1, EventType.BUOY_MOVEMENT, buoy)
+                self.schedule_event(initial_offset, EventType.BUOY_MOVEMENT, buoy)
         
         # Schedule initial channel update event
         self.schedule_event(1.0, EventType.CHANNEL_UPDATE, self.channel)
         
-        # Schedule first buoy array update for dynamic scenarios
+        # If scenario is static the update events end here
         if self.scenario == "static":
             return
         
+        # Schedule first buoy array update for dynamic scenarios (ramp/random)
         self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
         
         # Schedule periodic avg_neighbors calculation every 30 seconds if metrics are enabled
@@ -108,17 +110,21 @@ class Simulator:
                 self.schedule_event(sim_time + 30.0, EventType.AVG_NEIGHBORS_CALCULATION, self)
             case _:
                 logging.log_error(f"Simulator received unhandled event: {event.event_type}")
-    
+
     def _update_buoy_array_ramp(self, sim_time: float):
+        # If we already have all buoys active there is no need to add more
+        current_count = len(self.buoys)
+        if current_count >= total_buoys:
+            return
+        
         active_set = set(self.buoys)
         inactive_buoys = [b for b in self.all_buoys if b not in active_set]
-        current_count = len(self.buoys)
         total_buoys = len(self.all_buoys)
+        
+        # Calculate the interval at which to add buoys based on the total number of buoys and the simulation duration
         buoys_to_add = total_buoys - 2
         add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
     
-        if current_count >= total_buoys:
-            return
         
         buoy = inactive_buoys[0]
         self.buoys.append(buoy)
@@ -162,8 +168,9 @@ class Simulator:
                     initial_offset = random.uniform(0, 1.0)
                     self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy)
                     self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy)
+                    
                     if buoy.is_mobile:
-                        self.schedule_event(sim_time + 0.1, EventType.BUOY_MOVEMENT, buoy)
+                        self.schedule_event(sim_time + initial_offset, EventType.BUOY_MOVEMENT, buoy)
 
                 self.channel.set_buoys(self.buoys)
                 logging.log_info(f"Added {num_to_add} buoys, now {len(self.buoys)} active at {sim_time:.2f}s")

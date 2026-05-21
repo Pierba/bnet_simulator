@@ -55,7 +55,8 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
            "--positions-file", positions_file,
            "--density", str(density),
            "--static-interval", str(interval),
-           "--scenario", scenario]
+           "--scenario", scenario,
+        ]
     
     if cfg.get('simulation', 'ideal_channel'):
         cmd.append("--ideal")
@@ -87,17 +88,17 @@ def plot_results(results_dir, plots_dir, interval):
     subprocess.run(plot_cmd)
 
 # Naming system for results and plots directories based on the interval value.
-def get_interval_str(interval: float) -> str:
-    interval_str = None
-    if interval < 1:
-        interval_str = str(int(interval * 100))
-        if interval * 100 % 10 == 0: # 0.5
-            interval_str = str(int(interval * 10))
-        else: # 0.25
-            interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
-    else:
-        interval_str = str(int(interval))
-    return interval_str
+# def get_interval_str(interval: float) -> str:
+#     interval_str = None
+#     if interval < 1:
+#         interval_str = str(int(interval * 100))
+#         if interval * 100 % 10 == 0: # 0.5
+#             interval_str = str(int(interval * 10))
+#         else: # 0.25
+#             interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
+#     else:
+#         interval_str = str(int(interval))
+#     return interval_str
 
 def main():
     cfg = ConfigHandler()
@@ -125,18 +126,19 @@ def main():
     scenario: str = cfg.get('simulation', 'scenario')               # Scenario to run (static, ramp, random)
     world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
     world_height: float = cfg.get('world', 'height')                # Height of the simulation world
+    multihop_mode: str = cfg.get('simulation', 'multihop_mode')
     
     try:
         for interval in intervals: # [1.0, 0.5, 0.25]
-            interval_str = get_interval_str(interval)
+            interval_str = f"{interval}"
             ideal_suffix = "_ideal" if ideal else ""
             scenario_suffix = f"_{scenario}"
-            multihop_mode = cfg.get('simulation', 'multihop_mode')
             multihop_suffix = f"_{multihop_mode}"
 
-            results_dir = os.path.join("metrics", f"results_interval{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
-            plots_dir = os.path.join("metrics", f"plots_interval{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
+            results_dir = os.path.join("metrics", f"results_interval:{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
             os.makedirs(results_dir, exist_ok=True)
+            
+            plots_dir = os.path.join("metrics", f"plots_interval:{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
             os.makedirs(plots_dir, exist_ok=True)
             
             print(f"Running simulations with interval = {interval}s")
@@ -146,6 +148,7 @@ def main():
                     positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
                     for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
                         run_simulation(mode, interval, max_buoys, positions, results_dir, cfg)
+                
                 case 'random' | 'static':
                     # Density of buoys within the specified range and step size
                     densities = list(range(min_buoys, max_buoys + 1, step_buoys))

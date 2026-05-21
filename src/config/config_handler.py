@@ -17,14 +17,14 @@ class ConfigHandler:
             'duration': 600,
             'num_processes': 4,
             'ideal_channel': True,
-            'scenario': 'static',  # Options: static, ramp, random
-            'random_variability': 0.05,  # Fraction of total buoys that can change per update in random scenario
+            'scenario': 'static',           # Options: static, ramp, random
+            'random_variability': 0.05,     # Fraction of total buoys that can change per update in random scenario
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
-            'multihop_mode': 'none',    # Options: none, append, forwarded
-            'multihop_limit': 2,        # Maximum hops for forwarded mode
-            'pending_queue_limit': 20,  # Maximum number of beacons that can be stored in pending queue
+            'multihop_mode': 'none',        # Options: none, append, forwarded
+            'multihop_limit': 2,            # Maximum hops for forwarded mode
+            'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
         },
         'world': {
             'width': 800.0,
@@ -35,6 +35,10 @@ class ConfigHandler:
             'mobile_percentage': 1.0,
             'default_battery': 100.0,
             'default_velocity': 15.0,
+            'rwp_speed_min': 5.0,
+            'rwp_speed_max': 20.0,
+            'rwp_pause_min': 0.0,
+            'rwp_pause_max': 10.0,
         },
         'network': {
             'bit_rate': 1000000,

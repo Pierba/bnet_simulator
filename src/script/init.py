@@ -40,7 +40,7 @@ def parse_args():
     parser.add_argument(
         "--seed",
         type=float,
-        default=None,
+        default=time.time(),
         help="Random seed for reproducibility"
     )
     parser.add_argument(
@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument(
         "--density",
         type=int,
-        default=None,
+        default=cfg.get('simulation', 'min_buoys'),
         help="Density value for this scenario"
     )
     parser.add_argument(
@@ -120,10 +120,12 @@ def parse_args():
 
 # Get random position within the world boundaries
 def random_position(world_width, world_height) -> Tuple[float, float]:
-    x = random.uniform(10, world_width - 10)
-    y = random.uniform(10, world_height - 10)
-    return (x, y)
+    return (
+        random.uniform(10, world_width - 10), 
+        random.uniform(10, world_height - 10)
+    )
 
+# Get random velocity vector for mobile buoys based on a default velocity
 def random_velocity(default_velocity) -> Tuple[float, float]:
     return (
         random.uniform(-1, 1) * default_velocity,
@@ -135,27 +137,24 @@ def main():
     args = parse_args()
 
     # Unpacking args values
-    mode: str = args.mode
-    duration: float = args.duration
-    seed: float = args.seed
-    world_width: float = args.world_width
-    world_height: float = args.world_height
-    mobile_buoy_count: int = args.mobile_buoy_count
-    fixed_buoy_count: int = args.fixed_buoy_count
-    result_file: str = args.result_file
-    positions_file: str = args.positions_file
-    density: int = args.density
-    ideal: bool = args.ideal
-    static_interval: float = args.static_interval
-    min_interval: float = args.min_interval
-    max_interval: float = args.max_interval
-    scenario: str = args.scenario
+    mode: str               =   args.mode
+    duration: float         =   args.duration
+    seed: float             =   args.seed
+    world_width: float      =   args.world_width
+    world_height: float     =   args.world_height
+    mobile_buoy_count: int  =   args.mobile_buoy_count
+    fixed_buoy_count: int   =   args.fixed_buoy_count
+    result_file: str        =   args.result_file
+    positions_file: str     =   args.positions_file
+    density: int            =   args.density
+    ideal: bool             =   args.ideal
+    static_interval: float  =   args.static_interval
+    min_interval: float     =   args.min_interval
+    max_interval: float     =   args.max_interval
+    scenario: str           =   args.scenario
 
-    # Set the random seed if provided, otherwise use the current time    
-    if seed is not None:
-        random.seed(seed)
-    else:
-        random.seed(time.time())
+    # Set the random seed for reproducibility
+    random.seed(seed)
 
     # Load buoy positions from file if provided, otherwise they will be generated randomly
     positions: List[Tuple[float, float]] = None
@@ -170,6 +169,7 @@ def main():
     metrics = None
     if cfg.get('simulation', 'enable_metrics'):
         multihop_mode = cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
+        
         metrics = Metrics(
             density=density,
             scheduler_type=mode,
@@ -181,7 +181,7 @@ def main():
             multihop_mode=multihop_mode,
         )
 
-    # Settin up the communication channel for the simulation
+    # Setting up the communication channel for the simulation
     channel = Channel(metrics=metrics, ideal_channel=ideal)
 
     # Initialization of buoys based on the parameters provided
@@ -201,6 +201,7 @@ def main():
             velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
             metrics=metrics is not None
         )
+
         # Set the scheduler type: ['static', 'dynamic_adab', 'dynamic_acab']
         buoy.scheduler.scheduler_type = mode
 
@@ -209,6 +210,7 @@ def main():
         buoy.scheduler.min_interval = min_interval
         buoy.scheduler.max_interval = max_interval
 
+        # Set callbacks for metrics data collection if metrics are enabled
         if metrics:
             buoy.record_scheduler_latency_callback = metrics.record_scheduler_latency
             buoy.set_unique_nodes_per_buoy_callback = metrics.set_unique_nodes_per_buoy
@@ -216,11 +218,12 @@ def main():
 
         buoys.append(buoy)
 
-
+    # Creating the Simulator instance with the initialized buoys, channel, and metrics
     simulator = Simulator(buoys, channel, metrics, scenario, duration)
     simulator.start()
 
-    if metrics:
+    # If metrics are enabled and there is the output file, then export metrics to a CSV file once simulation is complete
+    if metrics and result_file:
         match scenario:
             case "ramp":
                 metrics.export_time_series(result_file)
