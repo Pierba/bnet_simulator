@@ -43,7 +43,7 @@ class Buoy:
         self.channel: Channel = channel
         self.state: BuoyState = BuoyState.RECEIVING # Default state is RECEIVING
         self.metrics: bool = metrics
-        self._active: bool = True
+        self.active: bool = True
         self._generation: int = 0  # Incremented on each deactivation; guards stale recurring events
         
         # Callbacks to be set by the simulator for event scheduling and metrics tracking
@@ -99,18 +99,14 @@ class Buoy:
         self.pending_forward_beacons: dict[uuid.UUID, Beacon] = {}  # origin_id → Beacon, insertion-ordered FIFO
         self.pending_queue_limit: int = cfg.get('simulation', 'pending_queue_limit')
 
-    @property
-    def active(self) -> bool:
-        return self._active
+    def activate(self):
+        self.active = True
+        self.processing = False    # drop CSMA pipeline state left over from a prior cycle
+        self.want_to_send = False
 
-    @active.setter
-    def active(self, value: bool) -> None:
-        if self._active and not value:       # deactivation: invalidate pending recurring events
-            self._generation += 1
-        elif not self._active and value:     # reactivation: clear stale CSMA pipeline state
-            self.processing = False
-            self.want_to_send = False
-        self._active = value
+    def deactivate(self):
+        self.active = False
+        self._generation += 1      # invalidate recurring events scheduled in this cycle
 
     def handle_event(self, event: EventType, sim_time: float):
         # Lazy cancellation: discard stale events for inactive buoys in O(1)
@@ -147,8 +143,7 @@ class Buoy:
         # Schedule the next scheduler check
         self.next_scheduler_time = sim_time + self.scheduler.get_next_check_interval()
         self.schedule_callback(
-            self.next_scheduler_time, EventType.SCHEDULER_CHECK, self,
-            {'_gen': self._generation}
+            self.next_scheduler_time, EventType.SCHEDULER_CHECK, self, {'_gen': self._generation}
         )
 
         # Makes the transmission pipeline atomic by ignoring new scheduler decisions while processing a transmission
@@ -314,6 +309,11 @@ class Buoy:
         beacon = event.data.get("beacon")
         if not beacon:
             return
+
+        # Drop the beacon unless this receiver still holds a valid scheduled reception:
+        # a later colliding transmission revokes it (a real radio sees corrupted bits)
+        if self.id not in beacon.scheduled_receivers:
+            return
   
         # Update direct neighbors of this buoy with the sender of the beacon (1-hop neighbors)
         self.neighbors[beacon.sender_id] = (sim_time, beacon.position)
@@ -348,9 +348,7 @@ class Buoy:
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
 
-                    # (Re)start pipeline if not active — covers both update and add paths
-                    # - processing=True: pipeline already running, beacon will be picked up
-                    # - processing=False: need to start full CSMA
+                    # Start transmission pipeline if not active
                     if self.pending_forward_beacons and not self.processing:
                         self.processing = True
                         self.scheduler_decision_time = sim_time

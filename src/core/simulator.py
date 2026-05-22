@@ -22,7 +22,7 @@ class Simulator:
         # When on ramp scenario only the first 2 buoys are considered active (existing in the network)
         if self.scenario == "ramp":
             for b in self.all_buoys[2:]:
-                b.active = False
+                b.deactivate()
             self._active_count: int = 2
         else:
             self._active_count: int = len(self.all_buoys)
@@ -129,7 +129,7 @@ class Simulator:
 
         # With next() it finds the first inactive buoy without allocating a list
         buoy = next(b for b in self.all_buoys if not b.active)
-        buoy.active = True
+        buoy.activate()
         self._active_count += 1
 
         # Scheduling initial events for the newly added buoy
@@ -144,18 +144,18 @@ class Simulator:
             active_buoys = [b for b in self.all_buoys if b.active]
             num_to_remove = random.randint(1, min(self.rnd_max_change, self._active_count - self.rnd_min_buoys))
             for buoy in random.sample(active_buoys, num_to_remove):
-                buoy.active = False
+                buoy.deactivate()
             self._active_count -= num_to_remove
             logging.log_info(f"Removed {num_to_remove} buoys, now {self._active_count} active at {sim_time:.2f}s")
 
-        # Otherwise deactivate some random buoys
+        # Otherwise activate some inactive buoys
         else:
             inactive_buoys = [b for b in self.all_buoys if not b.active]
             if inactive_buoys:
                 num_to_add = random.randint(1, min(self.rnd_max_change, len(inactive_buoys)))
 
                 for buoy in random.sample(inactive_buoys, num_to_add):
-                    buoy.active = True
+                    buoy.activate()
                     
                     initial_offset = random.uniform(0, 1.0)
                     self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})

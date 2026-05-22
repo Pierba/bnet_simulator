@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Tuple, List, Optional
+from dataclasses import dataclass, field
+from typing import Tuple, List, Optional, Set
 import uuid
 
 @dataclass
@@ -14,6 +14,10 @@ class Beacon:
     origin_id: Optional[uuid.UUID] = None  # 16 bytes (only in forwarded mode)
     hop_limit: int = 0  # 4 bytes (only in forwarded mode)
 
+    # Simulation-only bookkeeping, not part of the on-air packet (excluded from size_bytes):
+    # receiver ids with a still-valid scheduled reception of this beacon; a colliding
+    # transmission removes a receiver here so its corrupted copy is dropped on arrival
+    scheduled_receivers: Set[uuid.UUID] = field(default_factory=set, compare=False)
 
     def size_bytes(self) -> int:
         # Base size: sender_id(16) + mobile(1) + position(8) + battery(4) + timestamp(4) = 37 bytes
