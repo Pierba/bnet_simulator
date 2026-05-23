@@ -8,6 +8,8 @@ simulation:
   step_buoys: 20
   intervals:
    - 1.0
+   - 0.5
+   - 0.25
   duration: 90
   num_processes: 10
   ideal_channel: false
@@ -26,9 +28,7 @@ simulation:
   pending_queue_limit: 20
   # Max consecutive forwards a node can drain before re-contending via full CSMA (TXOP cap)
   forward_txop_limit: 3
-  # Counter-based forward suppression: cancel a pending forward after K duplicates of the same (origin, timestamp) are overheard during CSMA backoff. 0 disables.
-  forward_suppression_k: 2
-  # Probabilistic forwarding baseline: a fresh forwardable beacon is queued with probability min(1, n0/n_neighbors). 0 disables.
+  # Probabilistic forwarding: just before broadcasting a pending forward, fire it with p = min(1, n0/n_neighbors). 0 disables.
   forward_density_baseline: 5
 
 world:
