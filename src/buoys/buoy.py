@@ -374,12 +374,16 @@ class Buoy:
             # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
             case 'forwarded' if beacon.hop_limit > 0:
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
+                    # If already in pending queue, just update the beacon
                     if beacon.origin_id in self.pending_forward_beacons:
-                        # Origin already queued: update in-place (preserves FIFO order, no size change)
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
+
+                    # If the queue is full, drop the beacon
                     elif len(self.pending_forward_beacons) >= self.pending_queue_limit:
                         logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]} from {str(beacon.sender_id)[:6]}")
+                    
+                    # We can add the beacon to the queue
                     else:
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
@@ -451,9 +455,10 @@ class Buoy:
 
     # Picks a random waypoint within the world boundaries
     def _pick_rwp_waypoint(self) -> tuple[float, float]:
-        x = random.uniform(0.0, self.world_width)
-        y = random.uniform(0.0, self.world_height)
-        return (x, y)
+        return (
+            random.uniform(0.0, self.world_width),
+            random.uniform(0.0, self.world_height)
+        )
 
     def _handle_buoy_movement(self, event, sim_time: float):
         if not self.is_mobile:

@@ -135,10 +135,10 @@ def main():
             scenario_suffix = f"_{scenario}"
             multihop_suffix = f"_{multihop_mode}"
 
-            results_dir = os.path.join("metrics", f"results_interval:{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
+            results_dir = os.path.join("metrics", f"results_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
             os.makedirs(results_dir, exist_ok=True)
             
-            plots_dir = os.path.join("metrics", f"plots_interval:{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
+            plots_dir = os.path.join("metrics", f"plots_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
             os.makedirs(plots_dir, exist_ok=True)
             
             print(f"Running simulations with interval = {interval}s")

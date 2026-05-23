@@ -120,7 +120,7 @@ class Metrics:
 
     def delivery_ratio(self) -> float:
         # True Packet Delivery Ratio: unique beacons received divided by beacons sent
-        return self.beacons_received / self.beacons_sent if self.beacons_sent else 0
+        return self.beacons_received / self.beacons_sent if self.beacons_sent else 0.0
 
     
     def avg_unique_nodes_discovered(self) -> float:

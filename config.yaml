@@ -10,7 +10,7 @@ simulation:
    - 1.0
    - 0.5
    - 0.25
-  duration: 90
+  duration: 100
   num_processes: 10
   ideal_channel: false
   # Options: static, ramp, random
