@@ -65,63 +65,86 @@ class Channel:
     def broadcast(self, beacon: Beacon, sim_time: float) -> float:
         if logging.LOGGING_ENABLED:
             logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
-        
-        # Refresh the current transmissions
-        self.update(sim_time)            
 
-        # Inverse formula to get transmission time: time = bits / bit_rate
-        new_start_time = sim_time
+        self.update(sim_time)
+
+        # Transmission time = bits / bit_rate
         transmission_time = beacon.size_bits() / self.bit_rate
         new_end_time = sim_time + transmission_time
-        
-        # Precompute distances and keep track of receivers in range
+
+        receivers_data = self._receivers_in_range(beacon)
+        n_receivers = len(receivers_data)
+
+        receivers_with_collisions, poisoned_count = self._detect_collisions(
+            beacon, receivers_data, sim_time, new_end_time
+        )
+
+        # Record this transmission so later broadcasts can detect collisions against it
+        self.active_transmissions.append((beacon, sim_time, new_end_time))
+        self.schedule_callback(new_end_time, EventType.TRANSMISSION_END, self, {"beacon": beacon})
+
+        probability_lost = self._schedule_receptions(
+            beacon, receivers_data, receivers_with_collisions, new_end_time
+        )
+
+        collision_lost = len(receivers_with_collisions)
+        total_lost = collision_lost + probability_lost
+        actual_successful = n_receivers - total_lost
+
+        if self.metrics:
+            self.metrics.log_sent()
+            self.metrics.log_potentially_sent(n_receivers)
+            self.metrics.log_successful_receivers(actual_successful)
+            self.metrics.log_collision(collision_lost)
+            self.metrics.log_lost(total_lost)
+
+            # Retroactive correction for earlier receptions revoked by this transmission
+            if poisoned_count:
+                self.metrics.log_collision(poisoned_count)
+                self.metrics.log_lost(poisoned_count)
+                self.metrics.log_successful_receivers(-poisoned_count)
+
+            if logging.LOGGING_ENABLED:
+                logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
+
+        return new_end_time
+
+    def _receivers_in_range(self, beacon: Beacon) -> list:
+        # Active buoys (excluding the sender) within communication range of the beacon
         receivers_data = []
         beacon_x, beacon_y = beacon.position
-        comm_range_sq = self.comm_range_max_sq
         sender_id = beacon.sender_id
+        comm_range_sq = self.comm_range_max_sq
 
-        # Find all buoy receivers in range of the sender
         for buoy in self.buoys:
-            # Skip the sender itself, it cannot receive its own transmission
-            if buoy.id == sender_id:
+            if buoy.id == sender_id or not buoy.active:
                 continue
-       
-            # Skip inactive buoys, they cannot receive or cause collisions
-            if not buoy.active:
-                continue
-
             bx, by = buoy.position
-            dx = bx - beacon_x
-            dy = by - beacon_y
+            dx, dy = bx - beacon_x, by - beacon_y
             dist_sq = (dx * dx) + (dy * dy)
             if dist_sq <= comm_range_sq:
                 receivers_data.append((buoy, dist_sq))
-                
-        n_receivers = len(receivers_data)
 
-        # Check for collisions with active transmissions
-        receivers_with_collisions = set()      # receivers that lose THIS (new) beacon
-        poisoned_count = 0                     # already-scheduled receptions invalidated below
+        return receivers_data
+
+    def _detect_collisions(self, beacon: Beacon, receivers_data: list, start_time: float, end_time: float) -> tuple[set, int]:
+        # Returns (receiver ids that lose this beacon, count of earlier receptions revoked)
+        receivers_with_collisions = set()
+        poisoned_count = 0
+        sender_id = beacon.sender_id
+        beacon_x, beacon_y = beacon.position
+        comm_range_sq = self.comm_range_max_sq
 
         for existing, start, end in self.active_transmissions:
             if existing.sender_id == sender_id:
-                continue # Avoid self-collision check, a buoy's own transmission should not collide with itself
-            
-            # ===============
-            #  TIME OVERLAP
-            # ===============
-            # Check if the time windows of the two transmissions overlap in timing
-            if not (new_start_time < end and start < new_end_time):
+                continue
+            # Skip transmissions whose time window does not overlap this one
+            if not (start_time < end and start < end_time):
                 continue
 
-            # ================
-            #  SPACE OVERLAP
-            # ================
-            # Check if the beacons are close enough to cause a direct collision
+            # Two senders within range of each other => direct collision
             ex, ey = existing.position
-            dx = beacon_x - ex
-            dy = beacon_y - ey
-            
+            dx, dy = beacon_x - ex, beacon_y - ey
             senders_in_range = (dx * dx) + (dy * dy) <= comm_range_sq
 
             if senders_in_range:
@@ -131,10 +154,9 @@ class Channel:
                 # The new beacon is lost here on a direct collision, or whenever this
                 # receiver also sits in range of the existing transmission's sender
                 rx, ry = buoy.position
-                dx = rx - ex
-                dy = ry - ey
+                dx, dy = rx - ex, ry - ey
                 hears_existing = (dx * dx) + (dy * dy) <= comm_range_sq
-                    
+
                 if senders_in_range or hears_existing:
                     receivers_with_collisions.add(buoy.id)
 
@@ -145,83 +167,32 @@ class Channel:
                     poisoned_count += 1
                     logging.log_error(f"Collision at receiver {str(buoy.id)[:6]} between {str(sender_id)[:6]} and {str(existing.sender_id)[:6]}")
 
-        # Log the calculated transmission informations
-        self.active_transmissions.append((beacon, new_start_time, new_end_time))
-        
-        # Schedule the end of transmission event
-        self.schedule_callback(
-            new_end_time, 
-            EventType.TRANSMISSION_END, 
-            self,
-            {"beacon": beacon}
-        )
-        
-        # ==================
-        #  PROBABILITY LOSS
-        # ==================
-        # Schedule receptions for all receivers that are in range and not affected by collisions or probabilistic loss
-        collision_lost = len(receivers_with_collisions)
+        return receivers_with_collisions, poisoned_count
+
+    def _schedule_receptions(self, beacon: Beacon, receivers_data: list, receivers_with_collisions: set, end_time: float) -> int:
+        # Schedules a RECEPTION per surviving receiver; returns the probabilistic-loss count
         probability_lost = 0
-        
-        ideal_channel = self.ideal_channel
-        high_prob_sq = self.comm_range_high_prob_sq
-        prob_high = self.delivery_prob_high
-        prob_low = self.delivery_prob_low
-        speed_of_light = self.speed_of_light
 
         for buoy, dist_sq in receivers_data:
-            # If this receiver is affected by a collision skip it
             if buoy.id in receivers_with_collisions:
                 continue
-                
-            # Calculate probabilistic loss
-            if not ideal_channel:
-                # Determine delivery probability based on distance
-                delivery_prob = prob_high if dist_sq <= high_prob_sq else prob_low
-                # If the random value exceeds the prob consder the packet lost
+
+            # In a non-ideal channel, drop the packet with distance-dependent probability
+            if not self.ideal_channel:
+                delivery_prob = self.delivery_prob_high if dist_sq <= self.comm_range_high_prob_sq else self.delivery_prob_low
                 if random.random() >= delivery_prob:
                     probability_lost += 1
                     continue
-            
+
             distance = math.sqrt(dist_sq)
-            
-            # Compute propagation timing if the packet actually survived
-            propagation_delay = distance / speed_of_light
-            reception_time = new_end_time + propagation_delay + 1e-9
-            
-            # Schedule the reception event and mark this receiver as a valid recipient
-            # (a later colliding transmission can still revoke it before arrival)
+            propagation_delay = distance / self.speed_of_light
+            reception_time = end_time + propagation_delay + 1e-9
+
+            # Mark this receiver as a valid recipient (a later colliding transmission can revoke it)
             beacon.scheduled_receivers.add(buoy.id)
-            self.schedule_callback(
-                reception_time,
-                EventType.RECEPTION, 
-                buoy,
-                {"beacon": beacon}
-            )
-        
-        total_lost = collision_lost + probability_lost
-        actual_successful = n_receivers - total_lost
-        
-        if self.metrics:
-            self.metrics.log_sent()
-            self.metrics.log_potentially_sent(n_receivers)
-            self.metrics.log_successful_receivers(actual_successful)
-            self.metrics.log_collision(collision_lost)
-            
-            self.metrics.log_lost(total_lost)
+            self.schedule_callback(reception_time, EventType.RECEPTION, buoy, {"beacon": beacon})
 
-            # Retroactive correction: receivers that already had a reception scheduled for
-            # an earlier transmission collided with this one -> move them from "successful"
-            # to "collided/lost" so the channel-side counters stay consistent
-            if poisoned_count:
-                self.metrics.log_collision(poisoned_count)
-                self.metrics.log_lost(poisoned_count)
-                self.metrics.log_successful_receivers(-poisoned_count)
-
-            if logging.LOGGING_ENABLED:
-                logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
-
-        return new_end_time
+        return probability_lost
 
     def is_busy(self, position: tuple[float, float], sim_time: float) -> tuple[bool, float]:
         self.update(sim_time)
