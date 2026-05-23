@@ -104,6 +104,15 @@ class Buoy:
         self.forward_txop_limit: int = cfg.get('simulation', 'forward_txop_limit')
         self.forward_burst_count: int = 0
 
+        # Broadcast-storm suppression for forwarded mode:
+        # K duplicate forwards heard while pending => cancel our forward (coverage already achieved).
+        # Density-based probabilistic gate at first reception so only ~n0 forwarders fire per cluster.
+        k = cfg.get('simulation', 'forward_suppression_k')
+        n0 = cfg.get('simulation', 'forward_density_baseline')
+        self.forward_suppression_k: int = k if k is not None else 0
+        self.forward_density_baseline: float = float(n0) if n0 is not None else 0.0
+        self.duplicate_forward_counts: dict[uuid.UUID, int] = {}
+
     def activate(self):
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
@@ -300,6 +309,7 @@ class Buoy:
         while self.pending_forward_beacons:
             origin_id, b = next(iter(self.pending_forward_beacons.items()))
             del self.pending_forward_beacons[origin_id]
+            self.duplicate_forward_counts.pop(origin_id, None)
             if sim_time - b.timestamp <= self.neighbor_timeout:
                 forward_beacon = b
                 break
@@ -351,24 +361,43 @@ class Buoy:
 
             # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
             case 'forwarded' if beacon.hop_limit > 0:
-                if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
-                    if beacon.origin_id in self.pending_forward_beacons:
-                        # Origin already queued: update in-place (preserves FIFO order, no size change)
-                        self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
-                        self.pending_forward_beacons[beacon.origin_id] = beacon
-                    elif len(self.pending_forward_beacons) >= self.pending_queue_limit:
-                        logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]} from {str(beacon.sender_id)[:6]}")
-                    else:
-                        self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
-                        self.pending_forward_beacons[beacon.origin_id] = beacon
+                last_seen_ts = self.forwarded_beacons.get(beacon.origin_id, -1)
 
-                    # Start transmission pipeline if not active
-                    if self.pending_forward_beacons and not self.processing:
-                        self.processing = True
-                        self.scheduler_decision_time = sim_time
-                        self.schedule_callback(
-                            sim_time, EventType.CHANNEL_SENSE, self
+                if beacon.timestamp == last_seen_ts and beacon.origin_id in self.pending_forward_beacons:
+                    # Counter-based suppression: another node forwarded the same (origin, ts)
+                    # while we waited in CSMA. After K duplicates, coverage is achieved and
+                    # our forward would only add load -> cancel it.
+                    count = self.duplicate_forward_counts.get(beacon.origin_id, 0) + 1
+                    if self.forward_suppression_k > 0 and count >= self.forward_suppression_k:
+                        del self.pending_forward_beacons[beacon.origin_id]
+                        self.duplicate_forward_counts.pop(beacon.origin_id, None)
+                        logging.log_info(
+                            f"Buoy {str(self.id)[:6]} suppressed forward of {str(beacon.origin_id)[:6]} after {count} duplicates"
                         )
+                    else:
+                        self.duplicate_forward_counts[beacon.origin_id] = count
+
+                elif beacon.timestamp > last_seen_ts:
+                    # Record the timestamp so subsequent duplicates are recognized even
+                    # if probabilistic gating decides not to queue.
+                    self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
+
+                    # Probabilistic gating: in dense neighborhoods only ~n0 forwarders
+                    # need to fire to cover the cluster.
+                    n_neighbors = len(self.neighbors)
+                    if self.forward_density_baseline > 0 and n_neighbors > self.forward_density_baseline:
+                        p_forward = self.forward_density_baseline / n_neighbors
+                        if random.random() >= p_forward:
+                            logging.log_info(
+                                f"Buoy {str(self.id)[:6]} skipped forward of {str(beacon.origin_id)[:6]} (p={p_forward:.2f}, n={n_neighbors})"
+                            )
+                            # Skip queuing — timestamp already recorded above so we won't
+                            # accept a duplicate of this same beacon later.
+                            pass
+                        else:
+                            self._queue_forward(beacon, sim_time)
+                    else:
+                        self._queue_forward(beacon, sim_time)
             case _:
                 pass
 
@@ -395,6 +424,25 @@ class Buoy:
                 receive_time=sim_time,
                 receiver_id=self.id
             )
+
+    def _queue_forward(self, beacon: Beacon, sim_time: float):
+        # Queue a forwardable beacon and kick off CSMA if idle.
+        if beacon.origin_id in self.pending_forward_beacons:
+            # Origin already queued: update in-place (preserves FIFO order).
+            # Reset duplicate counter because the suppression window restarts with fresh data.
+            self.pending_forward_beacons[beacon.origin_id] = beacon
+            self.duplicate_forward_counts[beacon.origin_id] = 0
+        elif len(self.pending_forward_beacons) >= self.pending_queue_limit:
+            logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]}")
+            return
+        else:
+            self.pending_forward_beacons[beacon.origin_id] = beacon
+            self.duplicate_forward_counts[beacon.origin_id] = 0
+
+        if not self.processing:
+            self.processing = True
+            self.scheduler_decision_time = sim_time
+            self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
 
     def _handle_neighbor_cleanup(self, event, sim_time: float):
         # Cleanup direct neighbors
