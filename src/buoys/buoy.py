@@ -99,6 +99,11 @@ class Buoy:
         self.pending_forward_beacons: dict[uuid.UUID, Beacon] = {}  # origin_id → Beacon, insertion-ordered FIFO
         self.pending_queue_limit: int = cfg.get('simulation', 'pending_queue_limit')
 
+        # TXOP-style cap: forward burst is capped to N back-to-back transmissions,
+        # after which the node must re-enter full CSMA so peers get a fair shot.
+        self.forward_txop_limit: int = cfg.get('simulation', 'forward_txop_limit')
+        self.forward_burst_count: int = 0
+
     def activate(self):
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
@@ -255,6 +260,7 @@ class Buoy:
 
         # Delegate forwarding: piggyback after own transmission or forward-only
         if self.pending_forward_beacons:
+            self.forward_burst_count = 0  # Fresh CSMA win => reset TXOP burst counter
             self.schedule_callback(
                 end_time, EventType.FORWARD_TRANSMISSION_START, self
             )
@@ -275,6 +281,13 @@ class Buoy:
             self.processing = False
             logging.log_info(f"Buoy {str(self.id)[:6]} yielded forwarding to scheduler at {sim_time:.4f}s")
             return  # Remaining forwards will be resumed by the next scheduler check
+
+        # TXOP cap: after N back-to-back forwards re-enter full CSMA so other nodes
+        # get a fair shot at the medium. The counter resets when CSMA hands back.
+        if self.forward_burst_count >= self.forward_txop_limit:
+            logging.log_info(f"Buoy {str(self.id)[:6]} hit TXOP cap ({self.forward_txop_limit}), re-contending")
+            self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
+            return
 
         # Checking each time if channel remains idle
         is_busy, next_try_time = self.channel.is_busy(self.position, sim_time)
@@ -297,12 +310,13 @@ class Buoy:
 
         forwarded = self.forward_beacon(forward_beacon, sim_time)
         end_time = self.channel.broadcast(forwarded, sim_time)
+        self.forward_burst_count += 1
         logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
 
         if self.pending_forward_beacons:
             self.schedule_callback(end_time, EventType.FORWARD_TRANSMISSION_START, self)
             return
-        
+
         self.processing = False
 
     def _handle_reception(self, event: Event, sim_time: float):

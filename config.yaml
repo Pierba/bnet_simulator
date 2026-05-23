@@ -26,6 +26,8 @@ simulation:
   multihop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
   pending_queue_limit: 20
+  # Max consecutive forwards a node can drain before re-contending via full CSMA (TXOP cap)
+  forward_txop_limit: 3
 
 world:
   width: 200.0
