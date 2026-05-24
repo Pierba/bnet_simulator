@@ -1,7 +1,5 @@
 import random
-import uuid
 import math
-from typing import Tuple, List, Dict
 from config.config_handler import ConfigHandler
 
 class BeaconScheduler:
@@ -24,6 +22,10 @@ class BeaconScheduler:
         # Last computed back-off intensity (fq = combined²). Used so forwarding can
         # throttle itself in step with how aggressively the scheduler has backed off.
         self.last_fq: float = 0.0
+
+        # Forwarding gate: target this many forwarders per cascade in dense
+        # neighborhoods. 0 disables the gate (every receiver forwards).
+        self.forward_density_baseline: int = cfg.get('simulation', 'forward_density_baseline')
         
         # Cache interval range and jitter scale
         self.interval_range: float = self.max_interval - self.min_interval
@@ -32,7 +34,7 @@ class BeaconScheduler:
         # Cache scheduler-specific thresholds and weights
         self.acab_neighbors_threshold: float = 10.0
         self.acab_contact_threshold: float = 20.0
-        self.acab_weights: Tuple[float, float, float] = (0.4, 0.3, 0.3)  # density, contact, mobility
+        self.acab_weights: tuple[float, float, float] = (0.4, 0.3, 0.3)  # density, contact, mobility
         self.adab_neighbors_threshold: float = 15.0
 
     def get_next_check_interval(self) -> float:
@@ -46,7 +48,7 @@ class BeaconScheduler:
 
     def should_send(self, 
             battery: float, 
-            velocity: Tuple[float, float], 
+            velocity: tuple[float, float], 
             n_neighbors: int, 
             last_contact_ts: float, 
             current_time: float
@@ -72,7 +74,7 @@ class BeaconScheduler:
     def should_send_dynamic(
         self,
         battery: float,
-        velocity: Tuple[float, float],
+        velocity: tuple[float, float],
         n_neighbors: int,
         last_contact_ts: float,
         current_time: float,
@@ -92,7 +94,7 @@ class BeaconScheduler:
 
     def compute_interval(
         self,
-        velocity: Tuple[float, float],
+        velocity: tuple[float, float],
         n_neighbors: int,
         last_contact_ts: float,
         current_time: float,
@@ -133,12 +135,22 @@ class BeaconScheduler:
 
         return bi + random.uniform(-max_negative_jitter, max_positive_jitter)
 
-    # Per-node forwarding eagerness. Static has no back-off signal, so it returns 1
-    # and the forwarding gate falls back to the pure density-baseline behavior.
-    # Dynamic schedulers tie forwarding to their own back-off: when fq saturates
-    # (dense, well-known neighborhood) the node forwards less, with a floor so the
-    # cascade does not collapse to nothing.
-    def forward_factor(self) -> float:
-        if self.scheduler_type == "static":
-            return 1.0
-        return max(0.3, 1.0 - self.last_fq)
+    # Per-node forwarding gate. Mirrors should_send() — the scheduler owns every
+    # "may I use the channel?" decision, regardless of whether the payload is an
+    # origination or a relay. Decoupled from origination credits (does not mutate
+    # last_*_send_time) so forwarding latency stays bounded.
+    #
+    # Density-baseline term: keeps the expected forwarders per cascade ≈
+    # forward_density_baseline regardless of how many neighbors are in range
+    # (p = baseline / n_neighbors). Dynamic schedulers further scale by their
+    # own back-off intensity (1 - fq, floored at 0.3) so a node that has decided
+    # it's in a saturated cluster also forwards less. Static has no back-off
+    # signal, so only the density baseline gates it.
+    def should_forward(self, n_neighbors: int) -> bool:
+        if self.forward_density_baseline <= 0 or n_neighbors <= self.forward_density_baseline:
+            return True
+
+        p = self.forward_density_baseline / n_neighbors
+        if self.scheduler_type != "static":
+            p *= max(0.3, 1.0 - self.last_fq)
+        return random.random() < p

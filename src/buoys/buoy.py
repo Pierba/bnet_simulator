@@ -105,11 +105,6 @@ class Buoy:
         self.forward_txop_limit: int = cfg.get('simulation', 'forward_txop_limit')
         self.forward_burst_count: int = 0
 
-        # Probabilistic forwarding gate: fire each pending forward with p = min(1, n0/n_neighbors)
-        # so in dense neighborhoods only ~n0 forwarders relay per origination. 0 disables.
-        n0 = cfg.get('simulation', 'forward_density_baseline')
-        self.forward_density_baseline: float = float(n0) if n0 is not None else 0.0
-
     def activate(self):
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
@@ -314,24 +309,17 @@ class Buoy:
             self.processing = False
             return
 
-        # Probabilistic gate: in dense neighborhoods only ~n0 forwarders need to
-        # relay per origination to cover the cluster. Scaled by the scheduler's
-        # forward_factor so dynamic schedulers (which know they're in a saturated
-        # neighborhood) throttle their forwards in step with their own back-off,
-        # while static keeps the pure baseline behavior.
-        n_neighbors = len(self.neighbors)
-        if self.forward_density_baseline > 0 and n_neighbors > self.forward_density_baseline:
-            sched_factor = self.scheduler.forward_factor()
-            p_forward = min(1.0, (self.forward_density_baseline / n_neighbors) * sched_factor)
-            if random.random() >= p_forward:
-                logging.log_info(
-                    f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]} (p={p_forward:.2f}, n={n_neighbors})"
-                )
-                if self.pending_forward_beacons:
-                    self.schedule_callback(sim_time, EventType.FORWARD_TRANSMISSION_START, self)
-                else:
-                    self.processing = False
-                return
+        # Scheduler is the single arbiter of channel access — it decides whether
+        # this relay slot fires, on the same footing as an origination decision.
+        if not self.scheduler.should_forward(len(self.neighbors)):
+            logging.log_info(
+                f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]}"
+            )
+            if self.pending_forward_beacons:
+                self.schedule_callback(sim_time, EventType.FORWARD_TRANSMISSION_START, self)
+            else:
+                self.processing = False
+            return
 
         forwarded = self.forward_beacon(forward_beacon, sim_time)
         end_time = self.channel.broadcast(forwarded, sim_time)
