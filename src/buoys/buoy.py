@@ -3,6 +3,7 @@ import random
 import math
 from enum import Enum
 
+# Simulator components
 from protocols.scheduler import BeaconScheduler
 from protocols.beacon import Beacon
 from core.events import EventType, Event
@@ -314,12 +315,14 @@ class Buoy:
             return
 
         # Probabilistic gate: in dense neighborhoods only ~n0 forwarders need to
-        # relay per origination to cover the cluster. Roll right before broadcast
-        # so the decision tracks the current local density (and lets the per-origin
-        # filter in self.forwarded_beacons do duplicate suppression on its own).
+        # relay per origination to cover the cluster. Scaled by the scheduler's
+        # forward_factor so dynamic schedulers (which know they're in a saturated
+        # neighborhood) throttle their forwards in step with their own back-off,
+        # while static keeps the pure baseline behavior.
         n_neighbors = len(self.neighbors)
         if self.forward_density_baseline > 0 and n_neighbors > self.forward_density_baseline:
-            p_forward = self.forward_density_baseline / n_neighbors
+            sched_factor = self.scheduler.forward_factor()
+            p_forward = min(1.0, (self.forward_density_baseline / n_neighbors) * sched_factor)
             if random.random() >= p_forward:
                 logging.log_info(
                     f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]} (p={p_forward:.2f}, n={n_neighbors})"

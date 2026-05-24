@@ -20,6 +20,10 @@ class BeaconScheduler:
 
         self.next_static_interval: float = self.static_interval
         self.next_dynamic_interval: float = None
+
+        # Last computed back-off intensity (fq = combined²). Used so forwarding can
+        # throttle itself in step with how aggressively the scheduler has backed off.
+        self.last_fq: float = 0.0
         
         # Cache interval range and jitter scale
         self.interval_range: float = self.max_interval - self.min_interval
@@ -121,9 +125,20 @@ class BeaconScheduler:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
         fq = combined * combined
+        self.last_fq = fq
         bi = self.min_interval + fq * self.interval_range
 
         max_positive_jitter = min(self.jitter_scale, self.max_interval - bi)
         max_negative_jitter = min(self.jitter_scale, bi - self.min_interval)
 
         return bi + random.uniform(-max_negative_jitter, max_positive_jitter)
+
+    # Per-node forwarding eagerness. Static has no back-off signal, so it returns 1
+    # and the forwarding gate falls back to the pure density-baseline behavior.
+    # Dynamic schedulers tie forwarding to their own back-off: when fq saturates
+    # (dense, well-known neighborhood) the node forwards less, with a floor so the
+    # cascade does not collapse to nothing.
+    def forward_factor(self) -> float:
+        if self.scheduler_type == "static":
+            return 1.0
+        return max(0.3, 1.0 - self.last_fq)
