@@ -21,7 +21,7 @@ simulation:
   enable_logging: false
   enable_file_logging: false
   # Options: none, append, forwarded
-  multihop_mode: forwarded
+  multihop_mode: append
   # Maximum hops for forwarded mode
   multihop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
@@ -37,7 +37,6 @@ world:
 
 buoys:
   mobile_percentage: 0.4
-  default_battery: 100.0
   default_velocity: 15.0
   # m/s – lower bound per leg
   rwp_speed_min: 5.0 
@@ -64,6 +63,14 @@ csma:
   backoff_time_max: 0.016
 
 scheduler:
+  static_interval: 1.0
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
-  static_interval: 1.0
+  # ADAB: neighbour count that maps to density factor = 1.0 (full backoff)
+  adab_neighbors_threshold: 15.0
+  # ACAB: neighbour count that maps density component to 1.0
+  acab_neighbors_threshold: 10.0
+  # ACAB: seconds since last contact at which contact-recency score decays to 0
+  acab_contact_threshold: 20.0
+  # ACAB blend weights: [density, contact, mobility] — must sum to 1.0
+  acab_weights: [0.4, 0.3, 0.3]

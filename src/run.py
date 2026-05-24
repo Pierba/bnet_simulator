@@ -1,14 +1,15 @@
-import os
-import json
-import subprocess
-import time
-import random
 from multiprocessing import Pool
 from config.config_handler import ConfigHandler
 
+import json
+import os
+import random
+import subprocess
+import time
+
 # Arrange buoys randomly within the world boundaries, ensuring they are not too close to the edges
-def arrange_buoys_randomly(n_buoys, world_width, world_height) -> list[tuple[float, float]]:
-    positions = []
+def arrange_buoys_randomly(n_buoys: int, world_width: float, world_height: float) -> list[tuple[float, float]]:
+    positions: list[tuple[float, float]] = []
     random.seed(time.time())
     for _ in range(n_buoys):
         x = random.uniform(10, world_width - 10)
@@ -17,7 +18,7 @@ def arrange_buoys_randomly(n_buoys, world_width, world_height) -> list[tuple[flo
     return positions
 
 # Function to run a single simulation with given parameters
-def run_simulation(mode, interval, density, positions, results_dir, cfg):
+def run_simulation(mode: str, interval: float, density: float, positions: list[tuple[float, float]], results_dir: str, cfg: ConfigHandler):
     unique_id = f"{mode}_{density}_{int(time.time() * 1000) % 10000}"
     positions_file = f"positions_{unique_id}.json"  # Name of simulation output file
 
@@ -25,6 +26,7 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
     with open(positions_file, "w") as f:
         json.dump(positions, f)
     
+    # Determine the result file name based on the scenario and mode
     scenario = cfg.get('simulation', 'scenario')
     result_file = None
     match scenario:
@@ -35,12 +37,15 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
         case 'random':
             result_file = os.path.join(results_dir, f"{mode}_random_density{density}.csv")
 
+    # Calculate the number of mobile and fixed buoys based on the total and the mobile percentage
     total_buoys = len(positions)
     mobile_percentage = cfg.get('buoys', 'mobile_percentage')
-
-    # Calculate the number of mobile and fixed buoys based on the total and the mobile percentage
     mobile_count = min(total_buoys, max(1, int(total_buoys * mobile_percentage))) if mobile_percentage > 0 else 0
     fixed_count = total_buoys - mobile_count
+
+    # Set scheduler intervals
+    min_interval: float = interval
+    max_interval: float = cfg.get('scheduler', 'beacon_max_interval')
 
     # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters
     cmd = ["uv", "run", "src/script/init.py",
@@ -55,6 +60,8 @@ def run_simulation(mode, interval, density, positions, results_dir, cfg):
            "--positions-file", positions_file,
            "--density", str(density),
            "--static-interval", str(interval),
+           "--min-interval", str(min_interval),
+           "--max-interval", str(max_interval),
            "--scenario", scenario,
         ]
     
@@ -76,47 +83,35 @@ def simulation_worker(args):
     run_simulation(mode, interval, density, positions, results_dir, cfg)
 
 # Dispatch simulations in parallel using multiprocessing Pool
-def run_simulations_parallel(tasks, num_processes):
+def run_simulations_parallel(tasks: list[tuple], num_processes: int):
     with Pool(processes=num_processes) as pool:
         pool.map(simulation_worker, tasks)
 
-def plot_results(results_dir, plots_dir, interval):
+# Plot results using the plot_metrics.py script
+def plot_results(results_dir: str, plots_dir: str, interval: float):
     plot_cmd = ["uv", "run", "src/script/plot_metrics.py",
                 "--results-dir", results_dir,
                 "--plot-dir", plots_dir,
                 "--interval", str(interval)]
-    subprocess.run(plot_cmd)
-
-# Naming system for results and plots directories based on the interval value.
-# def get_interval_str(interval: float) -> str:
-#     interval_str = None
-#     if interval < 1:
-#         interval_str = str(int(interval * 100))
-#         if interval * 100 % 10 == 0: # 0.5
-#             interval_str = str(int(interval * 10))
-#         else: # 0.25
-#             interval_str = f"{int(interval * 10)}_{int(interval * 100) % 10}"
-#     else:
-#         interval_str = str(int(interval))
-#     return interval_str
+    
+    subprocess.run(plot_cmd) # -> script/plot_metrics.py
 
 def main():
-    cfg = ConfigHandler()
-    
     # Extracting configuration parameters
+    cfg = ConfigHandler()
 
     #======================
     # PROTOCOLS 
     #======================
-    schedulers = cfg.get('simulation', 'schedulers')    # List of protocols to simulate
+    schedulers: list[str] = cfg.get('simulation', 'schedulers')    # List of protocols to simulate
 
     #======================
     # BUOYS DISTRIBUTION 
     #======================
-    min_buoys = cfg.get('simulation', 'min_buoys')      # Minimum number of buoys to simulate
-    max_buoys = cfg.get('simulation', 'max_buoys')      # Maximum number of buoys to simulate
-    step_buoys = cfg.get('simulation', 'step_buoys')    # Step size for buoy density
-    
+    min_buoys: int = cfg.get('simulation', 'min_buoys')      # Minimum number of buoys to simulate
+    max_buoys: int = cfg.get('simulation', 'max_buoys')      # Maximum number of buoys to simulate
+    step_buoys: int = cfg.get('simulation', 'step_buoys')    # Step size for buoy density
+
     #=======================
     # SIMULATION PARAMETERS
     #=======================
@@ -129,6 +124,7 @@ def main():
     multihop_mode: str = cfg.get('simulation', 'multihop_mode')
     
     try:
+        # For each beacon interval => run the simulations based on protocols and scenarios => plot the results
         for interval in intervals: # [1.0, 0.5, 0.25]
             interval_str = f"{interval}"
             ideal_suffix = "_ideal" if ideal else ""
@@ -152,10 +148,10 @@ def main():
                 case 'random' | 'static':
                     # Density of buoys within the specified range and step size
                     densities = list(range(min_buoys, max_buoys + 1, step_buoys))
-                    tasks = []
+                    tasks: list[tuple] = []
                     for density in densities:
                         positions = arrange_buoys_randomly(density, world_width, world_height)
-                        for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab'] -> protocols
+                        for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
                             # Each task is a tuple of arguments for the simulation_worker function
                             tasks.append((mode, interval, density, positions, results_dir, cfg))
                     
@@ -168,8 +164,10 @@ def main():
         print("\nAll simulations complete!")
         print("Check the metrics directory for results and plots.")
 
+        # Send a desktop notification when all simulations and plotting are done
         subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
-
+    
+    # Handle keyboard interrupt to allow clean exit and cleanup of any leftover files
     except KeyboardInterrupt:
         print("\n\n[!] Simulation batch interrupted by user. Exiting cleanly...")
         

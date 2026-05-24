@@ -8,8 +8,7 @@ class Beacon:
     sender_id: uuid.UUID # 16 bytes
     mobile: bool # 1 byte
     position: Tuple[float, float] # 8 bytes
-    battery: float # 4 bytes
-    neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] # 16 + 4 + 8 bytes per neighbor 
+    neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] # 16 + 4 + 8 bytes per neighbor
     timestamp: float # 4 bytes
     origin_id: Optional[uuid.UUID] = None  # 16 bytes (only in forwarded mode)
     hop_limit: int = 0  # 4 bytes (only in forwarded mode)
@@ -20,8 +19,8 @@ class Beacon:
     scheduled_receivers: Set[uuid.UUID] = field(default_factory=set, compare=False)
 
     def size_bytes(self) -> int:
-        # Base size: sender_id(16) + mobile(1) + position(8) + battery(4) + timestamp(4) = 37 bytes
-        base = 37
+        # Base size: sender_id(16) + mobile(1) + position(8) + timestamp(4) = 33 bytes
+        base = 33
         
         # Add size per neighbor: uuid(16) + timestamp(4) + position(8) = 28 bytes
         base += 28 * len(self.neighbors)

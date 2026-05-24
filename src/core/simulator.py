@@ -14,10 +14,11 @@ class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str, duration: float):
         cfg = ConfigHandler()
         
-        self.scenario = scenario
-        self.all_buoys: List[Buoy] = buoys
-        self.channel: Channel = channel
-        self.metrics: Metrics = metrics
+        # Simulation main components & settings
+        self.scenario: str          = scenario
+        self.all_buoys: List[Buoy]  = buoys
+        self.channel: Channel       = channel
+        self.metrics: Metrics       = metrics
 
         # When on ramp scenario only the first 2 buoys are considered active (existing in the network)
         if self.scenario == "ramp":
@@ -31,21 +32,17 @@ class Simulator:
         self.duration: float = duration
         
         # Neighbor settings
-        self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
-        self.comm_range_max: float = cfg.get('network', 'communication_range_max')
+        self.neighbor_timeout: float    = cfg.get('scheduler', 'neighbor_timeout')
+        self.comm_range_max: float      = cfg.get('network', 'communication_range_max')
 
         # Random scenario settings & precompute constants that never change
-        self.random_variability: float = cfg.get('simulation', 'random_variability')
-        total_buoys = len(self.all_buoys)
-        self.rnd_min_buoys: int = max(3, int(total_buoys * 0.2))
-        self.rnd_max_change: int = max(1, int(total_buoys * self.random_variability))
+        self.random_variability: float  = cfg.get('simulation', 'random_variability')
+        self.rnd_min_buoys: int         = max(3, int(len(self.all_buoys) * 0.2))
+        self.rnd_max_change: int        = max(1, int(len(self.all_buoys) * self.random_variability))
 
         # Channel settings
         self.channel.set_buoys(self.all_buoys)
         self.channel.schedule_callback = self.schedule_event
-        self.running: bool = False
-        self.simulated_time: float = 0.0
-        self.last_timepoint_log: int = -1  # Track interval logged to avoid duplicate timepoints
         
         # Setting callback function for buoys to schedule their events
         for buoy in self.all_buoys:
@@ -169,59 +166,64 @@ class Simulator:
 
         self.schedule_event(sim_time + random.uniform(15, 20), EventType.BUOY_ARRAY_UPDATE, self)
 
-    def start(self):
-        self.running = True
-        real_time_start = time.time()
+    def start(self) -> float:
+        # Simulation state variables
+        last_time_log: float    = None
+        last_timepoint_log: int = None
+        real_time_start: float  = time.time()
+        running: bool           = True
+        simulated_time: float   = 0.0
+        
         logging.reset() # Resetting metrics and logs at the start of the simulation
 
         # Calculate initial avg_neighbors and schedule initial events
         self.calculate_and_record_avg_neighbors()
         self._schedule_initial_events()
-
-        last_time_log = None
+        
         try:
             # Main simulation loop: process events until the simulation time exceeds the duration or there are no more events
-            while self.running and self.simulated_time < self.duration:
+            while running and simulated_time < self.duration:
                 event: Optional[Event] = self._get_next_event()
                 if not event:
                     logging.log_info("No more events to process.")
                     break
                 
                 # Update simulated time to the time of the event being processed
-                self.simulated_time = event.time
+                simulated_time = event.time
                 
                 if event.event_type in [EventType.TRANSMISSION_START, EventType.RECEPTION]:
                     logging.log_info(f"Processing {event.event_type.name} event")
-                # logging.log_info(f"Processing {event.event_type.name} event")
                 
-                time_log = int(self.simulated_time)
+                time_log = int(simulated_time)
                 if last_time_log != time_log and time_log > 0 and time_log % 10 == 0:
-                    logging.log_info(f"Time: {self.simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
+                    logging.log_info(f"Time: {simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
                     last_time_log = time_log
 
                 # Handle the event and catch any exceptions to prevent the simulation from crashing
                 try:
-                    event.target_obj.handle_event(event, self.simulated_time)
+                    event.target_obj.handle_event(event, simulated_time)
                 except Exception as e:
                     logging.log_error(f"Error handling event {event}: {str(e)}")
                 
-                if self.scenario == "ramp" and self.simulated_time > 0:
-                    current_interval = int(self.simulated_time) // 5 # Should it be this the interval?
-                    if current_interval != self.last_timepoint_log:
-                        self.last_timepoint_log = current_interval
+                if self.scenario == "ramp" and simulated_time > 0:
+                    current_interval = int(simulated_time) // 5 # Should it be this the interval?
+                    if current_interval != last_timepoint_log:
+                        last_timepoint_log = current_interval
                         avg_neighbors_sample = self.calculate_avg_neighbors()
                         if self.metrics:
-                            self.metrics.log_timepoint(self.simulated_time, self._active_count, avg_neighbors_sample)
+                            self.metrics.log_timepoint(simulated_time, self._active_count, avg_neighbors_sample)
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")
-            self.running = False
+            running = False
             
         real_time_end = time.time()
         real_duration = real_time_end - real_time_start
-        sim_speedup = self.simulated_time / real_duration if real_duration > 0 else float('inf')
-        logging.log_info(f"Simulation complete. {self.simulated_time:.2f}s simulated in {real_duration:.2f}s real time (speedup: {sim_speedup:.2f}x)")
-    
+        sim_speedup = simulated_time / real_duration if real_duration > 0 else float('inf')
+        logging.log_info(f"Simulation complete. {simulated_time:.2f}s simulated in {real_duration:.2f}s real time (speedup: {sim_speedup:.2f}x)")
+        
+        return simulated_time
+
     # This method calculates the average number of neighbors for the current buoy array
     def calculate_avg_neighbors(self) -> float: # O(n log n) using k-d tree
         if not self._active_count:
