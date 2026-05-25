@@ -39,9 +39,9 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     # Extract data from CSV files
     for f in files:
         df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
-        if "Density" in df.index and ("Delivery Ratio" in df.index or "B-PDR" in df.index):
+        if "Density" in df.index and "PDR" in df.index:
             density = float(df.loc["Density", "Value"])
-            pdr = float(df.loc["B-PDR", "Value"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "Value"])
+            pdr = float(df.loc["PDR", "Value"])
             
             if "Average Neighbors" in df.index:
                 avg_neighbors = float(df.loc["Average Neighbors", "Value"])
@@ -88,7 +88,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             collision_data.append((density, collision_rate, sched_type))
     
     if not data:
-        print("No B-PDR data with density found.")
+        print("No PDR data with density found.")
         return
     
     # Determine mode string for title
@@ -107,8 +107,8 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         else:
             mode_str = "Mixed Modes"
     
-    # Create B-PDR by density plot
-    df = pd.DataFrame(data, columns=["Density", "B-PDR", "Scheduler"])
+    # Create PDR by density plot
+    df = pd.DataFrame(data, columns=["Density", "PDR", "Scheduler"])
     grouped = df.groupby(["Density", "Scheduler"], observed=False).mean().reset_index()
     densities = sorted(df["Density"].unique())
     schedulers = ["dynamic_acab", "dynamic_adab", "static"]
@@ -129,7 +129,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         pdrs = []
         for d in densities:
             row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
-            pdrs.append(row["B-PDR"].values[0] if not row.empty else 0)
+            pdrs.append(row["PDR"].values[0] if not row.empty else 0)
         ax.bar(x + offset + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
     
     # Plot average neighbors as a connected line across all densities
@@ -163,10 +163,10 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
             ax2.set_ylim(0, max_avg_neighbors * 1.2)
     
     ax.set_xlabel("Total Buoys")
-    ax.set_ylabel("B-PDR")
-    
+    ax.set_ylabel("PDR")
+
     # Update title to include mode
-    title_parts = ["B-PDR vs Buoy Count"]
+    title_parts = ["PDR vs Buoy Count"]
     if mode_str:
         title_parts.append(f"({mode_str}")
         if interval:
@@ -188,11 +188,11 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     plt.tight_layout()
     
     if interval:
-        plt.savefig(os.path.join(plot_dir, f"b_pdr_interval{int(interval*10)}.png"))
+        plt.savefig(os.path.join(plot_dir, f"pdr_interval{int(interval*10)}.png"))
     else:
-        plt.savefig(os.path.join(plot_dir, "b_pdr_block_by_density.png"))
+        plt.savefig(os.path.join(plot_dir, "pdr_block_by_density.png"))
     plt.close()
-    
+
     if not collision_data:
         print("No collision rate data with density found.")
         return

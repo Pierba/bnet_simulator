@@ -5,7 +5,7 @@ class EventType(Enum):
     SCHEDULER_CHECK = auto()            # Check if buoy should send a beacon
     CHANNEL_SENSE = auto()              # Check if channel is free
     DIFS_COMPLETION = auto()            # DIFS waiting period completes
-    BACKOFF_COMPLETITION = auto()               # Process backoff slot
+    BACKOFF_COMPLETITION = auto()       # Process backoff slot
     TRANSMISSION_START = auto()         # Buoy starts transmitting
     FORWARD_TRANSMISSION_START = auto() # Buoy starts forwarding a beacon
     TRANSMISSION_END = auto()           # Transmission completes

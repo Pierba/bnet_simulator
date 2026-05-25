@@ -8,19 +8,21 @@ def sigint_handler(exctype, value, traceback):
     sys.__excepthook__(exctype, value, traceback)
 sys.excepthook = sigint_handler
 
-from typing import List, Tuple
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-from core.simulator import Simulator
-from core.channel import Channel
+
 from buoys.buoy import Buoy
+from core.channel import Channel
 from config.config_handler import ConfigHandler
+from core.simulator import Simulator
+from protocols.scheduler import BeaconScheduler
 from utils.metrics import Metrics
-import random
-import time
+
 import argparse
 import json
+import random
+import time
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     cfg = ConfigHandler()
     
     # Argument parser for command-line options to configure the simulation parameters
@@ -40,7 +42,7 @@ def parse_args():
     parser.add_argument(
         "--seed",
         type=float,
-        default=None,
+        default=time.time(),
         help="Random seed for reproducibility"
     )
     parser.add_argument(
@@ -82,7 +84,7 @@ def parse_args():
     parser.add_argument(
         "--density",
         type=int,
-        default=None,
+        default=cfg.get('simulation', 'min_buoys'),
         help="Density value for this scenario"
     )
     parser.add_argument(
@@ -109,21 +111,24 @@ def parse_args():
         help="Maximum interval for dynamic schedulers in seconds"
     )
     parser.add_argument(
-        "--ramp",
-        action='store_true',
-        help="Use ramp scenario"
+        "--scenario",
+        choices=["static", "ramp", "random"],
+        default="static",
+        help="Scenario type: static, ramp, or random (default: static)"
     )
 
     # Parse the command-line arguments and return them as a namespace object 
     return parser.parse_args()
 
 # Get random position within the world boundaries
-def random_position(world_width, world_height) -> Tuple[float, float]:
-    x = random.uniform(10, world_width - 10)
-    y = random.uniform(10, world_height - 10)
-    return (x, y)
+def random_position(world_width: float, world_height: float) -> tuple[float, float]:
+    return (
+        random.uniform(10, world_width - 10), 
+        random.uniform(10, world_height - 10)
+    )
 
-def random_velocity(default_velocity) -> Tuple[float, float]:
+# Get random velocity vector for mobile buoys based on a default velocity
+def random_velocity(default_velocity: float) -> tuple[float, float]:
     return (
         random.uniform(-1, 1) * default_velocity,
         random.uniform(-1, 1) * default_velocity
@@ -134,41 +139,40 @@ def main():
     args = parse_args()
 
     # Unpacking args values
-    mode: str = args.mode
-    duration: float = args.duration
-    seed: float = args.seed
-    world_width: float = args.world_width
-    world_height: float = args.world_height
-    mobile_buoy_count: int = args.mobile_buoy_count
-    fixed_buoy_count: int = args.fixed_buoy_count
-    result_file: str = args.result_file
-    positions_file: str = args.positions_file
-    density: int = args.density
-    ideal: bool = args.ideal
-    static_interval: float = args.static_interval
-    min_interval: float = args.min_interval
-    max_interval: float = args.max_interval
-    ramp: bool = args.ramp
+    density: int            = args.density
+    duration: float         = args.duration
+    fixed_buoy_count: int   = args.fixed_buoy_count
+    ideal: bool             = args.ideal
+    max_interval: float     = args.max_interval
+    min_interval: float     = args.min_interval
+    mobile_buoy_count: int  = args.mobile_buoy_count
+    mode: str               = args.mode
+    positions_file: str     = args.positions_file
+    result_file: str        = args.result_file
+    scenario: str           = args.scenario
+    seed: float             = args.seed
+    static_interval: float  = args.static_interval
+    world_height: float     = args.world_height
+    world_width: float      = args.world_width
 
-    # Set the random seed if provided, otherwise use the current time    
-    if seed is not None:
-        random.seed(seed)
-    else:
-        random.seed(time.time())
+    # Set the random seed for reproducibility
+    random.seed(seed)
 
     # Load buoy positions from file if provided, otherwise they will be generated randomly
-    positions: List[Tuple[float, float]] = None
+    positions: list[tuple[float, float]] = None
     if positions_file:
         with open(positions_file, "r") as f:
             positions = json.load(f)
     else:
-        positions = [random_position(world_width, world_height) for _ in range(mobile_buoy_count + fixed_buoy_count)]
+        positions = [
+            random_position(world_width, world_height) 
+            for _ in range(mobile_buoy_count + fixed_buoy_count)
+        ]
 
     # Initialize the Metrics object if metrics collection is enabled in the configuration
     # This object will track various performance metrics throughout the simulation
-    metrics = None
+    metrics: Metrics | None = None
     if cfg.get('simulation', 'enable_metrics'):
-        multihop_mode = cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
         metrics = Metrics(
             density=density,
             scheduler_type=mode,
@@ -177,54 +181,58 @@ def main():
             mobile_count=mobile_buoy_count,
             fixed_count=fixed_buoy_count,
             duration=duration,
-            multihop_mode=multihop_mode,
+            multihop_mode=cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
         )
 
-    # Settin up the communication channel for the simulation
+    # Setting up the communication channel for the simulation
     channel = Channel(metrics=metrics, ideal_channel=ideal)
 
     # Initialization of buoys based on the parameters provided
-    buoys = []
-    default_battery = cfg.get('buoys', 'default_battery')
-    default_velocity = cfg.get('buoys', 'default_velocity')
+    buoys: list[Buoy] = []
+    default_velocity: float = cfg.get('buoys', 'default_velocity')
     for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
         mobile = i < mobile_buoy_count
                     
         # Buoy initialization
         buoy = Buoy(
-            channel=channel,
             position=positions[i],
             is_mobile=mobile,
-            battery=default_battery,
+            scheduler=BeaconScheduler(
+                scheduler_type=mode,
+                static_interval=static_interval,
+                min_interval=min_interval,
+                max_interval=max_interval,
+                default_velocity=default_velocity
+            ),
             velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
             metrics=metrics is not None
         )
-        # Set the scheduler type: ['static', 'dynamic_adab', 'dynamic_acab']
-        buoy.scheduler.scheduler_type = mode
 
-        # Set scheduler intervals based on command-line arguments or configuration values
-        buoy.scheduler.static_interval = static_interval
-        buoy.scheduler.min_interval = min_interval
-        buoy.scheduler.max_interval = max_interval
+        # Set callbacks for channel interactions
+        buoy.channel_is_busy    = channel.is_busy
+        buoy.channel_broadcast  = channel.broadcast
 
+        # Set callbacks for metrics data collection if metrics are enabled
         if metrics:
-            buoy.record_scheduler_latency_callback = metrics.record_scheduler_latency
+            buoy.record_scheduler_latency_callback  = metrics.record_scheduler_latency
             buoy.set_unique_nodes_per_buoy_callback = metrics.set_unique_nodes_per_buoy
-            buoy.log_received_callback = metrics.log_received
+            buoy.log_received_callback              = metrics.log_received
 
         buoys.append(buoy)
 
+    # Creating the Simulator instance with the initialized buoys, channel, and metrics
+    simulator = Simulator(buoys, channel, metrics, scenario, duration)
+    simulated_time = simulator.start()
 
-    simulator = Simulator(buoys, channel, metrics, ramp, duration)
-    simulator.start()
-
-    if metrics:
-        if ramp:
-            metrics.export_time_series(result_file)
-        else:
-            summary = metrics.summary(sim_time=simulator.simulated_time)
-            metrics.export_metrics_to_csv(summary, filename=result_file)
+    # If metrics are enabled and there is the output file, then export metrics to a CSV file once simulation is complete
+    if metrics and result_file:
+        match scenario:
+            case "ramp":
+                metrics.export_time_series(result_file)
+            case "random" | "static":
+                summary = metrics.summary(sim_time=simulated_time)
+                metrics.export_metrics_to_csv(summary, filename=result_file)
 
 if __name__ == "__main__":
     main()
