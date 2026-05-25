@@ -103,7 +103,7 @@ class Buoy:
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
         self.want_to_send = False
 
-    def deactivate(self):
+    def deactivate(self): # Should the buoy loose the packets in queue when deactivated ?
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 
