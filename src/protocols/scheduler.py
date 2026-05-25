@@ -28,7 +28,7 @@ class BeaconScheduler:
         self.last_fq: float                 = 0.0   # Last computed back-off intensity
         self.last_dynamic_send_time: float  = -random.uniform(0, self.min_interval)
         self.last_static_send_time: float   = -random.uniform(0, self.static_interval)
-        self.next_dynamic_interval: float   = None
+        self.next_dynamic_interval: float   = self.min_interval
 
         # Forwarding gate baseline (expected forwarders per cascade)
         self.forward_density_baseline: int = cfg.get('simulation', 'forward_density_baseline')
@@ -80,10 +80,6 @@ class BeaconScheduler:
             last_contact_ts: float,
             current_time: float,
     ) -> bool:
-
-        if self.next_dynamic_interval is None:
-            self.next_dynamic_interval = self.compute_interval(velocity, n_neighbors, last_contact_ts, current_time)
-
         time_since_last = current_time - self.last_dynamic_send_time
 
         if time_since_last >= self.next_dynamic_interval:
