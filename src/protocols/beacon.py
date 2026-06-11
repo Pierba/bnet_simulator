@@ -8,7 +8,9 @@ class Beacon:
     sender_id: uuid.UUID # 16 bytes
     mobile: bool # 1 byte
     position: Tuple[float, float] # 8 bytes
-    neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float]]] # 16 + 4 + 8 bytes per neighbor
+    # Each entry: (id, last-contact ts, position, hop distance from this beacon's sender);
+    # the hop distance is not counted in the on-air size, like the forwarded-mode hop fields
+    neighbors: List[Tuple[uuid.UUID, float, Tuple[float, float], int]] # 16 + 4 + 8 bytes per neighbor
     timestamp: float # 4 bytes
     origin_id: Optional[uuid.UUID] = None  # 16 bytes (only in forwarded mode)
     hop_limit: int = 0  # 4 bytes (only in forwarded mode)

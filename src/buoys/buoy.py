@@ -10,6 +10,10 @@ from core.events import EventType, Event
 from config.config_handler import ConfigHandler
 from utils import logging
 
+# Max random delay (s) before a receiver contends to forward a beacon: desynchronizes
+# the receivers of the same beacon, which would otherwise all start contending at once
+FORWARD_JITTER_MAX: float = 0.05
+
 class BuoyState(Enum):
     SLEEPING = 0
     RECEIVING = 1
@@ -81,13 +85,18 @@ class Buoy:
         self.multihop_mode: bool = cfg.get('simulation', 'multihop_mode')
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
 
+        # Append mode: discovered nodes farther than this many hops from this buoy are
+        # not advertised in its beacons (1 = direct neighbors only, 0 = unlimited)
+        self.append_hop_limit: int = cfg.get('simulation', 'append_hop_limit')
+
         # State variables for CSMA and scheduling
         self.processing: bool               = False
         self.want_to_send: bool             = False
         self.scheduler_decision_time: float = 0.0
 
-        # Multihop append mode: store discovered nodes from neighbor lists
-        self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float]]] = {}
+        # Multihop append mode: store discovered nodes from neighbor lists as
+        # (last-contact ts, position, hop distance from this buoy)
+        self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
         
         # Multihop forwarded mode: track seen beacons to avoid forwarding duplicates
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
@@ -98,11 +107,6 @@ class Buoy:
         self.forward_txop_limit: int    = cfg.get('simulation', 'forward_txop_limit')
         self.forward_burst_count: int   = 0
 
-        # Max random delay before contending to forward: desynchronizes the receivers
-        # of the same beacon, which would otherwise all start contending at once.
-        # Defaults to 50ms when absent from config; an explicit 0 disables it
-        jitter_cfg = cfg.get('simulation', 'forward_jitter_max')
-        self.forward_jitter_max: float  = 0.05 if jitter_cfg is None else jitter_cfg
 
         # Event dispatch table, built once: handle_event runs for every event in the
         # simulation, so rebuilding this mapping per call is measurable overhead
@@ -110,7 +114,7 @@ class Buoy:
             EventType.SCHEDULER_CHECK:              self._handle_scheduler_check,
             EventType.CHANNEL_SENSE:                self._handle_channel_sense,
             EventType.DIFS_COMPLETION:              self._handle_difs_completion,
-            EventType.BACKOFF_COMPLETITION:         self._handle_backoff_completition,
+            EventType.BACKOFF_COMPLETION:           self._handle_backoff_completion,
             EventType.TRANSMISSION_START:           self._handle_transmission_start,
             EventType.FORWARD_TRANSMISSION_START:   self._handle_forward_transmission,
             EventType.RECEPTION:                    self._handle_reception,
@@ -123,7 +127,7 @@ class Buoy:
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
         self.want_to_send = False
 
-    def deactivate(self): # Should the buoy loose the packets in queue when deactivated ?
+    def deactivate(self): # Should the buoy lose the packets in queue when deactivated ?
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 
@@ -200,7 +204,7 @@ class Buoy:
             sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
         )
 
-    # DIFS completion handler: after DIFS time completition, checks channel again and either transmit immediately or enter backoff
+    # DIFS completion handler: after DIFS time completion, checks channel again and either transmit immediately or enter backoff
     def _handle_difs_completion(self, event: Event, sim_time: float):
         # If the buoy no longer wants to send/forward or state has changed, do nothing
         if not(self.want_to_send or self.pending_forward_beacons): # Buoy state are useless for now
@@ -220,11 +224,11 @@ class Buoy:
         # Start or resume slot-by-slot backoff countdown => go over the entire backoff time
         self.state = BuoyState.BACKOFF     
         self.schedule_callback(
-            sim_time + backoff_remaining, EventType.BACKOFF_COMPLETITION, self
+            sim_time + backoff_remaining, EventType.BACKOFF_COMPLETION, self
         )
 
     # Backoff slot handler: checks channel status each slot and either decrements backoff or transmits if backoff is complete
-    def _handle_backoff_completition(self, event: Event, sim_time: float):
+    def _handle_backoff_completion(self, event: Event, sim_time: float):
         if not(self.want_to_send or self.pending_forward_beacons):
             return
             
@@ -364,17 +368,24 @@ class Buoy:
             # Multihop append mode: collect discovered nodes from beacon's neighbor list
             # These are NOT direct neighbors, but nodes we learned about indirectly
             case 'append':
-                for neighbor_id, neighbor_ts, neighbor_pos in beacon.neighbors:
+                for neighbor_id, neighbor_ts, neighbor_pos, neighbor_hops in beacon.neighbors:
                     if neighbor_id == self.id or neighbor_id == beacon.sender_id: # This last case should not occur any time?
                         continue
-                    
+
                     # Skip the nodes that we already know as direct neighbors
                     if neighbor_id in self.neighbors:
                         continue
-                    
+
+                    # This node sits one hop farther from us than from the beacon's sender.
+                    # Nodes beyond the advertisement bound would never be re-advertised,
+                    # so they are not stored at all (0 = unlimited)
+                    hops = neighbor_hops + 1
+                    if self.append_hop_limit and hops > self.append_hop_limit:
+                        continue
+
                     # Update discovered nodes if beacon provides fresher information about this neighbor
-                    if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None))[0]:
-                        self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos)
+                    if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None, 0))[0]:
+                        self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos, hops)
 
             # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0.
             # Never re-forward a beacon this buoy originated (echo received via a neighbor)
@@ -400,7 +411,7 @@ class Buoy:
                     if self.pending_forward_beacons and not self.processing:
                         self.processing = True
                         self.scheduler_decision_time = sim_time
-                        jitter = random.uniform(0, self.forward_jitter_max)
+                        jitter = random.uniform(0, FORWARD_JITTER_MAX)
                         self.schedule_callback(
                             sim_time + jitter, EventType.CHANNEL_SENSE, self
                         )
@@ -411,7 +422,7 @@ class Buoy:
             # Track all unique nodes discovered from this beacon: its neighbor list,
             # the sender, and (in forward mode) the origin. Built as a single set,
             # this runs for every reception
-            discovered_nodes = {neighbor_id for neighbor_id, _, _ in beacon.neighbors}
+            discovered_nodes = {neighbor_id for neighbor_id, _, _, _ in beacon.neighbors}
             discovered_nodes.add(beacon.sender_id)
 
             if self.multihop_mode == 'forwarded' and beacon.origin_id != beacon.sender_id:
@@ -523,18 +534,19 @@ class Buoy:
         self.schedule_callback(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
     
     def create_beacon(self, sim_time: float) -> Beacon:
-        # Beacon initialization parameters
-        all_neighbors = [(id, ts, pos) for id, (ts, pos) in self.neighbors.items()]
+        # Beacon initialization parameters; direct neighbors sit at hop distance 1
+        all_neighbors = [(id, ts, pos, 1) for id, (ts, pos) in self.neighbors.items()]
         origin_id = None
         hop_limit = 0
-        
+
         match self.multihop_mode:
             case 'append':
-                # In append mode, add discovered nodes to the neighbor list
-                # These are nodes learned from other beacons (not direct 1-hop neighbors)
-                for node_id, (ts, pos) in self.discovered_nodes.items():
+                # In append mode, add discovered nodes to the neighbor list.
+                # These are nodes learned from other beacons (not direct 1-hop neighbors);
+                # storage already enforces the append_hop_limit advertisement bound
+                for node_id, (ts, pos, hops) in self.discovered_nodes.items():
                     if node_id not in self.neighbors: # Don't include direct neighbors again
-                        all_neighbors.append((node_id, ts, pos))
+                        all_neighbors.append((node_id, ts, pos, hops))
             case 'forwarded':
                 # Set origin and hop_limit for forwarded mode
                 origin_id = self.id

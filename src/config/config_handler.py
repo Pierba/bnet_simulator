@@ -25,10 +25,10 @@ class ConfigHandler:
             'multihop_mode': 'append',      # Options: none, append, forwarded
             'multihop_modes': ['none', 'append', 'forwarded'],  # Modes swept and compared per run
             'multihop_limit': 1,            # Maximum hops for forwarded mode
+            'append_hop_limit': 2,          # Append mode: max hop distance advertised (1 = direct only, 0 = unlimited)
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
             'forward_txop_limit': 3,        # Max consecutive forwards drained before re-entering CSMA
             'forward_density_baseline': 5,  # Expected forwarders per cascade (probabilistic gate)
-            'forward_jitter_max': 0.05,     # Max random delay (s) before contending to forward
         },
         'world': {
             'width': 500.0,
@@ -103,6 +103,4 @@ class ConfigHandler:
     # Used to inject per-simulation parameters (e.g. multihop_mode) that must be
     # honored by behavior code reading directly from the config singleton.
     def set(self, section: str, key: str, value: Any) -> None:
-        if self._config is None:
-            self._load_config()
         self._config.setdefault(section, {})[key] = value

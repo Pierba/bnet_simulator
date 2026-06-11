@@ -8,14 +8,14 @@ from uuid import UUID
 class Metrics:
     def __init__(
         self,
-        density=None,
-        scheduler_type=None,
-        world_width=None,
-        world_height=None,
-        mobile_count=None,
-        fixed_count=None,
-        duration=None,
-        multihop_mode=None,
+        density: float,
+        scheduler_type: str,
+        world_width: float,
+        world_height: float,
+        mobile_count: int,
+        fixed_count: int,
+        duration: float,
+        multihop_mode: str,
     ):
         # Store configuration parameters for context in the summary
         self.density: float             = density
@@ -160,7 +160,7 @@ class Metrics:
     # Average percentage of the network each buoy has discovered.
     # density - 1 excludes the buoy itself from the set of discoverable nodes.
     def avg_percentage_network_discovered(self) -> float:
-        if not self.density or self.density <= 1:
+        if self.density <= 1:
             return 0.0
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
 
@@ -178,12 +178,12 @@ class Metrics:
     # Generate a summary of all metrics for the simulation run
     def summary(self, sim_time: float) -> dict[str]:
         summary = {
-            "Scheduler Type": self.scheduler_type or "unknown",
-            "Multihop Mode": self.multihop_mode or "none",
-            "World Size": f"{self.world_width}x{self.world_height}" if self.world_width else "unknown",
-            "Mobile Buoys": self.mobile_buoy_count or 0,
-            "Fixed Buoys": self.fixed_buoy_count or 0,
-            "Simulation Duration": self.simulation_duration or sim_time,
+            "Scheduler Type": self.scheduler_type,
+            "Multihop Mode": self.multihop_mode,
+            "World Size": f"{self.world_width}x{self.world_height}",
+            "Mobile Buoys": self.mobile_buoy_count,
+            "Fixed Buoys": self.fixed_buoy_count,
+            "Simulation Duration": self.simulation_duration,
             "Sent": self.beacons_sent,
             "Forwards Sent": self.beacons_forwarded,
             "Unique Beacons Received": self.beacons_received,
@@ -208,27 +208,14 @@ class Metrics:
             "Average Neighbors": self.get_final_avg_neighbors(),
             "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
             "Avg % Network Discovered": self.avg_percentage_network_discovered(),
+            "Density": self.density,
         }
 
-        if self.density is not None:
-            summary["Density"] = self.density
-            
         return summary
 
     # Export the summary metrics to a CSV file for later plotting
-    def export_metrics_to_csv(self, summary, filename=None):
-        if filename is None:
-            results_dir = os.path.join("metrics", "test_results")
-            os.makedirs(results_dir, exist_ok=True)
-            filename = (
-                f"{self.scheduler_type or 'unknown'}_"
-                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
-                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}.csv"
-            )
-            filepath = os.path.join(results_dir, filename)
-        else:
-            filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    def export_metrics_to_csv(self, summary, filepath: str):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
@@ -238,20 +225,9 @@ class Metrics:
         logging.log_info(f"Metrics exported to {filepath}")
 
     # Export the time-series data to a CSV file for later plotting
-    def export_time_series(self, filename=None):
+    def export_time_series(self, filepath: str):
         import pandas as pd
-        if filename is None:
-            results_dir = os.path.join("metrics", "test_results")
-            os.makedirs(results_dir, exist_ok=True)
-            filename = (
-                f"{self.scheduler_type or 'unknown'}_"
-                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
-                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}_timeseries.csv"
-            )
-            filepath = os.path.join(results_dir, filename)
-        else:
-            filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)

@@ -44,7 +44,7 @@ class BeaconScheduler:
             case "static":
                 return self.static_interval
             case "dynamic_adab" | "dynamic_acab":
-                return self.next_dynamic_interval if self.next_dynamic_interval is not None else self.min_interval
+                return self.next_dynamic_interval
             case _:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 

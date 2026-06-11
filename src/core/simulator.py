@@ -29,7 +29,7 @@ class Simulator:
         else:
             self._active_count: int = len(self.buoys)
 
-        # Durantion time of the simulation in seconds
+        # Duration time of the simulation in seconds
         self.duration: float = duration
         
         # Neighbor settings

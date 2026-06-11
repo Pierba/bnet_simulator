@@ -7,7 +7,7 @@ simulation:
   max_buoys: 140
   step_buoys: 20
   intervals:
-   - 1.0
+   - 1.0   
    - 0.5
    - 0.25
   duration: 100
@@ -29,6 +29,9 @@ simulation:
   - forwarded
   # Maximum hops for forwarded mode
   multihop_limit: 1
+  # Append mode: discovered nodes farther than this many hops from the sender are
+  # not advertised in its beacons (1 = direct neighbors only, 0 = unlimited)
+  append_hop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
   pending_queue_limit: 20
   # Max consecutive forwards a node can drain before CSMA (TXOP cap)

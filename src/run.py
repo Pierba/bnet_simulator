@@ -79,7 +79,7 @@ def run_simulation(mode: str, interval: float, density: float, positions: list[t
     if os.path.exists(positions_file):
         os.remove(positions_file)
 
-# Subpocesses worker function for parallel execution of simulations
+# Subprocess worker function for parallel execution of simulations
 def simulation_worker(args):
     mode, interval, density, positions, results_dir, cfg, multihop_mode = args
     run_simulation(mode, interval, density, positions, results_dir, cfg, multihop_mode)

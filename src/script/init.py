@@ -243,7 +243,7 @@ def main():
                 metrics.export_time_series(result_file)
             case "random" | "static":
                 summary = metrics.summary(sim_time=simulated_time)
-                metrics.export_metrics_to_csv(summary, filename=result_file)
+                metrics.export_metrics_to_csv(summary, result_file)
 
 if __name__ == "__main__":
     main()
