@@ -98,6 +98,12 @@ class Buoy:
         self.forward_txop_limit: int    = cfg.get('simulation', 'forward_txop_limit')
         self.forward_burst_count: int   = 0
 
+        # Max random delay before contending to forward: desynchronizes the receivers
+        # of the same beacon, which would otherwise all start contending at once.
+        # Defaults to 50ms when absent from config; an explicit 0 disables it
+        jitter_cfg = cfg.get('simulation', 'forward_jitter_max')
+        self.forward_jitter_max: float  = 0.05 if jitter_cfg is None else jitter_cfg
+
         # Event dispatch table, built once: handle_event runs for every event in the
         # simulation, so rebuilding this mapping per call is measurable overhead
         self._event_handlers = {
@@ -224,10 +230,13 @@ class Buoy:
             
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
-            # If channel is busy then we remain in this state until elegible for transmission start
-            self.state = BuoyState.BACKOFF
+            # Busy during backoff => re-enter full CSMA (sense + DIFS + fresh backoff)
+            # once the channel frees. Transmitting directly on wake-up would make every
+            # contender parked on this same transmission fire at the same clear time
+            # and collide deterministically
+            self.state = BuoyState.RECEIVING
             self.schedule_callback(
-                next_try_time, EventType.BACKOFF_COMPLETITION, self
+                next_try_time, EventType.CHANNEL_SENSE, self
             )
             return
 
@@ -290,7 +299,11 @@ class Buoy:
         # Checking each time if channel remains idle
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
-            self.schedule_callback(next_try_time, EventType.FORWARD_TRANSMISSION_START, self)
+            # Busy => re-contend with full CSMA once the channel frees instead of
+            # transmitting blindly on wake-up (parked forwarders would all fire at the
+            # same clear time and collide). A fresh contention grants a fresh TXOP
+            self.forward_burst_count = 0
+            self.schedule_callback(next_try_time, EventType.CHANNEL_SENSE, self)
             return
 
         # Take the first valid beacon from the queue (lazy evaluation, insertion-ordered dict)
@@ -363,8 +376,9 @@ class Buoy:
                     if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None))[0]:
                         self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos)
 
-            # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0
-            case 'forwarded' if beacon.hop_limit > 0:
+            # Multihop forwarded mode: forward beacon WITHOUT modification if hop_limit > 0.
+            # Never re-forward a beacon this buoy originated (echo received via a neighbor)
+            case 'forwarded' if beacon.hop_limit > 0 and beacon.origin_id != self.id:
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
                     # If already in pending queue, just update the beacon
                     if beacon.origin_id in self.pending_forward_beacons:
@@ -380,12 +394,15 @@ class Buoy:
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
 
-                    # Start transmission pipeline if not active
+                    # Start transmission pipeline if not active, after a random jitter:
+                    # every receiver of this beacon processes it at the same instant,
+                    # so contending immediately would synchronize the forwarders
                     if self.pending_forward_beacons and not self.processing:
                         self.processing = True
                         self.scheduler_decision_time = sim_time
+                        jitter = random.uniform(0, self.forward_jitter_max)
                         self.schedule_callback(
-                            sim_time, EventType.CHANNEL_SENSE, self
+                            sim_time + jitter, EventType.CHANNEL_SENSE, self
                         )
             case _:
                 pass

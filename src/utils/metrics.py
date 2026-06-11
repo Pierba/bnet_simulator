@@ -32,6 +32,7 @@ class Metrics:
         self.avg_neighbors_count: int                       = 0
         self.avg_neighbors_sum: float                       = 0.0
         self.beacons_sent: int                              = 0
+        self.beacons_forwarded: int                         = 0
         self.beacons_received: int                          = 0
         self.beacons_lost: int                              = 0
         self.beacons_collided: int                          = 0
@@ -55,9 +56,12 @@ class Metrics:
         else:
             nodes.update(unique_nodes)
 
-    # Log a sent beacon
-    def log_sent(self):
+    # Log a sent beacon; forwarded copies are tracked separately so that
+    # origin-generated and relayed transmissions can be distinguished
+    def log_sent(self, is_forward: bool = False):
         self.beacons_sent += 1
+        if is_forward:
+            self.beacons_forwarded += 1
 
     # Log a received beacon and tracks unique deliveries and latency.
     # origin_id identifies the node that created the beacon: forwarded copies carry the
@@ -138,9 +142,12 @@ class Metrics:
             
         self.time_series.append(timepoint)
 
-    # Calculate True Packet Delivery Ratio: unique beacons delivered / beacons sent
+    # Calculate True Packet Delivery Ratio: unique beacons delivered / unique beacons
+    # generated. Forwarded copies are excluded from the denominator: they re-transmit
+    # existing beacons, and counting them made the ratio incomparable across modes
     def delivery_ratio(self) -> float:
-        return self.beacons_received / self.beacons_sent if self.beacons_sent else 0.0
+        originated = self.beacons_sent - self.beacons_forwarded
+        return self.beacons_received / originated if originated else 0.0
 
     # Calculate the average number of unique nodes discovered per buoy
     def avg_unique_nodes_discovered(self) -> float:
@@ -178,6 +185,7 @@ class Metrics:
             "Fixed Buoys": self.fixed_buoy_count or 0,
             "Simulation Duration": self.simulation_duration or sim_time,
             "Sent": self.beacons_sent,
+            "Forwards Sent": self.beacons_forwarded,
             "Unique Beacons Received": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,

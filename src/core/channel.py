@@ -123,7 +123,8 @@ class Channel:
             logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
             
         if self.metrics:
-            self.metrics.log_sent()
+            is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
+            self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
             self.metrics.log_successful_receivers(actual_successful)
             self.metrics.log_collision(collision_lost)
