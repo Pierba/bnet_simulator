@@ -4,7 +4,7 @@ simulation:
   - dynamic_adab
   - dynamic_acab
   min_buoys: 20
-  max_buoys: 100
+  max_buoys: 140
   step_buoys: 20
   intervals:
    - 1.0
@@ -14,7 +14,7 @@ simulation:
   num_processes: 10
   ideal_channel: false
   # Options: static, ramp, random
-  scenario: random          
+  scenario: static          
   # Percentage of buoys that can change per update in random scenario 
   random_variability: 0.10
   enable_metrics: true
@@ -22,18 +22,23 @@ simulation:
   enable_file_logging: false
   # Options: none, append, forwarded
   multihop_mode: append
+  # Multihop modes swept and compared per run (subset of: none, append, forwarded)
+  multihop_modes:
+  - none
+  - append
+  - forwarded
   # Maximum hops for forwarded mode
-  multihop_limit: 2
+  multihop_limit: 1
   # Maximum number of beacons that can be stored in pending queue
   pending_queue_limit: 20
-  # Max consecutive forwards a node can drain before re-contending via full CSMA (TXOP cap)
+  # Max consecutive forwards a node can drain before CSMA (TXOP cap)
   forward_txop_limit: 3
-  # Probabilistic forwarding: just before broadcasting a pending forward, fire it with p = min(1, n0/n_neighbors). 0 disables.
+  # Probabilistic forwarding: fire a pending beacon with p = min(1, n0/n_neighbors)
   forward_density_baseline: 5
 
 world:
-  width: 200.0
-  height: 200.0
+  width: 500.0
+  height: 500.0
 
 buoys:
   mobile_percentage: 0.4

@@ -116,8 +116,14 @@ def parse_args() -> argparse.Namespace:
         default="static",
         help="Scenario type: static, ramp, or random (default: static)"
     )
+    parser.add_argument(
+        "--multihop-mode",
+        choices=["none", "append", "forwarded"],
+        default=cfg.get('simulation', 'multihop_mode'),
+        help="Multihop mode to use for the simulation (default: from config)"
+    )
 
-    # Parse the command-line arguments and return them as a namespace object 
+    # Parse the command-line arguments and return them as a namespace object
     return parser.parse_args()
 
 # Get random position within the world boundaries
@@ -147,6 +153,7 @@ def main():
     min_interval: float     = args.min_interval
     mobile_buoy_count: int  = args.mobile_buoy_count
     mode: str               = args.mode
+    multihop_mode: str      = args.multihop_mode
     positions_file: str     = args.positions_file
     result_file: str        = args.result_file
     scenario: str           = args.scenario
@@ -154,6 +161,10 @@ def main():
     static_interval: float  = args.static_interval
     world_height: float     = args.world_height
     world_width: float      = args.world_width
+
+    # Override the multihop mode in the config singleton so that the behavior
+    # code (buoy.py) reading it directly uses this run's mode, not config.yaml's.
+    cfg.set('simulation', 'multihop_mode', multihop_mode)
 
     # Set the random seed for reproducibility
     random.seed(seed)
@@ -181,7 +192,7 @@ def main():
             mobile_count=mobile_buoy_count,
             fixed_count=fixed_buoy_count,
             duration=duration,
-            multihop_mode=cfg.get('simulation', 'multihop_mode')  # [none, append, forwarded]
+            multihop_mode=multihop_mode  # [none, append, forwarded]
         )
 
     # Setting up the communication channel for the simulation

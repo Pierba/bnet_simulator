@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Tuple, List, Optional, Set
 import uuid
 
-@dataclass
+@dataclass(slots=True)
 # Represents a beacon message sent by a buoy in the network
 class Beacon:
     sender_id: uuid.UUID # 16 bytes

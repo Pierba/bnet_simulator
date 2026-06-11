@@ -25,7 +25,7 @@ LOG_FILE = Path("logs/simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
     # Errors and critical messages are always logged regardless of enable_logging setting
-    if not LOGGING_ENABLED:
+    if not LOGGING_ENABLED and level not in ("ERROR", "CRITICAL"):
         return
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

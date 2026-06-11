@@ -18,6 +18,11 @@ class Channel:
         self.buoys: list[Buoy]                                          = []
         self.metrics: Metrics                                           = metrics
         self.schedule_callback: callable                                = None
+
+        # Earliest time at which an active transmission expires; lets update() skip
+        # rebuilding the list on the (very frequent) calls where nothing expired yet
+        self._next_expiry: float = float('inf')
+        self._buoys_by_id: dict = {}
         
         # Setting up network parameters from configuration
         self.ideal_channel: bool            = ideal_channel
@@ -36,6 +41,7 @@ class Channel:
     # Setting the list of buoys in the channel, used for calculating receivers in range
     def set_buoys(self, buoys: list[Buoy]):
         self.buoys = buoys
+        self._buoys_by_id = {buoy.id: buoy for buoy in buoys}
 
     def handle_event(self, event, sim_time: float): # Need to figure if deleting this handler ?
         match event.event_type:
@@ -54,21 +60,32 @@ class Channel:
 
     # Logs the end of a transmission for debugging purposes
     def _handle_transmission_end(self, event, sim_time: float):
-        beacon = event.data.get("beacon")
-        if beacon:
-            logging.log_info(f"Transmission completed at {sim_time} for beacon from {str(beacon.sender_id)[:6]}")
+        if logging.LOGGING_ENABLED:
+            beacon = event.data.get("beacon")
+            if beacon:
+                logging.log_info(f"Transmission completed at {sim_time} for beacon from {str(beacon.sender_id)[:6]}")
 
     # Keep only the transmissions that are still active based on sim_time
-    def update(self, sim_time: float):    
+    def update(self, sim_time: float):
+        # Fast path: the earliest expiry is still in the future, nothing to prune
+        if sim_time < self._next_expiry:
+            return
+
+        grace = self.grace_period
         self.active_transmissions = [
             (beacon, start, end)
             for (beacon, start, end) in self.active_transmissions
-            if end + self.grace_period > sim_time
+            if end + grace > sim_time
         ]
+        self._next_expiry = min(
+            (end + grace for _, _, end in self.active_transmissions),
+            default=float('inf')
+        )
 
     def broadcast(self, beacon: Beacon, sim_time: float) -> float:
-        logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
-        
+        if logging.LOGGING_ENABLED:
+            logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
+
         # Update channel to remove expired transmissions before processing this new one
         self.update(sim_time)
 
@@ -87,6 +104,9 @@ class Channel:
 
         # Record this transmission as active and schedule its end event
         self.active_transmissions.append((beacon, sim_time, new_end_time))
+        expiry = new_end_time + self.grace_period
+        if expiry < self._next_expiry:
+            self._next_expiry = expiry
         self.schedule_callback(new_end_time, EventType.TRANSMISSION_END, self, {"beacon": beacon})
 
         # Schedule receptions for surviving receivers and count probabilistic losses if the channel is non-ideal
@@ -98,8 +118,9 @@ class Channel:
         collision_lost = len(receivers_with_collisions)
         total_lost = collision_lost + probability_lost
         actual_successful = n_receivers - total_lost
-        
-        logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
+
+        if logging.LOGGING_ENABLED:
+            logging.log_info(f"Lost {total_lost} packets: {collision_lost} from collisions, {probability_lost} from probability")
             
         if self.metrics:
             self.metrics.log_sent()
@@ -120,13 +141,15 @@ class Channel:
     def _receivers_in_range(self, beacon: Beacon) -> list[tuple[Buoy, float]]:
         receivers_data: list[tuple[Buoy, float]] = []
         beacon_x, beacon_y = beacon.position
-        sender_id = beacon.sender_id
+        # Resolve the sender once so the per-buoy exclusion is an identity check
+        # instead of a UUID comparison (which dominates this loop at scale)
+        sender = self._buoys_by_id.get(beacon.sender_id)
         comm_range_sq = self.comm_range_max_sq
 
         for buoy in self.buoys:
-            if buoy.id == sender_id or not buoy.active:
+            if buoy is sender or not buoy.active:
                 continue
-            
+
             bx, by = buoy.position
             dx, dy = bx - beacon_x, by - beacon_y
             dist_sq = (dx * dx) + (dy * dy)
@@ -147,15 +170,23 @@ class Channel:
         # Returns (receiver ids that lose this beacon, count of earlier receptions revoked)
         receivers_with_collisions = set()
         poisoned_count = 0
+
+        # Concurrent transmissions are rare thanks to carrier sensing
+        if not self.active_transmissions:
+            return receivers_with_collisions, poisoned_count
+
         sender_id = beacon.sender_id
         beacon_x, beacon_y = beacon.position
         comm_range_sq = self.comm_range_max_sq
+
+        # Receiver coordinates resolved once instead of per (transmission x receiver) pair
+        receivers_pos = [(buoy.id, buoy.position[0], buoy.position[1]) for buoy, _ in receivers_data]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender
             if existing.sender_id == sender_id:
                 continue
-            
+
             # Skip transmissions whose time window does not overlap this one
             if not (start_time < end and start < end_time):
                 continue
@@ -165,25 +196,25 @@ class Channel:
             dx, dy = beacon_x - ex, beacon_y - ey
             senders_in_range = (dx * dx) + (dy * dy) <= comm_range_sq
 
-            if senders_in_range:
-                logging.log_error(f"Direct collision between {str(sender_id)[:6]} and {str(existing.sender_id)[:6]}")
+            if senders_in_range and logging.LOGGING_ENABLED:
+                logging.log_info(f"Direct collision between {str(sender_id)[:6]} and {str(existing.sender_id)[:6]}")
 
-            for buoy, _ in receivers_data:
+            for buoy_id, rx, ry in receivers_pos:
                 # The new beacon is lost here on a direct collision, or whenever this
                 # receiver also sits in range of the existing transmission's sender
-                rx, ry = buoy.position
                 dx, dy = rx - ex, ry - ey
                 hears_existing = (dx * dx) + (dy * dy) <= comm_range_sq
 
                 if senders_in_range or hears_existing:
-                    receivers_with_collisions.add(buoy.id)
+                    receivers_with_collisions.add(buoy_id)
 
                 # Revoke the existing beacon's reception here only if one was actually
                 # scheduled for this receiver -> poisoned_count counts real losses only
-                if hears_existing and buoy.id in existing.scheduled_receivers:
-                    existing.scheduled_receivers.discard(buoy.id)
+                if hears_existing and buoy_id in existing.scheduled_receivers:
+                    existing.scheduled_receivers.discard(buoy_id)
                     poisoned_count += 1
-                    logging.log_error(f"Collision at receiver {str(buoy.id)[:6]} between {str(sender_id)[:6]} and {str(existing.sender_id)[:6]}")
+                    if logging.LOGGING_ENABLED:
+                        logging.log_info(f"Collision at receiver {str(buoy_id)[:6]} between {str(sender_id)[:6]} and {str(existing.sender_id)[:6]}")
 
         return receivers_with_collisions, poisoned_count
     
@@ -224,26 +255,28 @@ class Channel:
     # Check if the channel is actually busy at the given position and time
     def is_busy(self, position: tuple[float, float], sim_time: float) -> tuple[bool, float]:
         self.update(sim_time)
-        
+
         busy = False
         next_free_time = sim_time
+        px, py = position
+        comm_range_sq = self.comm_range_max_sq
+        speed_of_light = self.speed_of_light
 
         for beacon, start, end in self.active_transmissions:
-            sender_position = beacon.position
-            dx = position[0] - sender_position[0]
-            dy = position[1] - sender_position[1]
-            distance = math.hypot(dx, dy)
-            
-            # Skip if outside of detection range
-            if distance > self.comm_range_max:
+            sx, sy = beacon.position
+            dx, dy = px - sx, py - sy
+            dist_sq = (dx * dx) + (dy * dy)
+
+            # Skip if outside of detection range (squared compare avoids the sqrt)
+            if dist_sq > comm_range_sq:
                 continue
-                
+
             # Calculate when the signal starts and stops passing through this specific position
-            propagation_delay = distance / self.speed_of_light
-            
+            propagation_delay = math.sqrt(dist_sq) / speed_of_light
+
             arrival_time = start + propagation_delay
             cleared_time = end + propagation_delay
-            
+
             # Channel is busy if the wave is currently over this position. Don't stop at
             # the first hit: keep the latest clear time so the caller retries only once.
             if arrival_time <= sim_time < cleared_time:

@@ -4,6 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 
+# Schedulers plotted by default when --schedulers is not provided.
+DEFAULT_SCHEDULERS = ["dynamic_acab", "dynamic_adab", "static"]
+SCHEDULER_LABELS = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+SCHEDULER_COLORS = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
+
 def resample_timeseries(df, time_col="time", num_points=200):
     """Resample a time series DataFrame to a fixed number of evenly-spaced points.
     
@@ -29,7 +34,8 @@ def resample_timeseries(df, time_col="time", num_points=200):
     
     return result
 
-def plot_block_by_density(results_dir, plot_dir, interval=None):
+def plot_block_by_density(results_dir, plot_dir, interval=None, schedulers=None):
+    schedulers = schedulers or DEFAULT_SCHEDULERS
     files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
     data = []
     collision_data = []
@@ -111,10 +117,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
     df = pd.DataFrame(data, columns=["Density", "PDR", "Scheduler"])
     grouped = df.groupby(["Density", "Scheduler"], observed=False).mean().reset_index()
     densities = sorted(df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
-    bar_width = 0.25
+    bar_width = 0.8 / max(1, len(schedulers))
     x = np.arange(len(densities))
     
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -130,7 +133,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         for d in densities:
             row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
             pdrs.append(row["PDR"].values[0] if not row.empty else 0)
-        ax.bar(x + offset + i * bar_width, pdrs, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+        ax.bar(x + offset + i * bar_width, pdrs, bar_width, label=SCHEDULER_LABELS[sched], color=SCHEDULER_COLORS[sched])
     
     # Plot average neighbors as a connected line across all densities
     if avg_neighbors_data:
@@ -209,7 +212,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         for d in densities:
             row = grouped_coll[(grouped_coll["Density"] == d) & (grouped_coll["Scheduler"] == sched)]
             rates.append(row["CollisionRate"].values[0] if not row.empty else 0)
-        ax.bar(x + offset + i * bar_width, rates, bar_width, label=scheduler_labels[sched], color=color_map[sched])
+        ax.bar(x + offset + i * bar_width, rates, bar_width, label=SCHEDULER_LABELS[sched], color=SCHEDULER_COLORS[sched])
     
     ax.set_xlabel("Total Buoys")
     ax.set_ylabel("Collision Rate")
@@ -238,9 +241,10 @@ def plot_block_by_density(results_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
     plt.close()
 
-def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
-    
+def plot_ramp_grouped_by_buoy_count(results_dir, plot_file, schedulers=None):
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    modes = [(sched, SCHEDULER_COLORS[sched]) for sched in schedulers]
+
     min_buoys = float('inf')
     max_buoys = 0
     all_data = {}
@@ -341,7 +345,7 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
 
     group_labels = sorted(list(all_labels), key=label_key)
     x = np.arange(len(group_labels))
-    bar_width = 0.25
+    bar_width = 0.8 / max(1, len(modes))
     fig, ax = plt.subplots(figsize=(10, 6))
     grouped_data = {}
     for mode, color in valid_modes:
@@ -353,18 +357,16 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file):
         return
     
     x = np.arange(len(group_labels))
-    bar_width = 0.25
+    bar_width = 0.8 / max(1, len(valid_modes))
     fig, ax = plt.subplots(figsize=(10, 6))
-    
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+
     offset = -(len(valid_modes) - 1) * bar_width / 2
-    
+
     for i, (mode, color) in enumerate(valid_modes):
         data = grouped_data[mode]
         if len(data) == len(x):
-            label = mode_labels.get(mode, mode.capitalize())
-            ax.bar(x + offset + i * bar_width, data, bar_width, 
-                  label=label, color=color)
+            ax.bar(x + offset + i * bar_width, data, bar_width,
+                  label=SCHEDULER_LABELS[mode], color=color)
         else:
             print(f"Warning: Data length mismatch for {mode}. Expected {len(x)}, got {len(data)}")
     
@@ -410,9 +412,9 @@ def extract_interval_from_dirname(dirname):
             return interval_value
     return None
 
-def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None, schedulers=None):
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    modes = [(sched, SCHEDULER_COLORS[sched]) for sched in schedulers]
     plt.figure(figsize=(10, 6))
     found = False
 
@@ -432,7 +434,7 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
             else:
                 print(f"Warning: No B-PDR or delivery_ratio column in {csv_file}")
                 continue
-            label = mode_labels.get(mode, mode.capitalize())
+            label = SCHEDULER_LABELS[mode]
             df_resampled = resample_timeseries(df, time_col="time")
             plt.plot(df_resampled["time"], df_resampled[y_col], label=label, color=color)
             found = True
@@ -508,8 +510,9 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None):
     plt.savefig(plot_file)
     plt.close()
 
-def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
+def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None, schedulers=None):
     """Plot average unique nodes discovered vs density for different schedulers"""
+    schedulers = schedulers or DEFAULT_SCHEDULERS
     files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
     data = []
     
@@ -551,32 +554,29 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
     df["PercentageDiscovered"] = (df["AvgUniqueNodes"] / (df["Density"] - 1)) * 100
     
     grouped = df.groupby(["Density", "Scheduler", "MultihopMode"], observed=False).mean().reset_index()
-    
+
     densities = sorted(df["Density"].unique())
-    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
-    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
-    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
-    
+
     multihop_modes = sorted(df["MultihopMode"].unique())
-    
+
     if len(multihop_modes) > 1:
         fig, axes = plt.subplots(1, len(multihop_modes), figsize=(8 * len(multihop_modes), 6))
         if len(multihop_modes) == 1:
             axes = [axes]
-        
+
         for ax, mode in zip(axes, multihop_modes):
             mode_data = grouped[grouped["MultihopMode"] == mode]
-            bar_width = 0.25
+            bar_width = 0.8 / max(1, len(schedulers))
             x = np.arange(len(densities))
-            
+
             offset = -(len(schedulers) - 1) * bar_width / 2
             for i, sched in enumerate(schedulers):
                 values = []
                 for d in densities:
                     row = mode_data[(mode_data["Density"] == d) & (mode_data["Scheduler"] == sched)]
                     values.append(row["PercentageDiscovered"].values[0] if not row.empty else 0)  # UPDATED
-                ax.bar(x + offset + i * bar_width, values, bar_width, 
-                      label=scheduler_labels[sched], color=color_map[sched])
+                ax.bar(x + offset + i * bar_width, values, bar_width,
+                      label=SCHEDULER_LABELS[sched], color=SCHEDULER_COLORS[sched])
             
             ax.set_xlabel("Total Buoys")
             ax.set_ylabel("Avg % of Network Discovered")  # UPDATED
@@ -596,17 +596,17 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
         
     else:
         fig, ax = plt.subplots(figsize=(10, 6))
-        bar_width = 0.25
+        bar_width = 0.8 / max(1, len(schedulers))
         x = np.arange(len(densities))
-        
+
         offset = -(len(schedulers) - 1) * bar_width / 2
         for i, sched in enumerate(schedulers):
             values = []
             for d in densities:
                 row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
                 values.append(row["PercentageDiscovered"].values[0] if not row.empty else 0)  # UPDATED
-            ax.bar(x + offset + i * bar_width, values, bar_width, 
-                  label=scheduler_labels[sched], color=color_map[sched])
+            ax.bar(x + offset + i * bar_width, values, bar_width,
+                  label=SCHEDULER_LABELS[sched], color=SCHEDULER_COLORS[sched])
         
         ax.set_xlabel("Total Buoys")
         ax.set_ylabel("Avg % of Network Discovered")  # UPDATED
@@ -634,10 +634,10 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, "avg_percentage_network_discovered_by_density.png"))  # UPDATED
     plt.close()
 
-def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None):
+def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None, schedulers=None):
     """Plot average unique nodes discovered vs time for ramp scenarios"""
-    modes = [("dynamic_acab", "tab:green"), ("dynamic_adab", "tab:orange"), ("static", "tab:blue")]
-    mode_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    modes = [(sched, SCHEDULER_COLORS[sched]) for sched in schedulers]
     plt.figure(figsize=(10, 6))
     found = False
 
@@ -650,7 +650,7 @@ def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None):
         if os.path.exists(csv_file):
             df = pd.read_csv(csv_file)
             if "avg_unique_nodes" in df.columns:
-                label = mode_labels.get(mode, mode.capitalize())
+                label = SCHEDULER_LABELS[mode]
                 df_resampled = resample_timeseries(df, time_col="time")
                 plt.plot(df_resampled["time"], df_resampled["avg_unique_nodes"], label=label, color=color)
                 found = True
@@ -718,10 +718,13 @@ def main():
     parser.add_argument("--results-dir", type=str, default=None, help="Directory with result CSVs")
     parser.add_argument("--plot-dir", type=str, default=None, help="Directory to save plots")
     parser.add_argument("--interval", type=float, default=None, help="Static interval value to display in plot")
+    parser.add_argument("--schedulers", nargs="+", default=None,
+                        help=f"Schedulers to plot (default: {' '.join(DEFAULT_SCHEDULERS)})")
     args = parser.parse_args()
 
     results_dir = args.results_dir or os.environ.get("RESULTS_DIR", "test_results")
     plot_dir = args.plot_dir or os.environ.get("PLOT_DIR", "test_plots")
+    schedulers = args.schedulers or DEFAULT_SCHEDULERS
 
     interval = args.interval
     if interval is None:
@@ -738,22 +741,22 @@ def main():
         os.makedirs(plot_dir, exist_ok=True)
 
     print("Plotting standard metrics...")
-    plot_block_by_density(results_dir, plot_dir, interval=interval)
+    plot_block_by_density(results_dir, plot_dir, interval=interval, schedulers=schedulers)
 
     print("Plotting unique nodes by density...")
-    plot_unique_nodes_by_density(results_dir, plot_dir, interval=interval)
+    plot_unique_nodes_by_density(results_dir, plot_dir, interval=interval, schedulers=schedulers)
 
     print("Plotting B-PDR vs time for ramp scenarios...")
     plot_file = os.path.join(plot_dir, "b_pdr_vs_time_ramp.png")
-    plot_delivery_ratio_vs_time(results_dir, plot_file, interval=interval)
+    plot_delivery_ratio_vs_time(results_dir, plot_file, interval=interval, schedulers=schedulers)
 
     print("Plotting unique nodes vs time for ramp scenarios...")
     plot_file = os.path.join(plot_dir, "avg_unique_nodes_vs_time_ramp.png")
-    plot_unique_nodes_vs_time(results_dir, plot_file, interval=interval)
+    plot_unique_nodes_vs_time(results_dir, plot_file, interval=interval, schedulers=schedulers)
 
     print("Plotting B-PDR grouped by buoy count for ramp scenario...")
     plot_group_file = os.path.join(plot_dir, "b_pdr_grouped_by_buoy_count_ramp.png")
-    plot_ramp_grouped_by_buoy_count(results_dir, plot_group_file)
+    plot_ramp_grouped_by_buoy_count(results_dir, plot_group_file, schedulers=schedulers)
 
     print("Plots saved to:", plot_dir)
 

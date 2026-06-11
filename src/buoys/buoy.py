@@ -98,6 +98,20 @@ class Buoy:
         self.forward_txop_limit: int    = cfg.get('simulation', 'forward_txop_limit')
         self.forward_burst_count: int   = 0
 
+        # Event dispatch table, built once: handle_event runs for every event in the
+        # simulation, so rebuilding this mapping per call is measurable overhead
+        self._event_handlers = {
+            EventType.SCHEDULER_CHECK:              self._handle_scheduler_check,
+            EventType.CHANNEL_SENSE:                self._handle_channel_sense,
+            EventType.DIFS_COMPLETION:              self._handle_difs_completion,
+            EventType.BACKOFF_COMPLETITION:         self._handle_backoff_completition,
+            EventType.TRANSMISSION_START:           self._handle_transmission_start,
+            EventType.FORWARD_TRANSMISSION_START:   self._handle_forward_transmission,
+            EventType.RECEPTION:                    self._handle_reception,
+            EventType.NEIGHBOR_CLEANUP:             self._handle_neighbor_cleanup,
+            EventType.BUOY_MOVEMENT:                self._handle_buoy_movement
+        }
+
     def activate(self):
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
@@ -118,23 +132,11 @@ class Buoy:
             return
 
         # Dispatch event to the appropriate handler based on event type
-        handlers = {
-            EventType.SCHEDULER_CHECK:              self._handle_scheduler_check,
-            EventType.CHANNEL_SENSE:                self._handle_channel_sense,
-            EventType.DIFS_COMPLETION:              self._handle_difs_completion,
-            EventType.BACKOFF_COMPLETITION:         self._handle_backoff_completition,
-            EventType.TRANSMISSION_START:           self._handle_transmission_start,
-            EventType.FORWARD_TRANSMISSION_START:   self._handle_forward_transmission,
-            EventType.RECEPTION:                    self._handle_reception,
-            EventType.NEIGHBOR_CLEANUP:             self._handle_neighbor_cleanup,
-            EventType.BUOY_MOVEMENT:                self._handle_buoy_movement
-        }
-        
-        handler = handlers.get(event.event_type)
+        handler = self._event_handlers.get(event.event_type)
         if not handler:
             logging.log_error(f"Buoy {str(self.id)[:6]} received unhandled event: {event.event_type}")
             return
-                
+
         # Call the handler for the event type
         handler(event, sim_time)
 
@@ -273,12 +275,14 @@ class Buoy:
         # so the scheduler can evaluate whether to send an own beacon first
         if sim_time >= self.next_scheduler_time:
             self.processing = False
-            logging.log_info(f"Buoy {str(self.id)[:6]} yielded forwarding to scheduler at {sim_time:.4f}s")
+            if logging.LOGGING_ENABLED:
+                logging.log_info(f"Buoy {str(self.id)[:6]} yielded forwarding to scheduler at {sim_time:.4f}s")
             return
 
         # TXOP cap: after N back-to-back forwards re-enter full CSMA so other nodes get a fair shot at the medium
         if self.forward_burst_count >= self.forward_txop_limit:
-            logging.log_info(f"Buoy {str(self.id)[:6]} hit TXOP cap ({self.forward_txop_limit}), re-contending")
+            if logging.LOGGING_ENABLED:
+                logging.log_info(f"Buoy {str(self.id)[:6]} hit TXOP cap ({self.forward_txop_limit}), re-contending")
             self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
             self.forward_burst_count = 0  # Fresh CSMA win => reset TXOP burst counter
             return
@@ -305,9 +309,10 @@ class Buoy:
 
         # Check with the scheduler if we should forward based on current conditions and forwarding density
         if not self.scheduler.should_forward(len(self.neighbors)):
-            logging.log_info(
-                f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]}"
-            )
+            if logging.LOGGING_ENABLED:
+                logging.log_info(
+                    f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]}"
+                )
             if self.pending_forward_beacons:
                 self.schedule_callback(sim_time, EventType.FORWARD_TRANSMISSION_START, self)
             else:
@@ -318,7 +323,8 @@ class Buoy:
         forwarded = self.forward_beacon(forward_beacon, sim_time)
         end_time = self.channel_broadcast(forwarded, sim_time)
         self.forward_burst_count += 1
-        logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
+        if logging.LOGGING_ENABLED:
+            logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
 
         if self.pending_forward_beacons:
             self.schedule_callback(end_time, EventType.FORWARD_TRANSMISSION_START, self)
@@ -385,25 +391,24 @@ class Buoy:
                 pass
 
         if self.metrics:
-            # Track all unique nodes discovered from this beacon starting with the sender
-            discovered_nodes = {beacon.sender_id}
-            
-            # In forward mode, also discover the origin if different
-            if self.multihop_mode == 'forwarded':
-                if beacon.origin_id != self.id and beacon.origin_id != beacon.sender_id:
-                    discovered_nodes.add(beacon.origin_id)
-            
-            # Discover all nodes from the beacon's neighbor list
-            neighbor_ids = {neighbor_id for neighbor_id, _, _ in beacon.neighbors}
-            discovered_nodes.update(neighbor_ids)
+            # Track all unique nodes discovered from this beacon: its neighbor list,
+            # the sender, and (in forward mode) the origin. Built as a single set,
+            # this runs for every reception
+            discovered_nodes = {neighbor_id for neighbor_id, _, _ in beacon.neighbors}
+            discovered_nodes.add(beacon.sender_id)
+
+            if self.multihop_mode == 'forwarded' and beacon.origin_id != beacon.sender_id:
+                discovered_nodes.add(beacon.origin_id)
+
             discovered_nodes.discard(self.id)  # Don't count self as discovered
 
             # Track all unique nodes discovered from this beacon
             self.set_unique_nodes_per_buoy_callback(self.id, discovered_nodes)
 
-            # Log the reception of this beacon
+            # Log the reception of this beacon, attributed to its origin: in forwarded
+            # mode the sender is just the relay, while timestamp belongs to the origin
             self.log_received_callback(
-                sender_id=beacon.sender_id,
+                origin_id=beacon.origin_id or beacon.sender_id,
                 timestamp=beacon.timestamp,
                 receive_time=sim_time,
                 receiver_id=self.id
@@ -478,11 +483,12 @@ class Buoy:
             self.rwp_waypoint = self._pick_rwp_waypoint()
             self.rwp_speed = random.uniform(self.rwp_speed_min, self.rwp_speed_max)
 
-            logging.log_info(
-                f"Buoy {str(self.id)[:6]} reached waypoint, pausing {pause:.2f}s, \
-                    next waypoint ({self.rwp_waypoint[0]:.1f}, {self.rwp_waypoint[1]:.1f}) \
-                    at speed {self.rwp_speed:.1f}"
-            )
+            if logging.LOGGING_ENABLED:
+                logging.log_info(
+                    f"Buoy {str(self.id)[:6]} reached waypoint, pausing {pause:.2f}s, \
+                        next waypoint ({self.rwp_waypoint[0]:.1f}, {self.rwp_waypoint[1]:.1f}) \
+                        at speed {self.rwp_speed:.1f}"
+                )
 
             # Resume after the pause
             self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})

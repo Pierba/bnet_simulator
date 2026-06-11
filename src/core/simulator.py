@@ -1,5 +1,6 @@
 import time
 import heapq
+import traceback
 from typing import List, Dict, Optional
 import random
 from utils.metrics import Metrics
@@ -53,12 +54,11 @@ class Simulator:
         self.event_queue: list = []
         self.event_counter: int = 0
 
-    # Scheduler of events ordered by their scheduled time
+    # Scheduler of events ordered by their scheduled time (counter breaks ties in FIFO order)
     def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
         event = Event(time, event_type, target_obj, data)
         self.event_counter += 1
-        epsilon = self.event_counter * 1e-10
-        heapq.heappush(self.event_queue, (event.time + epsilon, self.event_counter, event))
+        heapq.heappush(self.event_queue, (event.time, self.event_counter, event))
     
     # Retrieves the next event from the event queue
     def _get_next_event(self) -> Optional[Event]:
@@ -190,20 +190,25 @@ class Simulator:
                 
                 # Update simulated time to the time of the event being processed
                 simulated_time = event.time
-                
-                if event.event_type in (EventType.TRANSMISSION_START, EventType.RECEPTION):
-                    logging.log_info(f"Processing {event.event_type.name} event")
-                
-                time_log = int(simulated_time)
-                if last_time_log != time_log and time_log > 0 and time_log % 10 == 0:
-                    logging.log_info(f"Time: {simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
-                    last_time_log = time_log
+
+                # Per-event log bookkeeping is gated on one flag check: this loop runs
+                # for every event, and disabled logging must not cost formatting work
+                if logging.LOGGING_ENABLED:
+                    if event.event_type in (EventType.TRANSMISSION_START, EventType.RECEPTION):
+                        logging.log_info(f"Processing {event.event_type.name} event")
+
+                    time_log = int(simulated_time)
+                    if last_time_log != time_log and time_log > 0 and time_log % 10 == 0:
+                        logging.log_info(f"Time: {simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
+                        last_time_log = time_log
 
                 # Handle the event and catch any exceptions to prevent the simulation from crashing
                 try:
                     event.target_obj.handle_event(event, simulated_time)
-                except Exception as e:
-                    logging.log_error(f"Error handling event {event}: {str(e)}")
+                except Exception:
+                    logging.log_error(
+                        f"Error handling {event.event_type.name} event:\n{traceback.format_exc()}"
+                    )
 
         except KeyboardInterrupt:
             logging.log_info("Simulation interrupted by user.")

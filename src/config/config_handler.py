@@ -23,6 +23,7 @@ class ConfigHandler:
             'enable_logging': False,
             'enable_file_logging': False,
             'multihop_mode': 'none',        # Options: none, append, forwarded
+            'multihop_modes': ['none', 'append', 'forwarded'],  # Modes swept and compared per run
             'multihop_limit': 2,            # Maximum hops for forwarded mode
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
         },
@@ -91,3 +92,11 @@ class ConfigHandler:
             static_interval = self._config.get('scheduler', {}).get('static_interval', 1.0)
             return 3.0 * static_interval
         return self._config.get(section, {}).get(key)
+
+    # Setter to override a configuration value at runtime (in-process only).
+    # Used to inject per-simulation parameters (e.g. multihop_mode) that must be
+    # honored by behavior code reading directly from the config singleton.
+    def set(self, section: str, key: str, value: Any) -> None:
+        if self._config is None:
+            self._load_config()
+        self._config.setdefault(section, {})[key] = value

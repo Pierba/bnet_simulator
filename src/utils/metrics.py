@@ -49,38 +49,42 @@ class Metrics:
         
     # Set of unique nodes discovered by each buoy
     def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
-        if buoy_id not in self.unique_nodes_per_buoy:
-            self.unique_nodes_per_buoy[buoy_id] = set()
-        self.unique_nodes_per_buoy[buoy_id].update(unique_nodes)
+        nodes = self.unique_nodes_per_buoy.get(buoy_id)
+        if nodes is None:
+            self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
+        else:
+            nodes.update(unique_nodes)
 
     # Log a sent beacon
     def log_sent(self):
         self.beacons_sent += 1
 
-    # Log a received beacon and tracks unique deliveries and latency
-    def log_received(self, sender_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
+    # Log a received beacon and tracks unique deliveries and latency.
+    # origin_id identifies the node that created the beacon: forwarded copies carry the
+    # origin's timestamp, so deduplication must be keyed by origin, not by the forwarder.
+    def log_received(self, origin_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
         # If this beacon has already been counted as delivered, skip it
-        last_ts = self.delivered_beacons.get(sender_id)
+        last_ts = self.delivered_beacons.get(origin_id)
         if last_ts is not None and last_ts >= timestamp:
             return
 
         # Update the number of unique beacons received and total latency
-        self.delivered_beacons[sender_id] = timestamp
+        self.delivered_beacons[origin_id] = timestamp
         self.beacons_received += 1
         self.total_latency += receive_time - timestamp
 
-        # Only count the reaction latency for the first time this receiver discovers this sender
+        # Only count the reaction latency for the first time this receiver discovers this origin
         seen_senders = self.discovered_pairs.get(receiver_id)
         if seen_senders is None:
             seen_senders = set()
             self.discovered_pairs[receiver_id] = seen_senders
-        elif sender_id in seen_senders:
+        elif origin_id in seen_senders:
             return
 
-        seen_senders.add(sender_id)
+        seen_senders.add(origin_id)
         self.reaction_latency_count += 1
         self.reaction_latency_sum += receive_time - timestamp
                 
@@ -145,7 +149,14 @@ class Metrics:
         
         node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
         return sum(node_counts) / len(node_counts)
-    
+
+    # Average percentage of the network each buoy has discovered.
+    # density - 1 excludes the buoy itself from the set of discoverable nodes.
+    def avg_percentage_network_discovered(self) -> float:
+        if not self.density or self.density <= 1:
+            return 0.0
+        return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
+
     # Record a sample of the average number of neighbors for time-series analysis
     def record_avg_neighbors_sample(self, avg_neighbors_value: float):
         self.avg_neighbors_sum += avg_neighbors_value
@@ -188,6 +199,7 @@ class Metrics:
             "Successful Receivers": self.total_successful_receivers,
             "Average Neighbors": self.get_final_avg_neighbors(),
             "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
+            "Avg % Network Discovered": self.avg_percentage_network_discovered(),
         }
 
         if self.density is not None:
