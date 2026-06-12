@@ -11,6 +11,9 @@ from config.config_handler import ConfigHandler
 from utils import logging
 from scipy.spatial import cKDTree
 
+# Sim-time delay before the first buoy-array update in the ramp/random scenarios
+FIRST_ARRAY_UPDATE_DELAY: float = 30.0
+
 class Simulator:
     def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str, duration: float):
         cfg = ConfigHandler()
@@ -88,7 +91,7 @@ class Simulator:
             return
         
         # Schedule first buoy array update for dynamic scenarios (ramp/random)
-        self.schedule_event(30.0, EventType.BUOY_ARRAY_UPDATE, self)
+        self.schedule_event(FIRST_ARRAY_UPDATE_DELAY, EventType.BUOY_ARRAY_UPDATE, self)
         
         # Periodic metrics sampling: 5s for ramp (timepoint logs), 30s otherwise
         if self.metrics:
@@ -119,9 +122,11 @@ class Simulator:
         if self._active_count >= total_buoys:
             return
 
-        # Calculate the interval at which to add buoys based on the total number of buoys and the simulation duration
+        # Spread the additions over the time remaining after the first update, so that
+        # every buoy is active before the simulation ends
         buoys_to_add = total_buoys - 2
-        add_interval = (self.duration / buoys_to_add) if buoys_to_add > 0 else self.duration
+        ramp_window = max(self.duration - FIRST_ARRAY_UPDATE_DELAY, 0.0)
+        add_interval = (ramp_window / buoys_to_add) if buoys_to_add > 0 else self.duration
 
         # With next() it finds the first inactive buoy without allocating a list
         buoy = next(b for b in self.buoys if not b.active)

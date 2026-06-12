@@ -11,7 +11,6 @@ import time
 # Arrange buoys randomly within the world boundaries, ensuring they are not too close to the edges
 def arrange_buoys_randomly(n_buoys: int, world_width: float, world_height: float) -> list[tuple[float, float]]:
     positions: list[tuple[float, float]] = []
-    random.seed(time.time())
     for _ in range(n_buoys):
         x = random.uniform(10, world_width - 10)
         y = random.uniform(10, world_height - 10)
@@ -19,7 +18,7 @@ def arrange_buoys_randomly(n_buoys: int, world_width: float, world_height: float
     return positions
 
 # Function to run a single simulation with given parameters
-def run_simulation(mode: str, interval: float, density: float, positions: list[tuple[float, float]], results_dir: str, cfg: ConfigHandler, multihop_mode: str):
+def run_simulation(mode: str, interval: float, density: float, positions: list[tuple[float, float]], results_dir: str, cfg: ConfigHandler, multihop_mode: str, seed: int):
     unique_id = f"{mode}_{multihop_mode}_{density}_{int(time.time() * 1000) % 10000}"
     positions_file = f"positions_{unique_id}.json"  # Name of simulation output file
 
@@ -51,7 +50,7 @@ def run_simulation(mode: str, interval: float, density: float, positions: list[t
     # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters
     cmd = ["uv", "run", "src/script/init.py",
            "--mode", mode,
-           "--seed", str(int(time.time())),
+           "--seed", str(seed),
            "--world-width", str(cfg.get('world', 'width')),
            "--world-height", str(cfg.get('world', 'height')),
            "--mobile-buoy-count", str(mobile_count),
@@ -81,8 +80,8 @@ def run_simulation(mode: str, interval: float, density: float, positions: list[t
 
 # Subprocess worker function for parallel execution of simulations
 def simulation_worker(args):
-    mode, interval, density, positions, results_dir, cfg, multihop_mode = args
-    run_simulation(mode, interval, density, positions, results_dir, cfg, multihop_mode)
+    mode, interval, density, positions, results_dir, cfg, multihop_mode, seed = args
+    run_simulation(mode, interval, density, positions, results_dir, cfg, multihop_mode, seed)
 
 # Dispatch simulations in parallel using multiprocessing Pool
 def run_simulations_parallel(tasks: list[tuple], num_processes: int):
@@ -128,6 +127,12 @@ def main():
 
     # Extracting configuration parameters
     cfg = ConfigHandler()
+
+    # Master seed: every topology and per-simulation seed derives from it, so the whole
+    # batch can be reproduced by re-seeding with the value printed here
+    master_seed = int(time.time())
+    random.seed(master_seed)
+    print(f"Master seed: {master_seed}")
 
     #======================
     # PROTOCOLS 
@@ -196,15 +201,16 @@ def main():
                 match scenario:
                     case 'ramp':
                         for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
-                            run_simulation(mode, interval, max_buoys, ramp_positions, results_dir, cfg, multihop_mode)
+                            run_simulation(mode, interval, max_buoys, ramp_positions, results_dir, cfg, multihop_mode, random.randrange(2**32))
 
                     case 'random' | 'static':
                         tasks: list[tuple] = []
                         for density in densities:
                             positions = positions_by_density[density]
                             for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
-                                # Each task is a tuple of arguments for the simulation_worker function
-                                tasks.append((mode, interval, density, positions, results_dir, cfg, multihop_mode))
+                                # Each task is a tuple of arguments for the simulation_worker
+                                # function, with its own distinct reproducible seed
+                                tasks.append((mode, interval, density, positions, results_dir, cfg, multihop_mode, random.randrange(2**32)))
 
                         print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
                         run_simulations_parallel(tasks, num_processes)
@@ -231,9 +237,9 @@ def main():
     except KeyboardInterrupt:
         print("\n\n[!] Simulation batch interrupted by user. Exiting cleanly...")
         
-        # Clean up any leftover position files in the current directory
+        # Clean up any leftover position files written by run_simulation
         for f in os.listdir('.'):
-            if f.endswith('.json'):
+            if f.startswith('positions_') and f.endswith('.json'):
                 try:
                     os.remove(f)
                 except OSError as e:

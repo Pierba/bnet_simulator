@@ -131,6 +131,12 @@ class Buoy:
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 
+    # Schedules a generation-gated event targeting this buoy: events scheduled before a
+    # deactivation are lazily discarded by handle_event once the buoy is reactivated,
+    # so no stale pipeline event can transmit while bypassing carrier sense
+    def _schedule_event(self, time: float, event_type: EventType):
+        self.schedule_callback(time, event_type, self, {'_gen': self._generation})
+
     def handle_event(self, event: EventType, sim_time: float):
         # Lazy cancellation: discard stale events for inactive buoys
         if not self.active:
@@ -154,9 +160,7 @@ class Buoy:
     def _handle_scheduler_check(self, event: Event, sim_time: float):
         # Schedule the next scheduler check
         self.next_scheduler_time = sim_time + self.scheduler.get_next_check_interval()
-        self.schedule_callback(
-            self.next_scheduler_time, EventType.SCHEDULER_CHECK, self, {'_gen': self._generation}
-        )
+        self._schedule_event(self.next_scheduler_time, EventType.SCHEDULER_CHECK)
 
         # Makes the transmission pipeline atomic by ignoring new scheduler decisions while processing a transmission
         if self.processing:
@@ -172,15 +176,11 @@ class Buoy:
         if self.want_to_send:
             self.processing = True
             self.scheduler_decision_time = sim_time
-            self.schedule_callback(
-                sim_time, EventType.CHANNEL_SENSE, self
-            )
+            self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
         elif self.pending_forward_beacons:
             # Scheduler doesn't need to send, but there are pending forwards to resume
             self.processing = True
-            self.schedule_callback(
-                sim_time, EventType.CHANNEL_SENSE, self
-            )
+            self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
             
     # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
     def _handle_channel_sense(self, event: Event, sim_time: float):
@@ -190,19 +190,14 @@ class Buoy:
         
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
-            # Channel is busy => wait one slot and check again
-            self.schedule_callback(
-                # slot time best choice instead of waiting for the channel to be free
-                next_try_time, EventType.CHANNEL_SENSE, self
-            )
+            # Channel is busy => re-sense when it frees
+            self._schedule_event(next_try_time, EventType.CHANNEL_SENSE)
             return
-        
+
         # Channel is idle => proceed with DIFS and backoff as needed
         self.state = BuoyState.WAITING_DIFS
         # Simulate DIFS delay before checking channel again for backoff decision
-        self.schedule_callback(
-            sim_time + self.difs_time, EventType.DIFS_COMPLETION, self
-        )
+        self._schedule_event(sim_time + self.difs_time, EventType.DIFS_COMPLETION)
 
     # DIFS completion handler: after DIFS time completion, checks channel again and either transmit immediately or enter backoff
     def _handle_difs_completion(self, event: Event, sim_time: float):
@@ -214,18 +209,16 @@ class Buoy:
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
             self.state = BuoyState.RECEIVING
-            self.schedule_callback(next_try_time, EventType.CHANNEL_SENSE, self)
-            return    
+            self._schedule_event(next_try_time, EventType.CHANNEL_SENSE)
+            return
 
         # Draw a fresh backoff for this transmission attempt
         backoff_slots = random.randint(0, self.cw - 1) # Do we need to reset from DIFS and then resume backoff?
         backoff_remaining = backoff_slots * self.slot_time
 
         # Start or resume slot-by-slot backoff countdown => go over the entire backoff time
-        self.state = BuoyState.BACKOFF     
-        self.schedule_callback(
-            sim_time + backoff_remaining, EventType.BACKOFF_COMPLETION, self
-        )
+        self.state = BuoyState.BACKOFF
+        self._schedule_event(sim_time + backoff_remaining, EventType.BACKOFF_COMPLETION)
 
     # Backoff slot handler: checks channel status each slot and either decrements backoff or transmits if backoff is complete
     def _handle_backoff_completion(self, event: Event, sim_time: float):
@@ -239,15 +232,11 @@ class Buoy:
             # contender parked on this same transmission fire at the same clear time
             # and collide deterministically
             self.state = BuoyState.RECEIVING
-            self.schedule_callback(
-                next_try_time, EventType.CHANNEL_SENSE, self
-            )
+            self._schedule_event(next_try_time, EventType.CHANNEL_SENSE)
             return
 
         # If Backoff time completed successfully then transmit
-        self.schedule_callback(
-            sim_time, EventType.TRANSMISSION_START, self
-        )
+        self._schedule_event(sim_time, EventType.TRANSMISSION_START)
 
     # Transmission start handler: sends own beacon and/or delegates forwarding
     def _handle_transmission_start(self, event: Event, sim_time: float):
@@ -270,9 +259,7 @@ class Buoy:
 
         # Delegate forwarding: piggyback after own transmission or forward-only
         if self.pending_forward_beacons:
-            self.schedule_callback(
-                end_time, EventType.FORWARD_TRANSMISSION_START, self
-            )
+            self._schedule_event(end_time, EventType.FORWARD_TRANSMISSION_START)
             return
 
         # Reset of processing state if there are no pending beacons
@@ -296,7 +283,7 @@ class Buoy:
         if self.forward_burst_count >= self.forward_txop_limit:
             if logging.LOGGING_ENABLED:
                 logging.log_info(f"Buoy {str(self.id)[:6]} hit TXOP cap ({self.forward_txop_limit}), re-contending")
-            self.schedule_callback(sim_time, EventType.CHANNEL_SENSE, self)
+            self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
             self.forward_burst_count = 0  # Fresh CSMA win => reset TXOP burst counter
             return
 
@@ -307,7 +294,7 @@ class Buoy:
             # transmitting blindly on wake-up (parked forwarders would all fire at the
             # same clear time and collide). A fresh contention grants a fresh TXOP
             self.forward_burst_count = 0
-            self.schedule_callback(next_try_time, EventType.CHANNEL_SENSE, self)
+            self._schedule_event(next_try_time, EventType.CHANNEL_SENSE)
             return
 
         # Take the first valid beacon from the queue (lazy evaluation, insertion-ordered dict)
@@ -331,7 +318,7 @@ class Buoy:
                     f"Buoy {str(self.id)[:6]} skipped forward of {str(forward_beacon.origin_id)[:6]}"
                 )
             if self.pending_forward_beacons:
-                self.schedule_callback(sim_time, EventType.FORWARD_TRANSMISSION_START, self)
+                self._schedule_event(sim_time, EventType.FORWARD_TRANSMISSION_START)
             else:
                 self.processing = False
             return
@@ -344,7 +331,7 @@ class Buoy:
             logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
 
         if self.pending_forward_beacons:
-            self.schedule_callback(end_time, EventType.FORWARD_TRANSMISSION_START, self)
+            self._schedule_event(end_time, EventType.FORWARD_TRANSMISSION_START)
             return
 
         self.processing = False
@@ -412,9 +399,7 @@ class Buoy:
                         self.processing = True
                         self.scheduler_decision_time = sim_time
                         jitter = random.uniform(0, FORWARD_JITTER_MAX)
-                        self.schedule_callback(
-                            sim_time + jitter, EventType.CHANNEL_SENSE, self
-                        )
+                        self._schedule_event(sim_time + jitter, EventType.CHANNEL_SENSE)
             case _:
                 pass
 
@@ -469,10 +454,7 @@ class Buoy:
                 pass
         
         # Schedule the next cleanup
-        self.schedule_callback(
-            sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, self,
-            {'_gen': self._generation}
-        )
+        self._schedule_event(sim_time + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP)
 
     # Picks a random waypoint within the world boundaries
     def _pick_rwp_waypoint(self) -> tuple[float, float]:
@@ -488,7 +470,7 @@ class Buoy:
         # If the buoy is still paused at the previous waypoint it stays still and wakes up exactly when the pause expires
         if sim_time < self.rwp_pause_until:
             self.velocity = (0.0, 0.0)
-            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
+            self._schedule_event(self.rwp_pause_until, EventType.BUOY_MOVEMENT)
             return
 
         # Moving toward the waypoint
@@ -519,7 +501,7 @@ class Buoy:
                 )
 
             # Resume after the pause
-            self.schedule_callback(self.rwp_pause_until, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
+            self._schedule_event(self.rwp_pause_until, EventType.BUOY_MOVEMENT)
             return
 
         # Moving toward waypoint
@@ -531,7 +513,7 @@ class Buoy:
         self.position = (x + vx * self.rwp_dt, y + vy * self.rwp_dt)
 
         # Schedule next movement
-        self.schedule_callback(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT, self, {'_gen': self._generation})
+        self._schedule_event(sim_time + self.rwp_dt, EventType.BUOY_MOVEMENT)
     
     def create_beacon(self, sim_time: float) -> Beacon:
         # Beacon initialization parameters; direct neighbors sit at hop distance 1
