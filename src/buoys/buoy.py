@@ -61,8 +61,6 @@ class Buoy:
         self.neighbor_timeout: float    = cfg.get('scheduler', 'neighbor_timeout')
         self.world_width: float         = cfg.get('world', 'width')
         self.world_height: float        = cfg.get('world', 'height')
-        self.comm_range_max: float      = cfg.get('network', 'communication_range_max')
-        self.comm_range_max_sq: float   = self.comm_range_max * self.comm_range_max
 
         # Random Waypoint mobility model state
         # Speed is drawn uniformly from [rwp_speed_min, rwp_speed_max] per leg

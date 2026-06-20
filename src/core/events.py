@@ -11,7 +11,6 @@ class EventType(Enum):
     RECEPTION = auto()                  # Buoy receives a beacon
     NEIGHBOR_CLEANUP = auto()           # Clean up stale neighbor entries
     BUOY_MOVEMENT = auto()              # Update buoy position
-    CHANNEL_UPDATE = auto()             # Update channel state
     BUOY_ARRAY_UPDATE = auto()          # Add/remove buoys
     AVG_NEIGHBORS_CALCULATION = auto()  # Periodic calculation of avg neighbors
 

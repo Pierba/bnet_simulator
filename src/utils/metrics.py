@@ -70,7 +70,22 @@ class Metrics:
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
-        # If this beacon has already been counted as delivered, skip it
+        # Reaction latency: the first time THIS receiver discovers THIS origin. It is
+        # tracked per receiver, so it must be evaluated on every reception — not only on
+        # the network-wide first delivery of a beacon, which the origin-keyed dedup below
+        # filters out. Running it before that dedup is what makes the per-receiver
+        # discovered_pairs bookkeeping meaningful.
+        seen_senders = self.discovered_pairs.get(receiver_id)
+        if seen_senders is None:
+            seen_senders = set()
+            self.discovered_pairs[receiver_id] = seen_senders
+        if origin_id not in seen_senders:
+            seen_senders.add(origin_id)
+            self.reaction_latency_count += 1
+            self.reaction_latency_sum += receive_time - timestamp
+
+        # Unique-beacon accounting: count each generated beacon (origin, timestamp) once,
+        # the first time it reaches anyone. If already counted as delivered, skip it.
         last_ts = self.delivered_beacons.get(origin_id)
         if last_ts is not None and last_ts >= timestamp:
             return
@@ -80,18 +95,6 @@ class Metrics:
         self.beacons_received += 1
         self.total_latency += receive_time - timestamp
 
-        # Only count the reaction latency for the first time this receiver discovers this origin
-        seen_senders = self.discovered_pairs.get(receiver_id)
-        if seen_senders is None:
-            seen_senders = set()
-            self.discovered_pairs[receiver_id] = seen_senders
-        elif origin_id in seen_senders:
-            return
-
-        seen_senders.add(origin_id)
-        self.reaction_latency_count += 1
-        self.reaction_latency_sum += receive_time - timestamp
-                
 
     # Log a lost beacon
     def log_lost(self, count: int = 1):

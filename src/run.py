@@ -237,8 +237,13 @@ def main():
         print("\nAll simulations complete!")
         print("Check the metrics directory for results and plots.")
 
-        # Send a desktop notification when all simulations and plotting are done
-        subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
+        # Send a desktop notification when all simulations and plotting are done.
+        # notify-send only exists on Linux; swallow its absence so the batch doesn't
+        # crash at the very end on Windows/macOS (or headless Linux without libnotify).
+        try:
+            subprocess.run(["notify-send", "-e", "-i", "pycad", "-h", "string:sound-name:bell", "-a", "BNet Simulator", "Simulation Complete", "All simulations and plotting are done."])
+        except (FileNotFoundError, OSError):
+            pass
     
     # Handle keyboard interrupt to allow clean exit and cleanup of any leftover files
     except KeyboardInterrupt:

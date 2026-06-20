@@ -52,9 +52,7 @@ class ConfigHandler:
         'csma': {
             'slot_time': 0.000020,
             'difs_time': 0.000050,
-            'cw': 16,
-            'backoff_time_min': 0.001,
-            'backoff_time_max': 0.016
+            'cw': 16
         },
         'scheduler': {
             'static_interval': 1.0,

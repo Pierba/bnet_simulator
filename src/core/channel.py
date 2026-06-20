@@ -43,20 +43,12 @@ class Channel:
         self.buoys = buoys
         self._buoys_by_id = {buoy.id: buoy for buoy in buoys}
 
-    def handle_event(self, event, sim_time: float): # Need to figure if deleting this handler ?
+    def handle_event(self, event, sim_time: float):
         match event.event_type:
-            # case EventType.CHANNEL_UPDATE:
-            #     self._handle_channel_update(event, sim_time)
             case EventType.TRANSMISSION_END:
                 self._handle_transmission_end(event, sim_time)
             case _:
                 logging.log_error(f"Channel received unhandled event: {event.event_type}")
-
-    def _handle_channel_update(self, event, sim_time: float): # No more periodic updates, so this handler is not needed ?
-        self.update(sim_time)
-        # self.schedule_callback(
-        #     sim_time + 1.0, EventType.CHANNEL_UPDATE, self  <--- no more periodic updates 
-        # )
 
     # Logs the end of a transmission for debugging purposes
     def _handle_transmission_end(self, event, sim_time: float):
