@@ -27,7 +27,6 @@ class ConfigHandler:
             'multihop_limit': 1,            # Maximum hops for forwarded mode
             'append_hop_limit': 2,          # Append mode: max hop distance advertised (1 = direct only, 0 = unlimited)
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
-            'forward_txop_limit': 3,        # Max consecutive forwards drained before re-entering CSMA
             'forward_density_baseline': 5,  # Expected forwarders per cascade (probabilistic gate)
         },
         'world': {

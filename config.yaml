@@ -1,8 +1,8 @@
 simulation:
   schedulers:
   - static
-  - dynamic_adab
-  - dynamic_acab
+  # - dynamic_adab
+  # - dynamic_acab
   min_buoys: 20
   max_buoys: 140
   step_buoys: 20
@@ -24,7 +24,7 @@ simulation:
   multihop_mode: append
   # Multihop modes swept and compared per run (subset of: none, append, forwarded)
   multihop_modes:
-  - none
+  # - none
   - append
   - forwarded
   # Maximum hops for forwarded mode
@@ -34,9 +34,7 @@ simulation:
   append_hop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
   pending_queue_limit: 20
-  # Max consecutive forwards a node can drain before CSMA (TXOP cap)
-  forward_txop_limit: 3
-  # Probabilistic forwarding: fire a pending beacon with p = min(1, n0/n_neighbors)
+  # Probabilistic forwarding: queue a received beacon with p = min(1, n0/n_neighbors)
   forward_density_baseline: 5
 
 world:

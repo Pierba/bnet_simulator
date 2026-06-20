@@ -179,7 +179,7 @@ class Simulator:
         running: bool           = True
         simulated_time: float   = 0.0
         
-        logging.reset() # Resetting metrics and logs at the start of the simulation
+        logging.reset() # Resetting logs at the start of the simulation
 
         # Initial metrics sample and schedule initial events
         self._sample_metrics(simulated_time)
@@ -196,8 +196,7 @@ class Simulator:
                 # Update simulated time to the time of the event being processed
                 simulated_time = event.time
 
-                # Per-event log bookkeeping is gated on one flag check: this loop runs
-                # for every event, and disabled logging must not cost formatting work
+                # Per-event log bookkeeping is gated on one flag check
                 if logging.LOGGING_ENABLED:
                     if event.event_type in (EventType.TRANSMISSION_START, EventType.RECEPTION):
                         logging.log_info(f"Processing {event.event_type.name} event")
@@ -219,6 +218,7 @@ class Simulator:
             logging.log_info("Simulation interrupted by user.")
             running = False
             
+        # Final log with simulation results and performance metrics
         real_time_end = time.time()
         real_duration = real_time_end - real_time_start
         sim_speedup = simulated_time / real_duration if real_duration > 0 else float('inf')

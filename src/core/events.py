@@ -7,7 +7,6 @@ class EventType(Enum):
     DIFS_COMPLETION = auto()            # DIFS waiting period completes
     BACKOFF_COMPLETION = auto()         # Process backoff slot
     TRANSMISSION_START = auto()         # Buoy starts transmitting
-    FORWARD_TRANSMISSION_START = auto() # Buoy starts forwarding a beacon
     TRANSMISSION_END = auto()           # Transmission completes
     RECEPTION = auto()                  # Buoy receives a beacon
     NEIGHBOR_CLEANUP = auto()           # Clean up stale neighbor entries
