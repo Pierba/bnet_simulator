@@ -157,20 +157,24 @@ class Buoy:
         # Schedule the next scheduler check
         self._schedule_event(sim_time + self.scheduler.get_next_check_interval(), EventType.SCHEDULER_CHECK)
 
-        # The transmission pipeline is atomic: ignore new scheduler decisions while a
-        # transmission (own beacon or forward) is already in flight
-        if self.processing:
+        # An own beacon is already queued for the current pipeline => don't re-roll the
+        # scheduler decision (it would skew the send cadence and the latency metric)
+        if self.want_to_send:
             return
 
-        # Ask the scheduler if we should send a beacon based on current conditions
-        self.want_to_send = self.scheduler.should_send(
-            self.velocity, len(self.neighbors), self.last_contact_ts, sim_time
-        )
+        # Ask the scheduler whether an own beacon is due. This runs even while a forward
+        # pipeline is draining, so the buoy's own advertisement is never starved by relay
+        # traffic: the decision is recorded here and the in-flight pipeline (which always
+        # prioritizes own beacons) sends it at its next contention.
+        if not self.scheduler.should_send(self.velocity, len(self.neighbors), self.last_contact_ts, sim_time):
+            return
 
-        # If scheduler decides we should send, start the CSMA pipeline for own beacon
-        if self.want_to_send:
+        self.want_to_send = True
+        self.scheduler_decision_time = sim_time
+
+        # Start a fresh CSMA pipeline only if one isn't already in flight
+        if not self.processing:
             self.processing = True
-            self.scheduler_decision_time = sim_time
             self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
 
     # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
@@ -250,10 +254,13 @@ class Buoy:
         else:
             self._transmit_forward_beacon(sim_time)
 
-        # Anything still queued? re-contend from scratch. The transmission just started
-        # holds the channel, so the fresh sense will back off until it clears, giving a
-        # full DIFS + backoff before the next beacon goes out
-        if self.want_to_send or self.pending_forward_beacons:
+        # want_to_send is necessarily False here (an own beacon was either just sent and
+        # cleared, or was never set). Any own beacon that becomes due later is picked up
+        # by SCHEDULER_CHECK, so only a non-empty forward queue keeps the pipeline alive.
+        if self.pending_forward_beacons:
+            # Re-contend from scratch. The transmission just started holds the channel, so
+            # the fresh sense backs off until it clears => full DIFS + backoff before the
+            # next beacon goes out
             self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
         else:
             self.processing = False
