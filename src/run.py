@@ -1,8 +1,7 @@
-from multiprocessing import Pool
-from config.config_handler import ConfigHandler
-
 import argparse
+from config.config_handler import ConfigHandler
 import json
+from multiprocessing import Pool
 import os
 import random
 import subprocess
@@ -18,7 +17,16 @@ def arrange_buoys_randomly(n_buoys: int, world_width: float, world_height: float
     return positions
 
 # Function to run a single simulation with given parameters
-def run_simulation(mode: str, interval: float, density: float, positions: list[tuple[float, float]], results_dir: str, cfg: ConfigHandler, multihop_mode: str, seed: int):
+def run_simulation(
+        mode: str, 
+        interval: float, 
+        density: float, 
+        positions: list[tuple[float, float]], 
+        results_dir: str, 
+        cfg: ConfigHandler, 
+        multihop_mode: str, 
+        seed: int
+):
     unique_id = f"{mode}_{multihop_mode}_{density}_{int(time.time() * 1000) % 10000}"
     positions_file = f"positions_{unique_id}.json"  # Name of simulation output file
 
@@ -98,15 +106,14 @@ def plot_results(results_dir: str, plots_dir: str, interval: float, schedulers: 
 
     subprocess.run(plot_cmd) # -> script/plot_metrics.py
 
-# Plot the cross-mode comparison histograms using the plot_mode_comparison.py script.
-# mode_results_dirs maps each multihop mode (none/append/forwarded) to its results dir.
+# Plot the cross-mode comparison histograms using the plot_mode_comparison.py script
 def plot_mode_comparison(mode_results_dirs: dict[str, str], comparison_dir: str, interval: float, schedulers: list[str]):
     plot_cmd = ["uv", "run", "src/script/plot_mode_comparison.py",
                 "--output-dir", comparison_dir,
                 "--interval", str(interval),
                 "--schedulers", *schedulers]
     for mode, results_dir in mode_results_dirs.items():
-        plot_cmd += ["--mode-dir", mode, results_dir]
+        plot_cmd.extend(["--mode-dir", mode, results_dir])
 
     subprocess.run(plot_cmd) # -> script/plot_mode_comparison.py
 
@@ -128,8 +135,7 @@ def main():
     # Extracting configuration parameters
     cfg = ConfigHandler()
 
-    # Master seed: every topology and per-simulation seed derives from it, so the whole
-    # batch can be reproduced by re-seeding with the value printed here
+    # Every simulation seed derives from it
     master_seed = int(time.time())
     random.seed(master_seed)
     print(f"Master seed: {master_seed}")
@@ -155,26 +161,26 @@ def main():
     scenario: str = cfg.get('simulation', 'scenario')               # Scenario to run (static, ramp, random)
     world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
     world_height: float = cfg.get('world', 'height')                # Height of the simulation world
-    # Multihop modes to evaluate. With --compare/-c every mode in
-    # simulation.multihop_modes is run on identical topologies and the cross-mode
-    # comparison is plotted; otherwise a single run uses simulation.multihop_mode.
+    
+    # If the compare flage is set it will run every multihope_mode and eventually plot thier comparision
     if args.compare:
         multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes')
         print(f"Comparison mode: sweeping multihop modes {multihop_modes}")
+    
+    # Otherwise it will run only the multihope_mode selected and plot its results
     else:
         multihop_modes: list[str] = [cfg.get('simulation', 'multihop_mode')]
         print(f"Single run mode: multihop mode '{multihop_modes[0]}'")
 
     try:
-        # For each beacon interval => run the simulations for every multihop mode
-        # => plot per-mode results => plot the cross-mode comparison
+        # For each beacon interval: 
+        # run the simulations for every multihop mode => plot per-mode results => plot the cross-mode comparison
         for interval in intervals: # [1.0, 0.5, 0.25]
             interval_str = f"{interval}"
             ideal_suffix = "_ideal" if ideal else ""
             scenario_suffix = f"_{scenario}"
 
-            # Pre-generate the buoy topologies once per interval so that every
-            # multihop mode is evaluated on identical layouts (fair comparison).
+            # Setting up the density values and buoy positions for the scenario
             densities = list(range(min_buoys, max_buoys + 1, step_buoys))
             if scenario == 'ramp':
                 ramp_positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
@@ -218,6 +224,7 @@ def main():
                 print(f"Plotting results for interval = {interval}s, multihop mode = {multihop_mode}")
                 plot_results(results_dir, plots_dir, interval, schedulers)
 
+                # Store the results directory for this mode to feed the comparison plotter later
                 mode_results_dirs[multihop_mode] = results_dir
 
             # Build the cross-mode comparison histograms for density-based scenarios

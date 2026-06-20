@@ -1,8 +1,8 @@
 simulation:
   schedulers:
   - static
-  - dynamic_adab
-  - dynamic_acab
+  # - dynamic_adab
+  # - dynamic_acab
   min_buoys: 20
   max_buoys: 140
   step_buoys: 20
@@ -24,7 +24,7 @@ simulation:
   multihop_mode: append
   # Multihop modes swept and compared per run (subset of: none, append, forwarded)
   multihop_modes:
-  - none
+  # - none
   - append
   - forwarded
   # Maximum hops for forwarded mode
