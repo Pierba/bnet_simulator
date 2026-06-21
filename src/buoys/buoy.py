@@ -30,12 +30,12 @@ class Buoy:
         cfg = ConfigHandler()
 
         # Buoy properties
-        self.id: uuid.UUID                  = uuid.uuid4()
-        self.scheduler: BeaconScheduler     = scheduler
-        self.position: tuple[float, float]  = position
-        self.is_mobile: bool                = is_mobile
-        self.velocity: tuple[float, float]  = velocity
-        self.metrics: bool                  = metrics
+        self.id: uuid.UUID                 = uuid.uuid4()
+        self.scheduler: BeaconScheduler    = scheduler
+        self.position: tuple[float, float] = position
+        self.is_mobile: bool               = is_mobile
+        self.velocity: tuple[float, float] = velocity
+        self.metrics: bool                 = metrics
 
         # Network state
         self.active: bool           = True
@@ -44,61 +44,62 @@ class Buoy:
         self.state: BuoyState       = BuoyState.RECEIVING # Default state is RECEIVING
         self.neighbors: dict[uuid.UUID, tuple[float, tuple[float, float]]] = {}  # Direct neighbors (1-hop)
         
-        # Callbacks to be set by the simulator for event scheduling, channel interactions and metrics tracking
-        self.schedule_callback: callable                    = None
-        self.channel_is_busy: callable                      = None
-        self.channel_broadcast: callable                    = None
-        self.record_scheduler_latency_callback: callable    = None
-        self.set_unique_nodes_per_buoy_callback: callable   = None
-        self.log_received_callback: callable                = None    
+        # Callbacks to be set for event scheduling, channel interactions and metrics tracking
+        self.schedule_callback: callable                  = None
+        self.channel_is_busy: callable                    = None
+        self.channel_broadcast: callable                  = None
+        self.record_scheduler_latency_callback: callable  = None
+        self.set_unique_nodes_per_buoy_callback: callable = None
+        self.log_received_callback: callable              = None
 
         # CSMA parameters
-        self.cw: int                    = cfg.get('csma', 'cw')
-        self.difs_time: float           = cfg.get('csma', 'difs_time')
-        self.slot_time: float           = cfg.get('csma', 'slot_time')
+        self.cw: int          = cfg.get('csma', 'cw')
+        self.difs_time: float = cfg.get('csma', 'difs_time')
+        self.slot_time: float = cfg.get('csma', 'slot_time')
 
         # Network parameters for distance calculations
-        self.neighbor_timeout: float    = cfg.get('scheduler', 'neighbor_timeout')
-        self.world_width: float         = cfg.get('world', 'width')
-        self.world_height: float        = cfg.get('world', 'height')
+        self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
+        self.world_width: float      = cfg.get('world', 'width')  # They are not updated with the parsed arguments ?
+        self.world_height: float     = cfg.get('world', 'height')
 
         # Random Waypoint mobility model state
         # Speed is drawn uniformly from [rwp_speed_min, rwp_speed_max] per leg
+        self.rwp_speed_min: float = cfg.get('buoys', 'rwp_speed_min')
+        self.rwp_speed_max: float = cfg.get('buoys', 'rwp_speed_max')
+        
         # Pause is drawn uniformly from [rwp_pause_min, rwp_pause_max] on waypoint arrival
-        self.rwp_speed_min: float   = cfg.get('buoys', 'rwp_speed_min')
-        self.rwp_speed_max: float   = cfg.get('buoys', 'rwp_speed_max')
-        self.rwp_pause_min: float   = cfg.get('buoys', 'rwp_pause_min')
-        self.rwp_pause_max: float   = cfg.get('buoys', 'rwp_pause_max')
-        self.rwp_dt: float          = 0.5 # Time interval for movement updates in seconds
+        self.rwp_pause_min: float = cfg.get('buoys', 'rwp_pause_min')
+        self.rwp_pause_max: float = cfg.get('buoys', 'rwp_pause_max')
+        self.rwp_pause_until: float            = 0.0
+        self.rwp_dt: float        = 0.5 # Time interval for movement updates in seconds
 
         # Randomly pick initial waypoint and speed when first spawned
-        self.rwp_waypoint: tuple[float, float]  = self._pick_rwp_waypoint()
-        self.rwp_speed: float                   = random.uniform(self.rwp_speed_min, self.rwp_speed_max)
-        self.rwp_pause_until: float             = 0.0
-
+        self.rwp_waypoint: tuple[float, float] = self._pick_rwp_waypoint()
+        self.rwp_speed: float                  = random.uniform(self.rwp_speed_min, self.rwp_speed_max)
 
         # State variables for CSMA and scheduling
+        # processing is the single-pipeline lock: True while a CSMA chain
+        # (CHANNEL_SENSE -> DIFS -> BACKOFF -> TX) is in flight
         self.processing: bool               = False
         self.want_to_send: bool             = False
         self.scheduler_decision_time: float = 0.0
 
-        # Multihop append mode: store discovered nodes from neighbor lists as
-        # (last-contact ts, position, hop distance from this buoy)
-        self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
-        
         # Multihop mode configuration ('none' | 'append' | 'forwarded')
         self.multihop_mode: str = cfg.get('simulation', 'multihop_mode')
-        # Forwarded mode: multihop limit sets time to live for fowarded beacons
+        # Forwarded mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
         # Append mode: hop limit for nodes to be included in the neighbor list (0 = unlimited, 1 = only direct neighbors, etc.)
         self.append_hop_limit: int = cfg.get('simulation', 'append_hop_limit')
 
-        # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline
-        # one at a time, exactly like an own beacon. forwarded_beacons records the latest
-        # timestamp decided per origin so duplicates aren't re-evaluated.
+        # Multihop append mode: store discovered nodes from neighbor lists as
+        # (last-contact ts, position, hop distance from this buoy)
+        self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
+
+        # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline one at a time
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
-        self.forwarded_beacons: dict[uuid.UUID, float]          = {}
         self.pending_forward_beacons: dict[uuid.UUID, Beacon]   = {}
+        # forwarded_beacons records the latest timestamp decided per origin so duplicates aren't re-evaluated
+        self.forwarded_beacons: dict[uuid.UUID, float]          = {}
 
         # Event dispatch table for handling different event types with their corresponding methods
         self._event_handlers = {
@@ -121,9 +122,7 @@ class Buoy:
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 
-        # A powered-down node loses its volatile forward queue: beacons are
-        # time-sensitive advertisements, draining them after a downtime would
-        # only burn channel time and skew latency metrics
+        # When deactivated the buoy drops the pending forward queue entirely
         self.pending_forward_beacons.clear()
 
     # Schedules a generation-gated event targeting this buoy: events scheduled before a
@@ -131,7 +130,7 @@ class Buoy:
     def _schedule_event(self, time: float, event_type: EventType):
         self.schedule_callback(time, event_type, self, {'_gen': self._generation})
 
-    def handle_event(self, event: EventType, sim_time: float):
+    def handle_event(self, event: Event, sim_time: float):
         # Lazy cancellation: discard stale events for inactive buoys
         if not self.active:
             return
@@ -155,8 +154,7 @@ class Buoy:
         # Schedule the next scheduler check
         self._schedule_event(sim_time + self.scheduler.get_next_check_interval(), EventType.SCHEDULER_CHECK)
 
-        # An own beacon is already queued for the current pipeline => don't re-roll the
-        # scheduler decision (it would skew the send cadence and the latency metric)
+        # An own beacon is already queued for the current pipeline => don't re-roll the scheduler decision
         if self.want_to_send:
             return
 
@@ -177,10 +175,12 @@ class Buoy:
 
     # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
     def _handle_channel_sense(self, event: Event, sim_time: float):
-        # If it is ready to send or there is a forwarded beacon to send start the CSMA processs
+        # If it is ready to send or there is a forwarded beacon to send start the CSMA processs.
+        # Nothing left to send => release the pipeline lock so a later check can start fresh
         if not (self.want_to_send or self.pending_forward_beacons):
+            self.processing = False
             return
-        
+
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
             # Channel is busy => re-sense when it frees
@@ -195,8 +195,9 @@ class Buoy:
 
     # DIFS completion handler: after DIFS time completion, checks channel again and either transmit immediately or enter backoff
     def _handle_difs_completion(self, event: Event, sim_time: float):
-        # If the buoy no longer wants to send/forward or state has changed, do nothing
+        # If the buoy no longer wants to send/forward or state has changed, release the lock
         if not(self.want_to_send or self.pending_forward_beacons):
+            self.processing = False
             return
 
         # After DIFS, check channel again to decide if we can transmit immediately or need to backoff
@@ -217,8 +218,9 @@ class Buoy:
     # Backoff slot handler: checks channel status each slot and either decrements backoff or transmits if backoff is complete
     def _handle_backoff_completion(self, event: Event, sim_time: float):
         if not(self.want_to_send or self.pending_forward_beacons):
+            self.processing = False
             return
-            
+
         is_busy, next_try_time = self.channel_is_busy(self.position, sim_time)
         if is_busy:
             # Busy during backoff => re-enter full CSMA (sense + DIFS + fresh backoff) instead of transmitting blindly
@@ -229,10 +231,8 @@ class Buoy:
         # If Backoff time completed successfully then transmit
         self._schedule_event(sim_time, EventType.TRANSMISSION_START)
 
-    # Transmission start handler: sends a SINGLE beacon per CSMA win. Own beacons take
-    # priority over forwards; if anything is still queued afterwards the buoy re-enters
-    # the pipeline from scratch, so forwards are paced like ordinary traffic instead of
-    # being drained back-to-back
+    # Transmission start handler: sends a SINGLE beacon per CSMA win. Own beacons take priority over forwards;
+    # if anything is still queued afterwards the buoy re-enters the pipeline from scratch
     def _handle_transmission_start(self, event: Event, sim_time: float):
         if not (self.want_to_send or self.pending_forward_beacons):
             self.processing = False
@@ -252,14 +252,11 @@ class Buoy:
         else:
             self._transmit_forward_beacon(sim_time)
 
-        # want_to_send is necessarily False here (an own beacon was either just sent and
-        # cleared, or was never set). Any own beacon that becomes due later is picked up
-        # by SCHEDULER_CHECK, so only a non-empty forward queue keeps the pipeline alive.
+        # If there are still pending forwards, go back immediately at the beginning of CSMA pipeline 
         if self.pending_forward_beacons:
-            # Re-contend from scratch. The transmission just started holds the channel, so
-            # the fresh sense backs off until it clears => full DIFS + backoff before the
-            # next beacon goes out
             self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
+        
+        # Otherwise stop processing and start a brand new CSMA pipeline
         else:
             self.processing = False
 
@@ -275,9 +272,11 @@ class Buoy:
                 forward_beacon = b
                 break
 
+        # If no valid beacon was found, return without transmitting
         if not forward_beacon:
             return
 
+        # Forward the beacon and log the action
         forwarded = self.forward_beacon(forward_beacon, sim_time)
         self.channel_broadcast(forwarded, sim_time)
         logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
@@ -285,10 +284,8 @@ class Buoy:
     # Reception handler: processes incoming beacon, updates neighbors and either appends discovered nodes or forwards the beacon
     def _handle_reception(self, event: Event, sim_time: float):
         beacon: Beacon = event.data.get("beacon")
-        if not beacon:
-            return
 
-        # Drop the beacon unless this receiver still holds a valid scheduled reception:
+        # Drop the beacon unless this receiver is still able to receive it correctly:
         # a later colliding transmission revokes it (a real radio sees corrupted bits)
         if self.id not in beacon.scheduled_receivers:
             return
@@ -302,8 +299,7 @@ class Buoy:
             # These are NOT direct neighbors, but nodes we learned about indirectly
             case 'append':
                 for neighbor_id, neighbor_ts, neighbor_pos, neighbor_hops in beacon.neighbors:
-                    # This checks could be resolved with is operator ?
-                    if neighbor_id == self.id or neighbor_id == beacon.sender_id: # This last case should not occur any time?
+                    if neighbor_id == self.id:
                         continue
 
                     # Skip the nodes that we already know as direct neighbors
@@ -321,9 +317,9 @@ class Buoy:
                     if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None, 0))[0]:
                         self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos, hops)
 
-            # Multihop forwarded mode: queue beacon WITHOUT modification if hop_limit > 0.
+            # Multihop forwarded mode: queue beacon WITHOUT modification if beacon.origin_id != self.id and beacon.hop_limit > 0:
             # Never re-forward a beacon this buoy originated (echo received via a neighbor)
-            case 'forwarded' if beacon.hop_limit > 0 and beacon.origin_id != self.id:
+            case 'forwarded' if beacon.origin_id != self.id and beacon.hop_limit > 0:
                 # Only act on a beacon fresher than the last one decided for this origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
                     # Density-based forward suppression is decided once here, at enqueue
@@ -340,7 +336,7 @@ class Buoy:
 
                         # Forwarding is paced like an own beacon: start a CSMA pipeline if
                         # one isn't already running. The jitter desynchronizes the many
-                        # receivers of this beacon so they don't all contend at once.
+                        # receivers of this beacon so they don't all contend at once
                         if not self.processing:
                             self.processing = True
                             jitter = random.uniform(0, FORWARD_JITTER_MAX)
@@ -352,8 +348,7 @@ class Buoy:
 
         if self.metrics:
             # Track all unique nodes discovered from this beacon: its neighbor list,
-            # the sender, and (in forward mode) the origin. Built as a single set,
-            # this runs for every reception
+            # the sender, and - in forward mode - the origin
             discovered_nodes = {neighbor_id for neighbor_id, _, _, _ in beacon.neighbors}
             discovered_nodes.add(beacon.sender_id)
 
@@ -413,9 +408,6 @@ class Buoy:
 
     # Handles buoy movement according to the Random Waypoint mobility model
     def _handle_buoy_movement(self, event: Event, sim_time: float):
-        if not self.is_mobile:
-            return
-
         # If the buoy is still paused at the previous waypoint it stays still and wakes up exactly when the pause expires
         if sim_time < self.rwp_pause_until:
             self.velocity = (0.0, 0.0)
@@ -473,8 +465,8 @@ class Buoy:
             # Add discovered nodes to the neighbor list
             case 'append':
                 for node_id, (ts, pos, hops) in self.discovered_nodes.items():
-                    if node_id not in self.neighbors: # Don't include direct neighbors again
-                        all_neighbors.append((node_id, ts, pos, hops))
+                    # if node_id not in self.neighbors: # Don't include direct neighbors again
+                    all_neighbors.append((node_id, ts, pos, hops))
             
             # Set origin and hop limit
             case 'forwarded':

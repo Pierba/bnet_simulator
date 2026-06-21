@@ -146,22 +146,22 @@ def main():
     args = parse_args()
 
     # Unpacking args values
-    density: int            = args.density
-    duration: float         = args.duration
-    fixed_buoy_count: int   = args.fixed_buoy_count
-    ideal: bool             = args.ideal
-    max_interval: float     = args.max_interval
-    min_interval: float     = args.min_interval
-    mobile_buoy_count: int  = args.mobile_buoy_count
-    mode: str               = args.mode
-    multihop_mode: str      = args.multihop_mode
-    positions_file: str     = args.positions_file
-    result_file: str        = args.result_file
-    scenario: str           = args.scenario
-    seed: float             = args.seed
-    static_interval: float  = args.static_interval
-    world_height: float     = args.world_height
-    world_width: float      = args.world_width
+    density: int           = args.density
+    duration: float        = args.duration
+    fixed_buoy_count: int  = args.fixed_buoy_count
+    ideal: bool            = args.ideal
+    max_interval: float    = args.max_interval
+    min_interval: float    = args.min_interval
+    mobile_buoy_count: int = args.mobile_buoy_count
+    mode: str              = args.mode
+    multihop_mode: str     = args.multihop_mode
+    positions_file: str    = args.positions_file
+    result_file: str       = args.result_file
+    scenario: str          = args.scenario
+    seed: float            = args.seed
+    static_interval: float = args.static_interval
+    world_height: float    = args.world_height
+    world_width: float     = args.world_width
 
     # Inject the multihop mode parsed into the config to be accessed by other components of the simulation
     cfg.set('simulation', 'multihop_mode', multihop_mode)
@@ -220,8 +220,8 @@ def main():
         )
 
         # Set callbacks for channel interactions
-        buoy.channel_is_busy    = channel.is_busy
-        buoy.channel_broadcast  = channel.broadcast
+        buoy.channel_is_busy   = channel.is_busy
+        buoy.channel_broadcast = channel.broadcast
 
         # Set callbacks for metrics data collection if metrics are enabled
         if metrics:

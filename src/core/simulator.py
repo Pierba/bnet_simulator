@@ -39,8 +39,8 @@ class Simulator:
             self._active_count: int = 2
 
             # Fixed interval between successive buoy activations (spread over the simulation period)
-            buoys_to_add: int           = len(self.buoys) - 2
-            ramp_window: float          = max(duration - FIRST_ARRAY_UPDATE_DELAY, 0.0)
+            buoys_to_add: int             = len(self.buoys) - 2
+            ramp_window: float            = max(duration - FIRST_ARRAY_UPDATE_DELAY, 0.0)
             self.ramp_add_interval: float = (ramp_window / buoys_to_add) if buoys_to_add > 0 else duration
         
         # Otherwise all buoys are considered active at the start of the simulation
@@ -51,14 +51,14 @@ class Simulator:
         self.duration: float = duration
         
         # Neighbor settings
-        self.neighbor_timeout: float    = cfg.get('scheduler', 'neighbor_timeout')
-        self.comm_range_max: float      = cfg.get('network', 'communication_range_max')
+        self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
+        self.comm_range_max: float   = cfg.get('network', 'communication_range_max')
 
         # Random scenario settings & precompute constants that never change
-        self.random_variability: float  = cfg.get('simulation', 'random_variability')
-        total_buoys: int                = len(self.buoys)
-        self.rnd_max_change: int        = max(1, int(total_buoys * self.random_variability))
-        self.rnd_min_buoys: int         = max(3, int(total_buoys * 0.2))
+        self.random_variability: float = cfg.get('simulation', 'random_variability')
+        total_buoys: int               = len(self.buoys)
+        self.rnd_max_change: int       = max(1, int(total_buoys * self.random_variability))
+        self.rnd_min_buoys: int        = max(3, int(total_buoys * 0.2))
 
         # Channel settings
         self.channel.set_buoys(self.buoys)
@@ -69,7 +69,7 @@ class Simulator:
             buoy.schedule_callback = self.schedule_event
 
         # Event variables for managing the event queue
-        self.event_queue: list = []
+        self.event_queue: list  = []
         self.event_counter: int = 0
 
     # Scheduler of events ordered by their scheduled time (counter breaks ties in FIFO order)
@@ -239,8 +239,8 @@ class Simulator:
         
         return simulated_time
 
-    # Calculates the average number of neighbors for the current buoy array
-    def calculate_avg_neighbors(self) -> float: # O(n log n) using k-d tree
+    # Calculates the average number of neighbors for the current buoy array (O(n log n) using k-d tree)
+    def calculate_avg_neighbors(self) -> float: 
         if not self._active_count:
             return 0.0
 
