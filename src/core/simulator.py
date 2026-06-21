@@ -1,7 +1,7 @@
 import time
 import heapq
 import traceback
-from typing import List, Dict, Optional
+from typing import Optional
 import random
 from utils.metrics import Metrics
 from buoys.buoy import Buoy
@@ -14,21 +14,36 @@ from scipy.spatial import cKDTree
 # Sim-time delay before the first buoy-array update in the ramp/random scenarios
 FIRST_ARRAY_UPDATE_DELAY: float = 30.0
 
+# Constants for metrics sampling intervals based on the scenario type
+SAMPLE_INTERVAL_RAMP: float = 5.0
+SAMPLE_INTERVAL_OTHER: float = 30.0
+
+# Constants for random buoy array update intervals in the random scenario
+MIN_INTERVAL_RANDOM: float = 15.0
+MAX_INTERVAL_RANDOM: float = 20.0
+
 class Simulator:
-    def __init__(self, buoys: List[Buoy], channel: Channel, metrics: Metrics, scenario: str, duration: float):
+    def __init__(self, buoys: list[Buoy], channel: Channel, metrics: Metrics, scenario: str, duration: float):
         cfg = ConfigHandler()
         
         # Simulation main components & settings
         self.scenario: str          = scenario
-        self.buoys: List[Buoy]      = buoys
+        self.buoys: list[Buoy]      = buoys
         self.channel: Channel       = channel
         self.metrics: Metrics       = metrics
 
         # When on ramp scenario only the first 2 buoys are considered active (existing in the network)
         if self.scenario == "ramp":
             for b in self.buoys[2:]:
-                b.deactivate()
+                b.deactivate() # python annotation
             self._active_count: int = 2
+
+            # Fixed interval between successive buoy activations (spread over the simulation period)
+            buoys_to_add: int           = len(self.buoys) - 2
+            ramp_window: float          = max(duration - FIRST_ARRAY_UPDATE_DELAY, 0.0)
+            self.ramp_add_interval: float = (ramp_window / buoys_to_add) if buoys_to_add > 0 else duration
+        
+        # Otherwise all buoys are considered active at the start of the simulation
         else:
             self._active_count: int = len(self.buoys)
 
@@ -58,7 +73,7 @@ class Simulator:
         self.event_counter: int = 0
 
     # Scheduler of events ordered by their scheduled time (counter breaks ties in FIFO order)
-    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[Dict] = None):
+    def schedule_event(self, time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[dict] = None):
         event = Event(time, event_type, target_obj, data)
         self.event_counter += 1
         heapq.heappush(self.event_queue, (event.time, self.event_counter, event))
@@ -69,24 +84,42 @@ class Simulator:
             return None
         _, _, event = heapq.heappop(self.event_queue)
         return event
+    
+    # Dispatches the event to the appropriate handler
+    def handle_event(self, event: Event, sim_time: float):
+        match event.event_type:
+            case EventType.BUOY_ARRAY_UPDATE:
+                self.update_buoy_array(sim_time)
+            case EventType.AVG_NEIGHBORS_CALCULATION:
+                self._sample_metrics(sim_time)
+                sample_interval = SAMPLE_INTERVAL_RAMP if self.scenario == "ramp" else SAMPLE_INTERVAL_OTHER
+                self.schedule_event(sim_time + sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
+            case _:
+                logging.log_error(f"Simulator received unhandled event: {event.event_type}")
 
-    # Schedule initial events for buoys, channel and simulator itself
+    # Schedules the recurring events for an active buoy: scheduler check, neighbor cleanup and movement (for mobile ones)
+    def _schedule_buoy_events(self, buoy, base_time: float = 0.0):
+        initial_offset = random.uniform(0, 1.0)
+        gen = {'_gen': buoy._generation}
+
+        # Trigger periodic events chain
+        self.schedule_event(base_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, gen)
+        self.schedule_event(base_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, gen)
+
+        # Mobile buoys also update their position
+        if buoy.is_mobile:
+            self.schedule_event(base_time + initial_offset, EventType.BUOY_MOVEMENT, buoy, gen)
+
+    # Schedules initial events for buoys, channel and simulator itself
     def _schedule_initial_events(self):
         for buoy in self.buoys:
-            # If the buoy is not active at the start of the simulation, it skips scheduling its events.
+            # If the buoy is not active at the start of the simulation, it skips scheduling its events
             if not buoy.active:
                 continue
 
-            # Scheduling first events that will trigger themself periodically along the simulation
-            initial_offset = random.uniform(0, 1.0)
-            self.schedule_event(initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
-            self.schedule_event(initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
+            self._schedule_buoy_events(buoy)
 
-            # Mobile buoys also update their position
-            if buoy.is_mobile:
-                self.schedule_event(initial_offset, EventType.BUOY_MOVEMENT, buoy, {'_gen': buoy._generation})
-        
-        # Schedule first buoy array update for dynamic scenarios
+        # If the scenario is static, no buoy array updates are needed
         if self.scenario == "static":
             return
         
@@ -95,38 +128,23 @@ class Simulator:
         
         # Periodic metrics sampling: 5s for ramp (timepoint logs), 30s otherwise
         if self.metrics:
-            sample_interval = 5.0 if self.scenario == "ramp" else 30.0
+            sample_interval = SAMPLE_INTERVAL_RAMP if self.scenario == "ramp" else SAMPLE_INTERVAL_OTHER
             self.schedule_event(sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
 
+    # Updates the buoy array based on the scenario type (ramp/random)
     def update_buoy_array(self, sim_time: float):
         match self.scenario:
             case "ramp":
                 self._update_buoy_array_ramp(sim_time)
             case "random":
                 self._update_buoy_array_random(sim_time)
-
-    def handle_event(self, event: Event, sim_time: float):
-        match event.event_type:
-            case EventType.BUOY_ARRAY_UPDATE:
-                self.update_buoy_array(sim_time)
-            case EventType.AVG_NEIGHBORS_CALCULATION:
-                self._sample_metrics(sim_time)
-                sample_interval = 5.0 if self.scenario == "ramp" else 30.0
-                self.schedule_event(sim_time + sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
-            case _:
-                logging.log_error(f"Simulator received unhandled event: {event.event_type}")
     
+    # Updates the buoy array in ramp scenario by activating one buoy at a time until they are all active
     def _update_buoy_array_ramp(self, sim_time: float):
         # If buoys are all active then stop adding more
         total_buoys = len(self.buoys)
         if self._active_count >= total_buoys:
             return
-
-        # Spread the additions over the time remaining after the first update, so that
-        # every buoy is active before the simulation ends
-        buoys_to_add = total_buoys - 2
-        ramp_window = max(self.duration - FIRST_ARRAY_UPDATE_DELAY, 0.0)
-        add_interval = (ramp_window / buoys_to_add) if buoys_to_add > 0 else self.duration
 
         # With next() it finds the first inactive buoy without allocating a list
         buoy = next(b for b in self.buoys if not b.active)
@@ -134,11 +152,10 @@ class Simulator:
         self._active_count += 1
 
         # Scheduling initial events for the newly added buoy
-        initial_offset = random.uniform(0, 1.0)
-        self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
-        self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
-        self.schedule_event(sim_time + add_interval, EventType.BUOY_ARRAY_UPDATE, self)
+        self._schedule_buoy_events(buoy, sim_time)
+        self.schedule_event(sim_time + self.ramp_add_interval, EventType.BUOY_ARRAY_UPDATE, self)
    
+    # Updates the buoy array in random scenario by randomly activating or deactivating buoys based on defined probabilities and constraints
     def _update_buoy_array_random(self, sim_time: float):
         # If there are more than minimum number of buoys active, randomly decide to remove some buoys with a 50% chance
         if self._active_count > self.rnd_min_buoys and random.random() < 0.5:
@@ -159,19 +176,15 @@ class Simulator:
 
                 for buoy in random.sample(inactive_buoys, num_to_add):
                     buoy.activate()
-                    
-                    initial_offset = random.uniform(0, 1.0)
-                    self.schedule_event(sim_time + initial_offset, EventType.SCHEDULER_CHECK, buoy, {'_gen': buoy._generation})
-                    self.schedule_event(sim_time + initial_offset + self.neighbor_timeout, EventType.NEIGHBOR_CLEANUP, buoy, {'_gen': buoy._generation})
+                    self._schedule_buoy_events(buoy, sim_time)
 
-                    if buoy.is_mobile:
-                        self.schedule_event(sim_time + initial_offset, EventType.BUOY_MOVEMENT, buoy, {'_gen': buoy._generation})
-                
                 self._active_count += num_to_add
                 logging.log_info(f"Added {num_to_add} buoys, now {self._active_count} active at {sim_time:.2f}s")
 
-        self.schedule_event(sim_time + random.uniform(15, 20), EventType.BUOY_ARRAY_UPDATE, self)
+        random_interval = random.uniform(MIN_INTERVAL_RANDOM, MAX_INTERVAL_RANDOM)
+        self.schedule_event(sim_time + random_interval, EventType.BUOY_ARRAY_UPDATE, self)
 
+    # Starts the simulation loop, processing events until the simulation duration ends or gets interrupted
     def start(self) -> float:
         # Simulation state variables
         last_time_log: float    = None
@@ -226,7 +239,7 @@ class Simulator:
         
         return simulated_time
 
-    # This method calculates the average number of neighbors for the current buoy array
+    # Calculates the average number of neighbors for the current buoy array
     def calculate_avg_neighbors(self) -> float: # O(n log n) using k-d tree
         if not self._active_count:
             return 0.0

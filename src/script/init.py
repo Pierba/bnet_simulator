@@ -22,10 +22,10 @@ import json
 import random
 import time
 
+# Argument parser for command-line options to configure the simulation parameters
 def parse_args() -> argparse.Namespace:
     cfg = ConfigHandler()
     
-    # Argument parser for command-line options to configure the simulation parameters
     parser = argparse.ArgumentParser(description="Run the BNet Simulator")
     parser.add_argument(
         "--mode",
@@ -140,6 +140,7 @@ def random_velocity(default_velocity: float) -> tuple[float, float]:
         random.uniform(-1, 1) * default_velocity
     )
 
+# Main function to initialize and run the simulation
 def main():
     cfg = ConfigHandler()
     args = parse_args()
@@ -162,8 +163,7 @@ def main():
     world_height: float     = args.world_height
     world_width: float      = args.world_width
 
-    # Override the multihop mode in the config singleton so that the behavior
-    # code (buoy.py) reading it directly uses this run's mode, not config.yaml's.
+    # Inject the multihop mode parsed into the config to be accessed by other components of the simulation
     cfg.set('simulation', 'multihop_mode', multihop_mode)
 
     # Set the random seed for reproducibility
@@ -180,8 +180,7 @@ def main():
             for _ in range(mobile_buoy_count + fixed_buoy_count)
         ]
 
-    # Initialize the Metrics object if metrics collection is enabled in the configuration
-    # This object will track various performance metrics throughout the simulation
+    # Initialize the Metrics object if metrics are enabled in the config
     metrics: Metrics | None = None
     if cfg.get('simulation', 'enable_metrics'):
         metrics = Metrics(
@@ -230,6 +229,7 @@ def main():
             buoy.set_unique_nodes_per_buoy_callback = metrics.set_unique_nodes_per_buoy
             buoy.log_received_callback              = metrics.log_received
 
+        # Add the initialized buoy to the list of buoys
         buoys.append(buoy)
 
     # Creating the Simulator instance with the initialized buoys, channel, and metrics
