@@ -98,9 +98,11 @@ class Channel:
 
         # Record this transmission as active and schedule its end event
         self.active_transmissions.append((beacon, sim_time, new_end_time))
-        expiry = new_end_time + self.grace_period
-        if expiry < self._next_expiry:
-            self._next_expiry = expiry
+
+        # Schedule the next expiry time for the channel, considering the grace period
+        new_expiry = new_end_time + self.grace_period
+        self._next_expiry = new_expiry if self._next_expiry < 0 else min(self._next_expiry, new_expiry)
+        
         self.schedule_callback(new_end_time, EventType.TRANSMISSION_END, self, {"beacon": beacon})
 
         # Schedule receptions for surviving receivers and count probabilistic losses if the channel is non-ideal
@@ -123,12 +125,6 @@ class Channel:
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
             self.metrics.log_collision(collision_lost + poisoned_count)
             self.metrics.log_lost(total_lost + poisoned_count)
-
-            # Retroactive correction for earlier receptions revoked by this transmission
-            # if poisoned_count:
-            #     self.metrics.log_collision(poisoned_count)
-            #     self.metrics.log_lost(poisoned_count)
-            #     self.metrics.log_successful_receivers(-poisoned_count)
 
         return new_end_time
 
