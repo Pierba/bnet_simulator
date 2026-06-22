@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import Tuple, List, Optional, Set
 import uuid
 
+BASE_BIT_SIZE = 33  # sender_id(16) + mobile(1) + position(8) + timestamp(4)
+BYTE_SIZE = 8
+
 @dataclass(slots=True)
 # Represents a beacon message sent by a buoy in the network
 class Beacon:
@@ -20,9 +23,8 @@ class Beacon:
     # transmission removes a receiver here so its corrupted copy is dropped on arrival
     scheduled_receivers: Set[uuid.UUID] = field(default_factory=set, compare=False)
 
-    def size_bytes(self) -> int:
-        # Base size: sender_id(16) + mobile(1) + position(8) + timestamp(4) = 33 bytes
-        base = 33
+    def size_bits(self) -> int:
+        base = BASE_BIT_SIZE
         
         # Add size per neighbor: uuid(16) + timestamp(4) + position(8) = 28 bytes
         base += 28 * len(self.neighbors)
@@ -32,7 +34,4 @@ class Beacon:
             base += 16  # origin_id
             base += 4   # hop_limit
         
-        return base
-
-    def size_bits(self) -> int:
-        return self.size_bytes() * 8
+        return base * BYTE_SIZE

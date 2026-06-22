@@ -113,7 +113,7 @@ def plot_mode_comparison(mode_results_dirs: dict[str, str], comparison_dir: str,
                 "--interval", str(interval),
                 "--schedulers", *schedulers]
     for mode, results_dir in mode_results_dirs.items():
-        plot_cmd.extend(["--mode-dir", mode, results_dir])
+        plot_cmd.extend(("--mode-dir", mode, results_dir))
 
     subprocess.run(plot_cmd) # -> script/plot_mode_comparison.py
 

@@ -293,6 +293,9 @@ class Buoy:
         # Update direct neighbors of this buoy with the sender of the beacon (1-hop neighbors)
         self.neighbors[beacon.sender_id] = (sim_time, beacon.position)
         self.last_contact_ts = sim_time
+        
+        # Remove from discovered nodes if it was there
+        self.discovered_nodes.pop(beacon.sender_id, None)
 
         match self.multihop_mode:
             # Multihop append mode: collect discovered nodes from beacon's neighbor list
@@ -464,9 +467,10 @@ class Buoy:
         match self.multihop_mode:
             # Add discovered nodes to the neighbor list
             case 'append':
-                for node_id, (ts, pos, hops) in self.discovered_nodes.items():
-                    # if node_id not in self.neighbors: # Don't include direct neighbors again
-                    all_neighbors.append((node_id, ts, pos, hops))
+                all_neighbors.extend(
+                    (node_id, ts, pos, hops) 
+                    for node_id, (ts, pos, hops) in self.discovered_nodes.items()
+                )
             
             # Set origin and hop limit
             case 'forwarded':

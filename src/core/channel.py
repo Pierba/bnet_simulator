@@ -14,35 +14,36 @@ class Channel:
         cfg = ConfigHandler()
         
         # Channel parameters
-        self.active_transmissions: list[tuple[Beacon, float, float]]    = []
-        self.buoys: list[Buoy]                                          = []
-        self.metrics: Metrics                                           = metrics
-        self.schedule_callback: callable                                = None
+        self.active_transmissions: list[tuple[Beacon, float, float]] = []
+        self.buoys: list[Buoy]                                       = []
+        self.metrics: Metrics                                        = metrics
+        self.schedule_callback: callable                             = None
 
         # Earliest time at which an active transmission expires; lets update() skip
         # rebuilding the list on the (very frequent) calls where nothing expired yet
-        self._next_expiry: float = float('inf')
+        self._next_expiry: float = -1
         self._buoys_by_id: dict = {}
         
         # Setting up network parameters from configuration
-        self.ideal_channel: bool            = ideal_channel
-        self.bit_rate: int                  = cfg.get('network', 'bit_rate')
-        self.comm_range_max: float          = cfg.get('network', 'communication_range_max')
-        self.comm_range_high_prob: float    = cfg.get('network', 'communication_range_high_prob')
-        self.delivery_prob_high: float      = cfg.get('network', 'delivery_prob_high')
-        self.delivery_prob_low: float       = cfg.get('network', 'delivery_prob_low')
-        self.speed_of_light: float          = cfg.get('network', 'speed_of_light')
+        self.ideal_channel: bool       = ideal_channel
+        self.bit_rate: int             = cfg.get('network', 'bit_rate')
+        self.delivery_prob_high: float = cfg.get('network', 'delivery_prob_high')
+        self.delivery_prob_low: float  = cfg.get('network', 'delivery_prob_low')
+        self.speed_of_light: float     = cfg.get('network', 'speed_of_light')
+        comm_range_max: float          = cfg.get('network', 'communication_range_max')
+        comm_range_high_prob: float    = cfg.get('network', 'communication_range_high_prob')
         
         # Precomputed values for efficiency
-        self.comm_range_max_sq: float       = self.comm_range_max * self.comm_range_max
-        self.comm_range_high_prob_sq: float = self.comm_range_high_prob * self.comm_range_high_prob
-        self.grace_period                   = self.comm_range_max / self.speed_of_light + 1e-6
+        self.comm_range_max_sq: float       = comm_range_max * comm_range_max
+        self.comm_range_high_prob_sq: float = comm_range_high_prob * comm_range_high_prob
+        self.grace_period                   = comm_range_max / self.speed_of_light + 1e-6
 
     # Setting the list of buoys in the channel, used for calculating receivers in range
     def set_buoys(self, buoys: list[Buoy]):
         self.buoys = buoys
         self._buoys_by_id = {buoy.id: buoy for buoy in buoys}
 
+    # Handling events received by the channel, currently only handling transmission end events ?
     def handle_event(self, event, sim_time: float):
         match event.event_type:
             case EventType.TRANSMISSION_END:
@@ -71,9 +72,10 @@ class Channel:
         ]
         self._next_expiry = min(
             (end + grace for _, _, end in self.active_transmissions),
-            default=float('inf')
+            default=-1
         )
 
+    # Broadcasts a beacon, handles collisions, schedules receptions, and updates metrics
     def broadcast(self, beacon: Beacon, sim_time: float) -> float:
         if logging.LOGGING_ENABLED:
             logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
@@ -118,15 +120,15 @@ class Channel:
             is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
-            self.metrics.log_successful_receivers(actual_successful)
-            self.metrics.log_collision(collision_lost)
-            self.metrics.log_lost(total_lost)
+            self.metrics.log_successful_receivers(actual_successful - poisoned_count)
+            self.metrics.log_collision(collision_lost + poisoned_count)
+            self.metrics.log_lost(total_lost + poisoned_count)
 
             # Retroactive correction for earlier receptions revoked by this transmission
-            if poisoned_count:
-                self.metrics.log_collision(poisoned_count)
-                self.metrics.log_lost(poisoned_count)
-                self.metrics.log_successful_receivers(-poisoned_count)
+            # if poisoned_count:
+            #     self.metrics.log_collision(poisoned_count)
+            #     self.metrics.log_lost(poisoned_count)
+            #     self.metrics.log_successful_receivers(-poisoned_count)
 
         return new_end_time
 
@@ -134,9 +136,9 @@ class Channel:
     def _receivers_in_range(self, beacon: Beacon) -> list[tuple[Buoy, float]]:
         receivers_data: list[tuple[Buoy, float]] = []
         beacon_x, beacon_y = beacon.position
+
         # Resolve the sender once so the per-buoy exclusion is an identity check
-        # instead of a UUID comparison (which dominates this loop at scale)
-        sender = self._buoys_by_id.get(beacon.sender_id)
+        sender = self._buoys_by_id[beacon.sender_id]
         comm_range_sq = self.comm_range_max_sq
 
         for buoy in self.buoys:
@@ -173,7 +175,7 @@ class Channel:
         comm_range_sq = self.comm_range_max_sq
 
         # Receiver coordinates resolved once instead of per (transmission x receiver) pair
-        receivers_pos = [(buoy.id, buoy.position[0], buoy.position[1]) for buoy, _ in receivers_data]
+        receivers_pos = [(buoy.id, *buoy.position) for buoy, _ in receivers_data]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender

@@ -17,27 +17,27 @@ class BeaconScheduler:
         cfg = ConfigHandler()
 
         # Scheduler settings
-        self.scheduler_type: str        = scheduler_type
-        self.static_interval: float     = static_interval
-        self.min_interval: float        = min_interval
-        self.max_interval: float        = max_interval
-        self.interval_range: float      = self.max_interval - self.min_interval
-        self.default_velocity: float    = max(default_velocity, 0.001)
+        self.scheduler_type: str     = scheduler_type
+        self.static_interval: float  = static_interval
+        self.min_interval: float     = min_interval
+        self.max_interval: float     = max_interval
+        self.default_velocity: float = max(default_velocity, 0.001)
+        self.interval_range: float   = self.max_interval - self.min_interval
     
         # States for static/dynamic scheduling decisions
-        self.last_fq: float                 = 0.0   # Last computed back-off intensity
-        self.last_dynamic_send_time: float  = -random.uniform(0, self.min_interval)
-        self.last_static_send_time: float   = -random.uniform(0, self.static_interval)
-        self.next_dynamic_interval: float   = self.min_interval
+        self.last_fq: float                = 0.0   # Last computed back-off intensity
+        self.last_dynamic_send_time: float = -random.uniform(0, self.min_interval)
+        self.last_static_send_time: float  = -random.uniform(0, self.static_interval)
+        self.next_dynamic_interval: float  = self.min_interval
 
         # Forwarding gate baseline (expected forwarders per cascade)
         self.forward_density_baseline: int = cfg.get('simulation', 'forward_density_baseline')
 
-        # Scheduler-specific thresholds and weights (from config)
-        self.acab_contact_threshold: float              = cfg.get('scheduler', 'acab_contact_threshold')
-        self.acab_neighbors_threshold: float            = cfg.get('scheduler', 'acab_neighbors_threshold')
-        self.adab_neighbors_threshold: float            = cfg.get('scheduler', 'adab_neighbors_threshold')
-        self.acab_weights: tuple[float, float, float]   = tuple(cfg.get('scheduler', 'acab_weights'))
+        # Scheduler-specific thresholds and weights
+        self.acab_contact_threshold: float            = cfg.get('scheduler', 'acab_contact_threshold')
+        self.acab_neighbors_threshold: float          = cfg.get('scheduler', 'acab_neighbors_threshold')
+        self.adab_neighbors_threshold: float          = cfg.get('scheduler', 'adab_neighbors_threshold')
+        self.acab_weights: tuple[float, float, float] = tuple(cfg.get('scheduler', 'acab_weights'))
 
     def get_next_check_interval(self) -> float:
         match self.scheduler_type:
