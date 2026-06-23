@@ -28,25 +28,25 @@ class Metrics:
         self.multihop_mode: str         = multihop_mode
         
         # Metrics tracking
-        self.actually_received: int                         = 0
-        self.avg_neighbors_count: int                       = 0
-        self.avg_neighbors_sum: float                       = 0.0
-        self.beacons_sent: int                              = 0
-        self.beacons_forwarded: int                         = 0
-        self.beacons_received: int                          = 0
-        self.beacons_lost: int                              = 0
-        self.beacons_collided: int                          = 0
-        self.delivered_beacons: dict[UUID, float]           = {}
-        self.discovered_pairs: dict[UUID, set[UUID]]        = {}
-        self.potentially_sent: int                          = 0
-        self.reaction_latency_count: int                    = 0
-        self.reaction_latency_sum: float                    = 0.0
-        self.scheduler_latency_count: int                   = 0
-        self.scheduler_latency_sum: float                   = 0.0
-        self.time_series: list                              = []
-        self.total_latency: float                           = 0.0
-        self.total_successful_receivers: int                = 0
-        self.unique_nodes_per_buoy: dict[UUID, set[UUID]]   = {} 
+        self.actually_received: int                       = 0
+        self.avg_neighbors_count: int                     = 0
+        self.avg_neighbors_sum: float                     = 0.0
+        self.beacons_sent: int                            = 0
+        self.beacons_forwarded: int                       = 0
+        self.beacons_received: int                        = 0
+        self.beacons_lost: int                            = 0
+        self.beacons_collided: int                        = 0
+        self.delivered_beacons: dict[UUID, float]         = {}
+        self.discovered_pairs: dict[UUID, set[UUID]]      = {}
+        self.potentially_sent: int                        = 0
+        self.reaction_latency_count: int                  = 0
+        self.reaction_latency_sum: float                  = 0.0
+        self.scheduler_latency_count: int                 = 0
+        self.scheduler_latency_sum: float                 = 0.0
+        self.time_series: list                            = []
+        self.total_latency: float                         = 0.0
+        self.total_successful_receivers: int              = 0
+        self.unique_nodes_per_buoy: dict[UUID, set[UUID]] = {}
         
     # Set of unique nodes discovered by each buoy
     def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
@@ -63,26 +63,23 @@ class Metrics:
         if is_forward:
             self.beacons_forwarded += 1
 
-    # Log a received beacon and tracks unique deliveries and latency.
-    # origin_id identifies the node that created the beacon: forwarded copies carry the
-    # origin's timestamp, so deduplication must be keyed by origin, not by the forwarder.
+    # Log a received beacon and tracks unique deliveries and latency
     def log_received(self, origin_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
-        # Reaction latency: the first time THIS receiver discovers THIS origin. It is
-        # tracked per receiver, so it must be evaluated on every reception — not only on
-        # the network-wide first delivery of a beacon, which the origin-keyed dedup below
-        # filters out. Running it before that dedup is what makes the per-receiver
-        # discovered_pairs bookkeeping meaningful.
+        # Reaction latency: the first time THIS receiver discovers THIS origin. 
+        # It is tracked per receiver, so it must be evaluated on every reception
         seen_senders = self.discovered_pairs.get(receiver_id)
         if seen_senders is None:
             seen_senders = set()
             self.discovered_pairs[receiver_id] = seen_senders
+        
+        latency = receive_time - timestamp
         if origin_id not in seen_senders:
             seen_senders.add(origin_id)
             self.reaction_latency_count += 1
-            self.reaction_latency_sum += receive_time - timestamp
+            self.reaction_latency_sum += latency
 
         # Unique-beacon accounting: count each generated beacon (origin, timestamp) once,
         # the first time it reaches anyone. If already counted as delivered, skip it.
@@ -93,7 +90,7 @@ class Metrics:
         # Update the number of unique beacons received and total latency
         self.delivered_beacons[origin_id] = timestamp
         self.beacons_received += 1
-        self.total_latency += receive_time - timestamp
+        self.total_latency += latency
 
 
     # Log a lost beacon
@@ -124,26 +121,11 @@ class Metrics:
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
 
-    # Calculate Packet Delivery Ratio: successful receivers / potential receivers
+    # Calculate Packet Delivery Ratio: packets actually received / packets sent.
+    # Both counts are at the per-receiver (transmission x in-range receiver) granularity
+    # and include forwarded beacons as individual packets, just like origin beacons.
     def packet_delivery_ratio(self) -> float:
-        return self.total_successful_receivers / self.potentially_sent if self.potentially_sent else 0.0
-
-    # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
-    def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
-        timepoint = {
-            "time": sim_time,
-            # True packet delivery ratio (unique beacons delivered / beacons sent)
-            "delivery_ratio": self.delivery_ratio(),
-            # PDR: successful receivers / potential receivers
-            "pdr": self.packet_delivery_ratio(),
-            "n_buoys": n_buoys,
-            "avg_unique_nodes": self.avg_unique_nodes_discovered()
-        }
-        
-        if avg_neighbors_sample is not None:
-            timepoint["avg_neighbors"] = avg_neighbors_sample
-            
-        self.time_series.append(timepoint)
+        return self.actually_received / self.potentially_sent if self.potentially_sent else 0.0
 
     # Calculate True Packet Delivery Ratio: unique beacons delivered / unique beacons
     # generated. Forwarded copies are excluded from the denominator: they re-transmit
@@ -166,6 +148,23 @@ class Metrics:
         if self.density <= 1:
             return 0.0
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
+
+    # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
+    def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
+        timepoint = {
+            "time": sim_time,
+            # True packet delivery ratio (unique beacons delivered / beacons sent)
+            "delivery_ratio": self.delivery_ratio(),
+            # PDR: successful receivers / potential receivers
+            "pdr": self.packet_delivery_ratio(),
+            "n_buoys": n_buoys,
+            "avg_unique_nodes": self.avg_unique_nodes_discovered()
+        }
+        
+        if avg_neighbors_sample is not None:
+            timepoint["avg_neighbors"] = avg_neighbors_sample
+            
+        self.time_series.append(timepoint)
 
     # Record a sample of the average number of neighbors for time-series analysis
     def record_avg_neighbors_sample(self, avg_neighbors_value: float):
