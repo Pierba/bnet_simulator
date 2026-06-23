@@ -1,0 +1,1182 @@
+% =====================================================================
+%  Bachelor's thesis -- Context-aware adaptive beaconing and multi-hop
+%  awareness for infrastructure-free maritime proximity detection.
+%
+%  Compile with:  pdflatex main.tex  (run twice for the ToC / references)
+%  Figures live in ./figures and are produced by make_figures.py from the
+%  averaged simulation CSVs in metrics/averaged/.
+% =====================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.7cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+\definecolor{codekw}{rgb}{0.10,0.30,0.65}
+\definecolor{codecm}{rgb}{0.30,0.55,0.30}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecm}\itshape,
+  stringstyle=\color{purple},
+  numbers=left, numberstyle=\tiny\color{gray},
+  breaklines=true, frame=single, framesep=4pt,
+  showstringspaces=false, captionpos=b, language=Python,
+}
+
+\newcommand{\bimin}{BI_{\min}}
+\newcommand{\bimax}{BI_{\max}}
+\newcommand{\nthr}{N_{\mathrm{thr}}}
+\renewcommand{\arraystretch}{1.15}
+
+\title{\textbf{Context-Aware Adaptive Beaconing and Multi-Hop Awareness\\for Infrastructure-Free Maritime Proximity Detection}}
+\author{Candidate Name\\\small ID number 0000000}
+\date{Academic Year 2024/2025}
+
+\begin{document}
+
+% ---------------------------------------------------------------- title
+\begin{titlepage}
+\centering
+{\scshape\LARGE Sapienza University of Rome \par}
+\vspace{0.4cm}
+{\scshape\large Faculty of Information Engineering, Informatics and Statistics \par}
+{\large Bachelor's Degree in Computer Science \par}
+\vfill
+{\huge\bfseries Context-Aware Adaptive Beaconing and\\[0.3em] Multi-Hop Awareness for Infrastructure-Free\\[0.3em] Maritime Proximity Detection \par}
+\vfill
+\begin{flushleft}
+\large
+\textbf{Candidate}\\
+Candidate Name --- ID number 0000000\\[1.2em]
+\textbf{Advisor}\\
+Prof.\ Gaia Maselli\\
+\end{flushleft}
+\vfill
+{\large Academic Year 2024/2025 \par}
+\end{titlepage}
+
+% ---------------------------------------------------------------- abstract
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Swimmers, snorkelers, kayakers and divers are largely invisible to the larger
+vessels that share coastal waters: the safety technologies designed for big
+ships (AIS, satellite distress beacons, cellular tracking) are too expensive,
+too slow, or dependent on infrastructure that does not exist offshore. A
+promising alternative is to turn the Wi-Fi radio that every modern device
+already carries into an \emph{infrastructure-free proximity beacon}: smart
+buoys periodically broadcast short, location-aware frames that nearby vessels
+listen for. The open question is how such broadcast beaconing should behave so
+that it stays reliable, energy-frugal and \emph{aware} of the wider
+neighbourhood as the density of users changes.
+
+This thesis extends an event-driven simulator for IEEE~802.11 broadcast
+beaconing and uses it to study two design axes that the existing literature
+treats only in isolation: \emph{how often} a buoy should beacon, and \emph{how
+far} the awareness it produces should propagate. Along the first axis we
+introduce and evaluate \textbf{ACAB} (Adaptive Context-Aware Beaconing), a
+scheduler that blends three locally observable signals --- neighbour density,
+time since last contact, and node mobility --- into a single beacon-interval
+decision, and we compare it against fixed-interval static beaconing (SBP) and
+density-only adaptive beaconing (ADAB). Along the second axis we implement and
+contrast two awareness-propagation mechanisms: \textbf{append} mode, which
+piggybacks a hop-bounded neighbour list onto every beacon, and
+\textbf{forwarded} mode, which actively relays beacons under a novel
+density-aware forwarding gate that re-uses the scheduler's own back-off
+intensity to suppress redundant relays. The channel model is calibrated from
+over-water field measurements, mobility follows a Random-Waypoint model, and
+the population churns over time to mimic users entering and leaving the water.
+
+Across $30$ averaged runs per configuration, three buoy densities-per-interval
+and node counts from $20$ to $100$, the experiments establish three main
+results. First, \emph{context-aware adaptation pays for itself}: ACAB holds the
+collision rate below $0.5\%$ where static beaconing climbs past $14\%$, and it
+does so while transmitting up to $93\%$ fewer beacons than static and $62\%$
+fewer than ADAB, with \emph{no} loss --- indeed a small gain --- in
+per-receiver delivery ratio. Second, \emph{per-link reliability and
+network-level awareness must be measured separately}: under a realistic
+path-loss channel the per-receiver delivery ratio is bounded by propagation,
+not contention, so the true value of adaptation surfaces in collision rate,
+channel airtime and energy rather than in raw delivery. Third, and most
+surprisingly, \emph{cheap passive awareness beats expensive active flooding}:
+append mode discovers an equal or larger fraction of the network than forwarded
+mode while generating three-to-five times less traffic and up to an order of
+magnitude lower discovery latency. Together these findings argue that simple,
+purely local information --- and parsimony in using the channel --- is
+sufficient to build a scalable, infrastructure-free maritime safety beacon.
+
+\clearpage
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ================================================================
+\chapter{Introduction}
+\label{ch:intro}
+
+\section{Context and motivation}
+Coastal and near-shore waters concentrate two populations that are very hard to
+make mutually visible. On one side there are large craft --- motorboats, ferries,
+fishing vessels --- equipped with radar and the Automatic Identification System
+(AIS)~\cite{imo-ais}. On the other side there are people in the water and the
+small craft around them: swimmers, snorkelers, free-divers, paddlers and
+kayakers. The instruments that protect the first population were never designed
+to detect the second. AIS transponders are expensive, power-hungry and
+optional for small vessels; satellite distress beacons such as EPIRBs and
+PLBs~\cite{noaa-beacons} are meant for emergencies, not for the continuous,
+second-by-second awareness that collision avoidance requires; and smartphone
+tracking depends on cellular coverage that is unreliable a few hundred metres
+from shore. The result is a persistent \emph{proximity-detection gap}: the most
+vulnerable maritime users remain electronically silent to the craft most likely
+to injure them.
+
+Closing this gap calls for a technology that is simultaneously cheap,
+energy-efficient, short-range and free of any fixed infrastructure. Wi-Fi
+(IEEE~802.11~\cite{ieee80211}) is an attractive candidate precisely because it
+is already everywhere. A buoy built around a commodity Wi-Fi chipset can
+broadcast a small frame announcing ``I am here, at this position'' without
+associating to any access point, without an Internet connection, and without
+any central coordinator. A vessel needs only to listen. The hardware is a few
+tens of euros, the range over open water is on the order of a hundred metres,
+and the whole system degrades gracefully because there is nothing centralized
+to fail.
+
+\section{The scalability and awareness problem}
+Wi-Fi was not, however, designed for safety-critical broadcast. Its Distributed
+Coordination Function (DCF)~\cite{sharetechnote-dcf} arbitrates the medium with
+a fixed set of CSMA/CA parameters~\cite{csma-ca} that do not adapt to how many
+nodes are contending. Worse, \emph{broadcast} frames are never acknowledged: a
+sender gets no feedback, cannot detect a collision, and cannot fall back on the
+binary exponential back-off that rescues unicast traffic. As the number of
+buoys in radio range grows, the probability that two of them transmit at once
+grows with it, and beacons are silently lost. For a safety system this is the
+worst possible failure mode --- a lost beacon is an undetected swimmer.
+
+There is a second, less-discussed problem. A single beacon only tells a listener
+about its \emph{immediate} sender. Yet a vessel approaching a group of swimmers
+benefits enormously from knowing about the whole group, including members
+temporarily hidden behind a wave or another hull. Awareness, in other words,
+should propagate beyond one radio hop --- but every extra transmission spent
+propagating it competes for the same scarce, unacknowledged channel that the
+scalability problem is already straining. Beaconing frequency (\emph{how often}
+to talk) and awareness propagation (\emph{how far} to spread what is heard) are
+therefore not independent knobs: they draw on the same budget and must be
+designed together.
+
+\section{Contributions}
+This thesis treats the two problems jointly. Building on an existing
+discrete-event simulator for infrastructure-free Wi-Fi beaconing, it makes the
+following contributions.
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{A context-aware adaptive scheduler (ACAB).} We design and
+  implement a beaconing scheduler that fuses three locally observable signals
+  --- neighbour density, recency of the last received beacon, and the node's own
+  speed --- into one adaptive beacon interval, and we position it against a
+  fixed-interval baseline (SBP) and a density-only adaptive scheme (ADAB).
+  \item \textbf{Two multi-hop awareness mechanisms and a forwarding gate.} We
+  implement \emph{append} mode (passive piggybacking of a hop-bounded neighbour
+  list) and \emph{forwarded} mode (active relaying with a time-to-live), and we
+  introduce a density-aware forwarding gate that re-uses the scheduler's own
+  back-off intensity to suppress redundant relays before they ever contend.
+  \item \textbf{A richer, decoupled metric suite.} We separate
+  \emph{per-receiver delivery ratio} from \emph{network-level delivery ratio},
+  add \emph{network-discovery percentage} and \emph{reaction latency}, and use
+  them to show that the benefit of adaptation lives in channel load and
+  collisions rather than in raw per-link delivery under a path-loss channel.
+  \item \textbf{A grounded experimental study.} Using a field-calibrated
+  channel, Random-Waypoint mobility and a churning population, we run a large
+  averaged campaign ($30$ repetitions per point) and report results that are,
+  in places, counter-intuitive --- most notably that cheap passive awareness
+  outperforms expensive active flooding.
+\end{enumerate}
+
+\section{Research questions}
+The work is organized around four questions.
+\begin{description}[leftmargin=2em,style=nextline]
+  \item[RQ1] How does node density affect the reliability and the channel cost
+  of broadcast beaconing in an infrastructure-free network?
+  \item[RQ2] Can a context-aware scheduler that uses only local information
+  reduce channel load and collisions without sacrificing reliability, and how
+  does it compare to a density-only scheme?
+  \item[RQ3] What is the right way to propagate awareness beyond one hop ---
+  passive piggybacking or active relaying --- and at what cost?
+  \item[RQ4] Which performance metrics actually expose the value of adaptation
+  once a realistic path-loss channel is in play?
+\end{description}
+
+\section{Structure of the thesis}
+Chapter~\ref{ch:background} surveys maritime safety technology, the relevant
+802.11 MAC mechanics, beaconing strategies and the role of custom simulation.
+Chapter~\ref{ch:system} describes the ProSafe system and specifies the three
+schedulers (SBP, ADAB, ACAB) and the two awareness mechanisms together with the
+forwarding gate. Chapter~\ref{ch:simulator} details the simulator: its
+event-driven core, the buoy state machine, the Random-Waypoint mobility model,
+the calibrated channel, the interleaved transmission pipeline and the metric
+suite. Chapter~\ref{ch:results} presents and discusses the experimental
+results. Chapter~\ref{ch:conclusions} concludes and outlines future work.
+
+% ================================================================
+\chapter{Background and Related Work}
+\label{ch:background}
+
+This chapter provides the background needed to understand the problem and the
+proposed solutions. It reviews why existing maritime safety technologies do not
+fill the proximity-detection gap, recalls the parts of the IEEE~802.11 MAC layer
+that govern broadcast behaviour, surveys beaconing and awareness-propagation
+strategies, and motivates the use of a purpose-built simulator.
+
+\section{Maritime and coastal safety technologies}
+\subsection{Automatic Identification System (AIS)}
+AIS is a VHF transponder system mandated by the International Maritime
+Organization for ships above $300$ gross tonnage and for all passenger
+ships~\cite{imo-ais}. It periodically broadcasts a vessel's identity, position,
+course and speed so that equipped ships and shore stations can track one
+another. AIS is excellent for ship-to-ship awareness in open water, but for
+coastal proximity detection it has decisive drawbacks: transponders are
+expensive and power-hungry, they are not carried by recreational users, their
+use is licensed in many jurisdictions, and their update period (seconds to tens
+of seconds for moving vessels) targets large-vessel navigation rather than
+immediate short-range awareness.
+
+\subsection{Distress beacons and cellular tracking}
+EPIRBs and PLBs~\cite{noaa-beacons} transmit on $406$\,MHz to the
+Cospas--Sarsat satellite constellation when manually activated. They are
+life-saving in a genuine emergency but are unsuitable for routine awareness: a
+false activation is costly, the satellite relay adds minutes of delay, and the
+signal reaches rescue coordination centres rather than the nearby craft that
+could actually avoid a collision. Smartphone applications backed by GPS and
+cellular data can in principle warn of proximity, but they inherit the
+unreliability of cellular coverage offshore, depend on infrastructure and a
+data plan, and drain the battery quickly.
+
+\subsection{The gap}
+Every one of these technologies is either too expensive, infrastructure-bound,
+or aimed at a different problem than continuous short-range detection. The
+people most at risk --- those actually in the water --- stay invisible. The gap
+calls for a low-cost, infrastructure-free, energy-aware solution operating at
+ranges of tens to a couple of hundred metres.
+
+\section{Wi-Fi as an infrastructure-free beacon}
+Wi-Fi devices can either associate with an access point (infrastructure mode) or
+talk peer-to-peer (ad-hoc / IBSS mode~\cite{ipcisco-ibss}). For proximity
+detection neither is ideal as such; what matters is that a device can transmit
+\emph{broadcast} frames that any in-range receiver decodes without association.
+Re-purposing this capability, a buoy can emit a custom beacon carrying a device
+identifier, a GPS position, a role flag, a battery level and a short list of
+recently heard neighbours. The advantages are concrete: no access point is
+needed, the hardware is ubiquitous and cheap, and the $100$--$300$\,m range
+typical of $2.4$\,GHz operation matches the coastal use case. The challenges are
+equally concrete and motivate the rest of this thesis: broadcast does not
+scale gracefully, broadcast frames are unacknowledged, the distributed MAC
+collides under load, and the over-water channel is harsh.
+
+\section{IEEE 802.11 MAC fundamentals}
+\subsection{Distributed Coordination Function}
+The 802.11 MAC arbitrates the medium with the DCF~\cite{sharetechnote-dcf},
+built on Carrier-Sense Multiple Access with Collision Avoidance
+(CSMA/CA)~\cite{csma-ca}. Before transmitting, a node senses the channel; if it
+is busy the node defers. Once the channel has been idle for a DCF Interframe
+Space (DIFS), the node draws a random back-off counter from the contention
+window $[0,CW-1]$ and decrements it slot by slot while the channel stays idle,
+freezing the counter whenever the channel becomes busy and resuming when it
+clears. When the counter reaches zero the node transmits.
+
+\subsection{Contention window and the broadcast handicap}
+For unicast traffic a receiver returns an acknowledgement; a missing ACK is read
+as a collision and triggers a doubling of the contention window (binary
+exponential back-off). \emph{Broadcast} traffic has no ACK. Consequently the
+sender has no collision feedback, the contention window cannot grow in response
+to load, and collisions become silent losses. In the system studied here the
+contention window is therefore held fixed at $CW=16$ and reliability must be
+defended by other means --- chiefly by controlling \emph{how often} nodes
+choose to transmit.
+
+\subsection{The hidden-terminal problem}
+Two senders out of range of each other but both in range of a common receiver
+can transmit simultaneously and collide at that receiver~\cite{tobagi-hidden}.
+Unicast Wi-Fi mitigates this with the RTS/CTS handshake, which is unavailable to
+broadcast. Hidden terminals are therefore a first-class source of loss in
+broadcast beaconing and must be modelled faithfully (Section~\ref{sec:collmodel}).
+
+\section{Beaconing strategies}
+\subsection{Static beaconing}
+The simplest scheme transmits at a fixed period regardless of conditions. It is
+trivial to implement and analyze, but its channel load grows linearly with the
+number of nodes; in dense scenarios it collides heavily, and in sparse ones it
+wastes energy.
+
+\subsection{Adaptive beaconing}
+Adaptive schemes tune the transmission rate to local conditions. The literature,
+mostly from vehicular and mobile ad-hoc networks, proposes density-based
+adaptation that backs off as neighbours multiply~\cite{takai-dvcs}, mobility-based
+adaptation keyed to relative velocity~\cite{alotaibi-adaptive}, and context-aware
+adaptation that weighs several factors at once~\cite{sommer-adaptive}. Surveys of
+beacon scheduling for device discovery confirm that adaptation can substantially
+improve efficiency~\cite{chen-survey}, and VANET studies show reliability gains
+from topology- and channel-aware interval control~\cite{zhao-vanet}. Most of
+these designs, however, assume bidirectional links, coordinated access or IP-level
+routing. The maritime setting forbids all three: communication is one-way
+broadcast, there is no coordination, and there is no routing layer.
+
+\subsection{Awareness beyond one hop}
+Extending awareness past direct neighbours is classically achieved either by
+\emph{piggybacking} digested neighbour information onto ordinary beacons or by
+\emph{flooding} --- relaying received frames outward under a hop limit. Flooding
+maximizes reach but is notorious for the ``broadcast storm''~\cite{broadcaststorm}:
+in dense networks redundant rebroadcasts collide and congest the medium.
+Piggybacking is cheaper but bounded in how far and how freshly it can carry
+information. Which mechanism wins in a dense, unacknowledged, single-domain
+broadcast network is exactly one of the questions this thesis answers
+empirically.
+
+\section{Simulation in wireless research}
+Physical experiments with hundreds of nodes are expensive, hard to control and
+nearly impossible to reproduce, and offshore deployments compound every
+difficulty. Simulation is the standard alternative. General-purpose simulators
+such as ns-3~\cite{nsnam} and OMNeT++~\cite{omnetpp} ship broad protocol stacks
+but carry a steep learning curve and significant overhead when a study targets
+one narrow mechanism. For focused MAC-layer questions a \emph{custom} simulator
+is often preferable: it contains only what the research question needs, gives
+full control over every model, and yields a compact, reproducible codebase ---
+at the price of requiring careful validation, which here is provided by
+field-calibrating the channel.
+
+\section{Gap in the literature}
+Wi-Fi proximity sensing has been studied indoors and in cities~\cite{goel-wifi};
+maritime communication has focused on long range; adaptive beaconing has been
+explored for vehicles. No prior work combines the specific constraints of
+coastal proximity detection --- infrastructure-free operation, one-way
+unacknowledged broadcast, energy-constrained wearable nodes, and a need for
+reliable short-range \emph{and} multi-hop awareness in a churning, mobile
+population --- nor does it jointly tune beaconing rate and awareness propagation
+under those constraints. That joint treatment is the gap this thesis addresses.
+
+% ================================================================
+\chapter{The ProSafe System and Beaconing Protocols}
+\label{ch:system}
+
+\section{System overview}
+ProSafe (Proximity-based Safety) is a minimalist, Wi-Fi-based safety network in
+which \emph{smart buoys} broadcast periodic, location-aware beacons so that
+vessels can detect people in the water. It runs entirely within a local ad-hoc
+802.11 domain: alerts are produced and consumed locally, with no access point,
+no router and no Internet. The design follows five principles --- it is
+infrastructure-free, it uses pure MAC-layer broadcast (no IP), vessels detect
+passively without transmitting, the hardware is low-cost commodity Wi-Fi, and
+the battery-powered buoys must be energy-frugal.
+
+\subsection{Components}
+A \emph{smart user buoy} is a floating device carried by a person in the water.
+It integrates a single-board computer with a Wi-Fi radio (e.g.\ a Raspberry
+Pi~\cite{raspberrypi}), a GPS module, an inertial unit, a battery and a
+waterproof enclosure. Its single radio both transmits its own beacons and
+listens for those of others. A \emph{vessel safety unit} is installed on a boat
+and listens only; when it hears a buoy above a configurable signal-strength
+threshold it raises an audible and visual alert and can plot detected buoys on a
+map. Because each beacon also carries the sender's recent neighbour list, the
+vessel can infer the presence of buoys it has not heard directly.
+
+\section{Communication model}
+\subsection{Beacon frame}
+Beacons are short broadcast frames sent to the broadcast address. The on-air
+payload modelled in the simulator (class \texttt{Beacon}) is:
+\begin{itemize}[leftmargin=1.4em,nosep]
+  \item \textbf{sender id} --- a $16$-byte UUID;
+  \item \textbf{mobile flag} --- $1$ byte;
+  \item \textbf{position} --- $8$ bytes;
+  \item \textbf{timestamp} --- $4$ bytes;
+  \item \textbf{neighbour list} --- $28$ bytes per entry (UUID $+$ timestamp $+$
+  position); the per-entry hop distance is bookkeeping and is \emph{not} counted
+  on air;
+  \item \textbf{origin id} and \textbf{hop limit} --- $16+4$ bytes, present only
+  in forwarded mode.
+\end{itemize}
+The base frame is therefore $33$ bytes and grows by $28$ bytes per advertised
+neighbour, so beacon size is itself a function of local density --- a fact that
+matters when comparing append against forwarded mode.
+
+\subsection{MAC operation and topology}
+Channel access is standard DCF: sense, wait DIFS ($\SI{50}{\micro\second}$ in
+the model), draw a back-off from $[0,CW-1]$ with $CW=16$ and
+$\text{slot}=\SI{20}{\micro\second}$, then transmit. No RTS/CTS and no ACK are
+used. Buoys form a pure peer-to-peer ad-hoc domain with no persistent
+associations; nodes enter and leave range continuously because of currents,
+waves and mobility, so each node keeps only a soft-state neighbour table that
+expires stale entries.
+
+\section{Scheduler 1: Static Beaconing Protocol (SBP)}
+SBP is the baseline. Each buoy transmits every $BI_{\text{static}}$ seconds
+irrespective of conditions, listens continuously, refreshes its neighbour table
+on every reception, and expires entries older than a timeout. SBP is simple and
+predictable but, as Chapter~\ref{ch:results} shows, its channel load and
+collision rate grow with density.
+
+\section{Scheduler 2: Adaptive Density-Aware Beaconing (ADAB)}
+ADAB regulates the beacon interval using a single local quantity: the number of
+neighbours $N_t$ currently in the table. It maps the count to a normalized
+density factor
+\begin{equation}
+  f_t = \min\!\left(1,\; \frac{N_t}{\nthr}\right),
+\end{equation}
+and expands the interval quadratically between bounds, with a small
+multiplicative jitter $\epsilon_t\sim\mathcal{U}[-\eta,\eta]$, $\eta=0.05$, to
+desynchronize nodes:
+\begin{equation}
+  BI_{t+1} = \Big[\,\bimin + f_t^{\,2}\,(\bimax-\bimin)\,\Big]\,(1+\epsilon_t),
+  \qquad BI_{t+1}\in[\bimin,\bimax].
+  \label{eq:adab}
+\end{equation}
+With few neighbours $f_t\approx 0$ and the buoy beacons near $\bimin$ for fast
+discovery; as $N_t\to\nthr$ the quadratic term drives the interval toward
+$\bimax$, throttling transmissions where contention is highest. In the
+implementation $\nthr=15$. ADAB changes only \emph{when} beacons are generated;
+the underlying CSMA/CA is untouched.
+
+\section{Scheduler 3: Adaptive Context-Aware Beaconing (ACAB)}
+\label{sec:acab}
+ADAB reacts to density alone. But density is not the only locally observable
+predictor of whether a beacon is worth sending. ACAB, the scheduler introduced
+in this thesis, blends three signals.
+
+\paragraph{Density score.} As in ADAB, a normalized neighbour count
+\begin{equation}
+  s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
+  \qquad \nthr^{\mathrm{ACAB}} = 10 .
+\end{equation}
+
+\paragraph{Contact-recency score.} If the buoy has heard \emph{someone} recently
+there is less urgency to advertise itself; if it has been silent for a while it
+should speak up. With $\Delta = t - t_{\text{last contact}}$ and a recency
+horizon $\tau_c = \SI{20}{\second}$,
+\begin{equation}
+  s_{\mathrm{con}} =
+  \begin{cases}
+    \max\!\big(0,\; 1 - \Delta/\tau_c\big) & N_t>0 \text{ and contact seen},\\
+    0 & \text{otherwise.}
+  \end{cases}
+\end{equation}
+A recently-contacted node yields $s_{\mathrm{con}}\to 1$ (throttle); a long-silent
+or isolated node yields $0$ (beacon aggressively).
+
+\paragraph{Mobility score.} A fast-moving node changes the picture quickly and
+should refresh its position more often. With speed $v=\lVert\mathbf{v}\rVert$ and
+a reference velocity $v_{\text{ref}}$,
+\begin{equation}
+  s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
+\end{equation}
+
+\paragraph{Blend and mapping.} The three are combined with weights
+$(w_d,w_c,w_m)=(0.4,0.3,0.3)$ that sum to one, noting that mobility \emph{lowers}
+the back-off (hence $1-s_{\mathrm{mob}}$):
+\begin{equation}
+  s = w_d\,s_{\mathrm{den}} + w_c\,s_{\mathrm{con}} + w_m\,(1 - s_{\mathrm{mob}}).
+  \label{eq:acab-blend}
+\end{equation}
+The blended score is then fed through the same quadratic interval map and jitter
+as ADAB (Eq.~\ref{eq:adab}) with $f_t\equiv s$. ACAB thus throttles a buoy that
+is simultaneously dense, recently-contacted and slow --- exactly the situation in
+which one more beacon adds the least value --- while keeping an isolated,
+silent or fast buoy talkative. Algorithm~\ref{alg:interval} gives the unified
+interval computation; the scheduler type selects which score drives $f_t$.
+
+\begin{algorithm}[t]
+\caption{Adaptive interval computation (shared by ADAB and ACAB)}
+\label{alg:interval}
+\begin{algorithmic}[1]
+\Function{ComputeInterval}{$\mathbf{v}, N_t, t_{\text{last}}, t$}
+  \If{scheduler $=$ \textsc{adab}}
+     \State $s \gets \min(1, N_t / \nthr^{\mathrm{ADAB}})$
+  \ElsIf{scheduler $=$ \textsc{acab}}
+     \State $s_{\mathrm{den}} \gets \min(1, N_t / \nthr^{\mathrm{ACAB}})$
+     \State $s_{\mathrm{con}} \gets (N_t>0 \wedge t_{\text{last}}\!\neq\!\mathrm{nil})\,?\,\max(0,1-(t-t_{\text{last}})/\tau_c) : 0$
+     \State $s_{\mathrm{mob}} \gets \min(1, \lVert\mathbf{v}\rVert / v_{\text{ref}})$
+     \State $s \gets w_d s_{\mathrm{den}} + w_c s_{\mathrm{con}} + w_m (1-s_{\mathrm{mob}})$
+  \EndIf
+  \State $f \gets s^2$ \Comment{quadratic back-off}
+  \State $BI \gets \bimin + f\,(\bimax-\bimin)$
+  \State $BI \gets BI \cdot (1 + \mathcal{U}[-\eta,\eta])$ \Comment{anti-sync jitter}
+  \State \Return $\mathrm{clamp}(BI, \bimin, \bimax)$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\section{Multi-hop awareness}
+\label{sec:multihop}
+A beacon natively conveys one-hop awareness. ProSafe supports two ways to extend
+it, selectable per run.
+
+\subsection{Append mode (passive)}
+In append mode a buoy includes, in every beacon, the nodes it has learned about
+--- both its direct neighbours (hop distance $1$) and nodes discovered
+indirectly through others' neighbour lists. On reception a buoy folds the
+sender's advertised list into a \emph{discovered-nodes} table, incrementing each
+entry's hop distance by one and dropping anything beyond an
+\emph{append hop limit} (so information cannot circulate indefinitely). No extra
+frame is ever sent: awareness rides for free on beacons that would be
+transmitted anyway. The cost is purely in beacon \emph{size} --- $28$ bytes per
+advertised node --- and hence in airtime per frame.
+
+\subsection{Forwarded mode (active) and the forwarding gate}
+In forwarded mode a buoy actively re-broadcasts beacons it receives. Each beacon
+carries an \emph{origin id} and a \emph{hop limit} (TTL). On receiving a beacon
+whose origin is not itself and whose TTL is positive, a buoy may relay a copy
+with the TTL decremented; the origin, timestamp and payload are preserved so
+duplicates can be detected and a node never re-forwards its own beacon. Relays
+are paced through the same CSMA pipeline as ordinary beacons, after a small
+random jitter that desynchronizes the many receivers of one frame.
+
+Left unchecked, this is a broadcast storm waiting to happen. The thesis
+introduces a \textbf{density-aware forwarding gate} that decides, once, at
+enqueue time, whether a received beacon is worth relaying at all:
+\begin{equation}
+  P_{\text{fwd}} =
+  \begin{cases}
+    1 & N \le n_0,\\[2pt]
+    \dfrac{n_0}{N}\cdot \max\!\big(0.3,\;1-f_q\big) & N > n_0,
+  \end{cases}
+  \label{eq:fwdgate}
+\end{equation}
+where $N$ is the relay's neighbour count, $n_0$ is a baseline expected number of
+forwarders per cascade, and $f_q$ is \emph{the squared back-off score the
+scheduler last computed} (line~10 of Algorithm~\ref{alg:interval}). The first
+factor $n_0/N$ thins relays in dense neighbourhoods so that, in expectation,
+only $\approx n_0$ of the $N$ candidates rebroadcast. The second factor is the
+novel coupling: a buoy that is \emph{already} throttling its own beacons because
+it sits in a busy, stable neighbourhood ($f_q$ large) further reduces its
+willingness to relay, down to a floor of $0.3$. The same local signal that
+governs ``how often I talk'' is thus re-used to govern ``how much I relay,''
+with no new state. Suppressed beacons are recorded as seen (so later copies are
+deduplicated) but never consume a contention.
+
+\section{Energy model}
+\label{sec:energy}
+The dominant energy cost is radio transmission, so a buoy's hourly transmission
+energy scales with its beacon rate $r$ and the per-beacon airtime
+$t_{\text{air}}$. For a $500$-byte beacon at $1$\,Mbps the airtime is dominated
+by the $\SI{4}{\milli\second}$ payload, giving roughly $E_{\text{beacon}}\approx
+\SI{4.4}{\milli\joule}$ at a $\sim\!1$\,W transmit draw and therefore
+\begin{equation}
+  E_{\text{h}} = 3600\cdot r\cdot E_{\text{beacon}}.
+\end{equation}
+Because every adaptive decision lowers $r$ (ADAB, ACAB) or suppresses a relay
+(the forwarding gate), the transmission-count metric reported in
+Chapter~\ref{ch:results} is, to first order, a direct proxy for energy: halving
+the beacons halves the transmission energy. ACAB's aggressive throttling and the
+forwarding gate's relay suppression are, in this sense, primarily
+\emph{energy} mechanisms whose reliability is shown to be preserved rather than
+sacrificed.
+
+% ================================================================
+\chapter{Simulator Design and Implementation}
+\label{ch:simulator}
+
+\section{Why a custom simulator}
+General-purpose simulators would force this study to navigate large protocol
+stacks irrelevant to a single MAC-layer question. A custom, discrete-event
+simulator instead contains exactly the buoy behaviour, channel model, beaconing
+logic and metrics the work needs; it is small enough to read in full, easy to
+extend with a new scheduler or awareness mode, and reproducible because every
+parameter is externalized. The simulator is written in Python~\cite{python} and
+organized into focused modules: \texttt{simulator.py} (engine and event queue),
+\texttt{events.py}, \texttt{channel.py}, \texttt{buoy.py}, \texttt{beacon.py},
+\texttt{scheduler.py}, \texttt{metrics.py} and \texttt{config\_handler.py}.
+
+\section{Event-driven core}
+The engine advances by popping events from a time-ordered priority queue
+implemented with Python's \texttt{heapq}~\cite{heapq}. Each event carries its
+firing time, a type, a target object (a buoy, the channel or the simulator) and
+an optional payload. A monotone counter breaks ties so that events with equal
+timestamps fire in insertion order, making runs deterministic for a fixed seed.
+The event types span the protocol's full lifecycle: \texttt{SCHEDULER\_CHECK},
+\texttt{CHANNEL\_SENSE}, \texttt{DIFS\_COMPLETION}, \texttt{BACKOFF\_COMPLETION},
+\texttt{TRANSMISSION\_START}, \texttt{TRANSMISSION\_END}, \texttt{RECEPTION},
+\texttt{NEIGHBOR\_CLEANUP}, \texttt{BUOY\_MOVEMENT}, \texttt{BUOY\_ARRAY\_UPDATE}
+and \texttt{AVG\_NEIGHBORS\_CALCULATION}. Recurring events scheduled before a
+buoy is deactivated are invalidated by a per-buoy generation counter, giving
+cheap lazy cancellation when the population churns.
+
+\section{The buoy: state and state machine}
+Each buoy holds a UUID, a position, a mobility flag and velocity, a battery
+level, a soft-state neighbour table, a scheduler instance, and the bookkeeping
+for whichever awareness mode is active (a discovered-nodes table for append, a
+pending-forward queue and a seen-origins map for forwarded). Its transmission
+behaviour follows the DCF state machine in Figure~\ref{fig:fsm-desc}:
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\textwidth}{\small
+\textsc{receiving} $\xrightarrow{\text{scheduler decides to send}}$
+\textsc{channel\_sense}:
+if busy, re-sense when the medium clears;
+if idle $\rightarrow$ \textsc{waiting\_difs} (wait DIFS).
+\textsc{difs\_completion}: if still idle, draw a back-off and enter
+\textsc{backoff}; if busy, return to sensing.
+\textsc{backoff}: count down; if the channel goes busy, re-enter the full
+sense--DIFS--back-off chain rather than transmitting blind.
+\textsc{backoff\_completion} $\rightarrow$ \textsc{transmission\_start}: broadcast
+one frame, then return to \textsc{receiving}.
+}}
+\caption{Textual rendering of the buoy CSMA/CA transmission state machine. The
+back-off counter freezes whenever the channel becomes busy and the chain
+restarts, faithfully reproducing 802.11 deferral.}
+\label{fig:fsm-desc}
+\end{figure}
+
+\subsection{Interleaved transmission pipeline}
+A buoy must serve two kinds of traffic: its \emph{own} scheduled beacons and, in
+forwarded mode, \emph{relayed} beacons. The implementation uses a single CSMA
+pipeline guarded by a \texttt{processing} lock, with a strict priority rule:
+when a contention is won, an own beacon is sent if one is due, otherwise a single
+queued relay is sent; if anything remains the pipeline immediately re-enters
+contention. This guarantees that relay traffic can never starve a buoy's own
+safety advertisement, while still draining the forward queue one frame per
+contention so that relaying is paced rather than bursty. The scheduler decision
+is recorded even while a relay pipeline is draining, so an own beacon is never
+missed.
+
+\section{Mobility: Random Waypoint}
+Earlier work modelled mobility as straight-line motion with boundary reflection.
+This thesis adopts the more realistic Random-Waypoint (RWP) model. A mobile buoy
+picks a uniformly random waypoint in the arena and a speed drawn uniformly from
+$[v_{\min},v_{\max}]$, advances toward the waypoint in fixed time steps, and on
+arrival pauses for a uniform random time before choosing a new waypoint and
+speed. RWP produces the start-stop, direction-changing tracks typical of people
+moving in water far better than constant-velocity bouncing, and --- importantly
+for ACAB --- it produces a realistic distribution of instantaneous speeds for
+the mobility score of Eq.~\ref{eq:acab-blend}. A configurable fraction of buoys
+(here $40\%$) is mobile; the rest are anchored.
+
+\section{Channel model}
+\label{sec:collmodel}
+\subsection{Range-based probabilistic reception}
+When a buoy broadcasts, the channel finds every active in-range receiver and
+schedules a \texttt{RECEPTION} for each. Reception is probabilistic and
+calibrated from over-water field measurements: with $d$ the sender--receiver
+distance,
+\begin{equation}
+  P_{\text{rx}}(d) =
+  \begin{cases}
+    0.9 & d \le \SI{70}{\metre} \quad(\text{high-probability zone}),\\
+    0.15 & \SI{70}{\metre} < d \le \SI{80}{\metre},\\
+    0 & d > \SI{80}{\metre}.
+  \end{cases}
+\end{equation}
+Accepted receptions are delayed by the propagation time $d/c$. An \emph{ideal}
+channel mode ($P_{\text{rx}}=1$ within range) is also available to isolate MAC
+collisions from path loss. This path-loss structure is decisive for interpreting
+the results: because even a collision-free link delivers with probability well
+below one, per-receiver delivery ratio is bounded by propagation, and the
+benefit of scheduling surfaces elsewhere (Chapter~\ref{ch:results}).
+
+\subsection{Collision and hidden-terminal modelling}
+The channel tracks active transmissions as (beacon, start, end) tuples. A new
+transmission collides with an existing one at a receiver $R$ when their time
+windows overlap \emph{and} $R$ lies within range of the other sender, or when
+the two senders are themselves in range. Crucially, a receiver in range of an
+already-active sender loses the new frame even if the two senders cannot hear
+each other --- this is precisely the hidden-terminal case, modelled directly.
+When a later transmission collides with an earlier one at a receiver that had
+already been scheduled to receive the earlier frame, that earlier reception is
+\emph{revoked} (``poisoned''), reproducing the corruption a real radio would
+see. Carrier sensing is modelled with a propagating wavefront: a position senses
+the medium busy only once a transmission's signal, travelling at $c$, has
+actually reached it and before it has passed.
+
+\section{Metric suite}
+The metrics module records, per run, a set of indicators that --- unlike a single
+delivery number --- separate the distinct effects of scheduling and awareness
+propagation.
+
+\begin{description}[leftmargin=1.6em,style=nextline]
+  \item[Per-receiver delivery ratio (PDR)] $=\dfrac{\text{actually received}}{\text{potentially sent}}$,
+  counted at the granularity of (transmission $\times$ in-range receiver). It
+  measures \emph{link-level} reliability and is sensitive to both collisions and
+  path loss.
+  \item[Network delivery ratio] $=\dfrac{\text{unique beacons received}}{\text{originated beacons}}$,
+  counting each generated beacon once, the first time it reaches anyone, and
+  \emph{excluding} forwarded copies from the denominator so the figure is
+  comparable across modes. It measures whether a node's information reaches the
+  network at all.
+  \item[Collision rate] $=\dfrac{\text{collided receptions}}{\text{potentially sent}}$,
+  a direct read-out of MAC contention.
+  \item[Network-discovery percentage] --- the average fraction of all other nodes
+  that a buoy has discovered (directly or via multi-hop awareness), the headline
+  \emph{awareness} metric.
+  \item[Reaction latency] --- the time between a beacon's generation and the first
+  moment its origin is discovered by a given receiver; the safety-relevant
+  ``time to first detection.''
+  \item[Channel load] --- beacons sent (and, separately, forwards sent), the
+  airtime/energy proxy of the energy model.
+\end{description}
+
+\section{Dynamic population (churn)}
+To mimic users entering and leaving the water, the population churns. After an
+initial settling delay, at random $15$--$20$\,s intervals the simulator either
+removes up to a fixed fraction of the active buoys (respecting a floor of
+$\max(3,\,0.2\,N_{\text{total}})$) or activates some currently-inactive ones (up
+to the total). Newly activated buoys have their recurring events rescheduled.
+This keeps density genuinely time-varying within a run, exercising each
+scheduler's responsiveness rather than testing it only at a static operating
+point.
+
+\section{Configuration and reproducibility}
+Every parameter --- world size, densities, intervals, channel calibration, CSMA
+timings, scheduler thresholds and weights, multihop mode and limits --- lives in
+a single YAML file read by a singleton \texttt{ConfigHandler}. A master seed is
+derived once per batch and every individual simulation receives its own derived,
+reproducible seed, so an entire campaign can be replayed bit-for-bit. The batch
+runner sweeps densities, intervals and multihop modes in parallel, and a
+companion script averages repeated runs and emits the plots used in the next
+chapter.
+
+% ================================================================
+\chapter{Experimental Results}
+\label{ch:results}
+
+\section{Experimental setup}
+All results below come from the field-calibrated probabilistic channel in a
+$\SI{500}{\metre}\times\SI{500}{\metre}$ arena with a maximum range of
+$\SI{80}{\metre}$. Each configuration was simulated for $\SI{60}{\second}$ and
+repeated $30$ times with independent seeds; every reported point is the mean of
+those $30$ runs and error bars, where shown, are $\pm1$ standard deviation. Node
+counts ("density") range from $20$ to $100$ in steps of $20$; $40\%$ of nodes
+are mobile under Random Waypoint; the population churns throughout each run. The
+three schedulers (SBP, ADAB, ACAB) are evaluated under both awareness modes
+(append, forwarded) and three beacon \emph{minimum} intervals
+($0.25$, $0.5$, $1.0$\,s; for SBP this is the fixed interval). Unless stated
+otherwise, plots use the $\SI{0.25}{\second}$ interval, where contention is
+highest and differences are clearest. The CSMA parameters are
+$CW=16$, $\text{DIFS}=\SI{50}{\micro\second}$,
+$\text{slot}=\SI{20}{\micro\second}$, with no RTS/CTS or ACK.
+
+Table~\ref{tab:headline} gives the scheduler comparison under append mode at the
+$\SI{0.25}{\second}$ interval, which anchors the discussion that follows.
+
+\begin{table}[t]
+\centering
+\caption{Scheduler comparison under \textbf{append} mode, $\SI{0.25}{\second}$
+interval, averaged over $30$ runs. PDR is per-receiver delivery ratio; Net.\
+disc.\ is the average percentage of the network each buoy discovers; "Sent" is
+the channel-load / energy proxy.}
+\label{tab:headline}
+\begin{tabular}{lrrrrrr}
+\toprule
+Scheduler & Density & PDR & Net.\ deliv. & Coll.\ rate & Sent & Net.\ disc.\ (\%) \\
+\midrule
+SBP   & 20  & 0.723 & 0.681 & 0.0093 & 4\,622  & 53.9 \\
+SBP   & 100 & 0.621 & 0.977 & 0.1429 & 23\,290 & 72.6 \\
+ADAB  & 20  & 0.715 & 0.589 & 0.0021 & 2\,475  & 51.7 \\
+ADAB  & 100 & 0.715 & 0.958 & 0.0105 & 4\,160  & 64.5 \\
+ACAB  & 20  & 0.696 & 0.475 & 0.0010 & 751     & 45.0 \\
+ACAB  & 100 & 0.726 & 0.971 & 0.0047 & 1\,578  & 59.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{RQ1 \& RQ2: density, reliability and the cost of beaconing}
+\subsection{Collisions: static degrades, adaptation stays flat}
+Figure~\ref{fig:sched-collision} is the clearest single result. As density
+climbs from $20$ to $100$ nodes the static scheduler's collision rate rises
+super-linearly from under $1\%$ to $14.3\%$, tracking the growth in average
+neighbours. Both adaptive schedulers flatten the curve almost completely: ADAB
+stays at or below $1.1\%$ and ACAB below $0.5\%$ across the entire range. At the
+densest operating point ACAB's collision rate is roughly $30\times$ lower than
+static's and ADAB's is $14\times$ lower. This directly answers RQ1 (density
+sharply degrades unmanaged broadcast) and the reliability half of RQ2
+(local adaptation contains contention).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/sched_collision_append.pdf}
+\caption{Collision rate versus density (append mode, $\SI{0.25}{\second}$
+interval). Static beaconing degrades super-linearly with the neighbour count
+(dotted, right axis); ADAB and ACAB stay nearly flat. Error bars are $\pm1$
+standard deviation over $30$ runs.}
+\label{fig:sched-collision}
+\end{figure}
+
+\subsection{Channel load and energy: the ACAB advantage}
+The price static pays for its collisions is a transmission count that grows
+without restraint. Figure~\ref{fig:sched-sent} (log scale) shows static sending
+$23\,290$ beacons at density $100$ while ADAB sends $4\,160$ and ACAB only
+$1\,578$ --- reductions of $82\%$ and $93\%$ respectively. Because transmission
+count is a direct energy proxy (Section~\ref{sec:energy}), ACAB roughly \emph{decuples}
+battery life relative to static at high density, and still nearly halves ADAB's
+energy. The mechanism is exactly the one designed in Section~\ref{sec:acab}:
+most buoys here are stationary ($60\%$) and, once a neighbourhood forms, recently
+contacted, so ACAB's contact and mobility terms drive the interval toward
+$\bimax$ far more decisively than ADAB's density term alone --- which, with an
+average neighbour count that peaks near $7.7$ against a threshold of $10$--$15$,
+never fully saturates.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/sched_sent_append.pdf}
+\caption{Beacon transmissions versus density (append mode, $\SI{0.25}{\second}$
+interval, log scale). ACAB transmits up to $93\%$ fewer beacons than static and
+$62\%$ fewer than ADAB.}
+\label{fig:sched-sent}
+\end{figure}
+
+\subsection{Reliability is preserved, not traded away}
+A natural worry is that throttling so hard must cost reliability. It does not.
+Figure~\ref{fig:sched-pdr} shows per-receiver PDR. Static's PDR \emph{falls} from
+$0.72$ to $0.62$ as its collisions mount, whereas ACAB holds a flat
+$\approx0.72$ across all densities --- ending up \emph{above} static by more than
+ten points despite a fraction of the transmissions. The network delivery ratio
+(Figure~\ref{fig:sched-deliv}) tells a complementary story: it rises with density
+for every scheduler (more originators, more chances to be heard) and all three
+converge above $0.95$ at high density, confirming that the throttled schedulers
+still get each node's information out to the network. ACAB therefore does not
+buy energy with reliability; it buys energy with \emph{redundancy} it did not
+need.
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/sched_pdr_append.pdf}
+\caption{Per-receiver PDR}
+\label{fig:sched-pdr}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/sched_deliv_append.pdf}
+\caption{Network delivery ratio}
+\label{fig:sched-deliv}
+\end{subfigure}
+\caption{Reliability under append mode at $\SI{0.25}{\second}$. Static's PDR
+degrades with contention while the adaptive schedulers hold flat; network
+delivery ratio rises with density and converges for all three.}
+\label{fig:sched-reliability}
+\end{figure}
+
+\section{RQ4: per-link reliability versus network awareness}
+The PDR and delivery-ratio curves together justify the metric refinement of
+RQ4. Under the realistic path-loss channel, a collision-free link still delivers
+with probability $0.9$ (near) or $0.15$ (far), so PDR is \emph{capped by
+propagation}: a single delivery number conflates two very different effects.
+Reporting PDR alone would have hidden ACAB's advantage --- its PDR is barely
+distinguishable from ADAB's --- while reporting only network delivery ratio would
+have hidden static's collision penalty, which the delivery ratio (a per-origin,
+first-arrival measure) largely absorbs. Only by separating per-receiver PDR,
+network delivery ratio, collision rate and channel load does the real trade-off
+become legible: \emph{adaptation's value at this scale is overwhelmingly in
+collisions and energy, not in raw delivery}. This is a methodological correction
+to the common practice of summarizing broadcast reliability with one ratio.
+
+\section{RQ3: passive append versus active forwarding}
+We now fix the scheduler and vary the awareness mechanism.
+Table~\ref{tab:modes} contrasts append and forwarded at density $100$.
+
+\begin{table}[t]
+\centering
+\caption{Append versus forwarded awareness at density $100$,
+$\SI{0.25}{\second}$ interval. Forwarded mode multiplies channel load and
+latency without improving --- in fact slightly reducing --- network discovery.}
+\label{tab:modes}
+\begin{tabular}{llrrrrr}
+\toprule
+Scheduler & Mode & PDR & Sent & Forwards & Coll.\ rate & Net.\ disc.\ (\%) \\
+\midrule
+SBP  & append    & 0.621 & 23\,290 & 0      & 0.1429 & 72.6 \\
+SBP  & forwarded & 0.572 & 80\,431 & 57\,123 & 0.2213 & 70.2 \\
+ADAB & append    & 0.715 & 4\,160  & 0      & 0.0105 & 64.5 \\
+ADAB & forwarded & 0.713 & 11\,198 & 7\,649  & 0.0298 & 61.4 \\
+ACAB & append    & 0.726 & 1\,578  & 0      & 0.0047 & 59.3 \\
+ACAB & forwarded & 0.716 & 4\,359  & 2\,978  & 0.0242 & 59.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The result is consistent and, at first glance, counter-intuitive: \emph{active
+relaying is the worse mechanism here on every axis that matters.}
+Figure~\ref{fig:mode-sent} shows forwarded mode generating $3$--$3.5\times$ the
+traffic of append (for static, $80\,431$ frames against $23\,290$, of which
+$57\,123$ are relays). That extra traffic does not buy awareness:
+Figure~\ref{fig:mode-netdisc} shows append discovering an \emph{equal or larger}
+fraction of the network than forwarded for both schedulers, because append's
+neighbour-list piggybacking carries multi-hop information with zero extra frames
+while forwarded's relays mostly duplicate and collide. The collision rate
+(Figure~\ref{fig:mode-collision}) is far higher under forwarding, and the
+reaction latency (Figure~\ref{fig:mode-reaction}) is several-fold worse --- a
+factor of about $5\times$ at the densest point ($\approx\!25$\,ms for
+static-forwarded against $\approx\!5$\,ms for static-append) and rising to
+$\approx\!16\times$ in the sparsest settings --- because relays sit in queues and
+wait out extra contention and jitter. For a
+single-domain, dense broadcast network the verdict on RQ3 is unambiguous:
+\emph{prefer cheap passive piggybacking; active flooding is counter-productive.}
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/mode_sent.pdf}
+\caption{Channel load (log scale)}
+\label{fig:mode-sent}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/mode_netdisc.pdf}
+\caption{Network discovered}
+\label{fig:mode-netdisc}
+\end{subfigure}
+
+\vspace{0.6em}
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/mode_collision.pdf}
+\caption{Collision rate}
+\label{fig:mode-collision}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/mode_reaction.pdf}
+\caption{Reaction latency}
+\label{fig:mode-reaction}
+\end{subfigure}
+\caption{Append (solid) versus forwarded (dashed) at $\SI{0.25}{\second}$.
+Forwarding multiplies channel load, collisions and latency while failing to
+improve --- even slightly reducing --- the fraction of the network discovered.}
+\label{fig:modes}
+\end{figure}
+
+\subsection{The forwarding gate's effect}
+Even though forwarding loses here, the density-aware gate of
+Eq.~\ref{eq:fwdgate} makes it lose far less badly. Comparing relay counts at
+density $100$: static forwarding emits $57\,123$ relays, but pairing forwarding
+with ADAB cuts that to $7\,649$ and with ACAB to $2\,978$ --- an $87$--$95\%$
+reduction. Part of this is the schedulers originating fewer beacons to begin
+with, but the back-off-coupled factor $\max(0.3,1-f_q)$ in the gate compounds it:
+a buoy already convinced (by density, recency and stillness) that it should stay
+quiet also declines to relay. The gate thus turns forwarding from a guaranteed
+broadcast storm into a merely expensive option, and it demonstrates a reusable
+idea --- \emph{one local congestion signal can govern both origination and
+relaying.}
+
+\subsection{The value of multi-hop awareness, quantified}
+It is worth making explicit how much awareness piggybacking actually adds. At
+density $100$ the average neighbour count is $\approx 7.7$, so pure one-hop
+awareness would let a buoy know about only $7.7/99\approx 7.8\%$ of the network.
+Append mode lifts this to $59$--$73\%$ --- a $7.6$--$9.3\times$ magnification ---
+at the cost of nothing but larger beacons. This is the strongest argument for
+carrying neighbour lists at all, and it is achieved without a single dedicated
+control frame.
+
+\section{Interval sensitivity}
+Figure~\ref{fig:interval} sweeps the minimum interval for ADAB under append.
+Shrinking the floor from $1.0$\,s to $0.25$\,s predictably raises both the
+transmission count and the collision rate, but the adaptive mapping keeps even
+the most aggressive setting bounded: ADAB at $0.25$\,s still collides less than
+$1.1\%$ at density $100$, where static at the same floor reaches $14\%$. The
+interval is therefore best read as a discovery-latency knob --- smaller floors
+find new neighbours faster --- whose contention cost adaptation absorbs. The same
+qualitative ordering (ACAB $<$ ADAB $<$ static in load and collisions, with
+preserved PDR) holds at every interval tested; the $0.25$\,s figures shown
+elsewhere are the stress case, not an outlier.
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/interval_collision_adab.pdf}
+\caption{Collision rate}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\includegraphics[width=\textwidth]{figures/interval_sent_adab.pdf}
+\caption{Beacon transmissions (log scale)}
+\end{subfigure}
+\caption{Interval sensitivity for ADAB (append mode). A smaller interval floor
+trades energy and contention for faster discovery; adaptation keeps the
+collision cost bounded even at the most aggressive setting.}
+\label{fig:interval}
+\end{figure}
+
+\section{Discussion}
+\subsection{Local information is sufficient}
+Neither ADAB nor ACAB ever consults a coordinator, measures the channel
+directly, or exchanges control traffic. They act on a neighbour count, a
+last-contact timestamp and their own speed --- all observed for free as a side
+effect of listening. That this suffices to flatten the collision curve and cut
+energy by an order of magnitude is the central scientific message: in a dense,
+infrastructure-free broadcast network, \emph{purely local context is enough} to
+coordinate the medium implicitly.
+
+\subsection{Parsimony beats redundancy}
+Both headline findings --- ACAB beating ADAB, and append beating forwarded ---
+are instances of the same principle. The system performs best when it transmits
+\emph{as little as the safety task allows}. Extra beacons (static), extra
+context-blind throttling headroom (ADAB versus ACAB), and extra relayed copies
+(forwarded) all add channel occupancy faster than they add value once the
+neighbourhood is even moderately dense. The design lesson for maritime safety
+beaconing is to spend the channel only where a node is isolated, silent or
+moving --- precisely where a missed beacon is most dangerous.
+
+\subsection{Trade-offs and limits}
+The savings are not free of trade-offs. ACAB discovers a somewhat smaller
+fraction of the network than static at equal density ($59\%$ versus $73\%$ at
+density $100$), because it simply emits less information; for a safety system
+this is acceptable while the maximum interval stays bounded --- at $\bimax=5$\,s a
+vessel at $10$\,m/s moves only $50$\,m, well within detection range --- but it
+marks the frontier of how hard one should throttle. Likewise, the case against
+forwarding is specific to a well-connected single domain; in a genuinely
+partitioned topology, where two-hop neighbours are physically unreachable by
+piggybacking, active relaying would regain its purpose, and the forwarding gate
+exists precisely to make that regime affordable.
+
+% ================================================================
+\chapter{Conclusions}
+\label{ch:conclusions}
+
+\section{Summary of contributions}
+This thesis extended a discrete-event simulator for infrastructure-free Wi-Fi
+broadcast beaconing and used it to study, jointly, how often a maritime safety
+buoy should beacon and how far the awareness it produces should travel. Its
+contributions are a context-aware scheduler (ACAB) that fuses density, contact
+recency and mobility; two awareness-propagation mechanisms (passive append and
+active forwarded) together with a density-aware forwarding gate that re-uses the
+scheduler's own back-off intensity; a metric suite that deliberately separates
+per-link reliability from network awareness, collisions and energy; and a
+field-calibrated experimental campaign over a churning, mobile, Random-Waypoint
+population.
+
+\section{Scientific insights}
+Three findings stand out.
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Context-aware adaptation is essentially free reliability and
+  large energy savings.} ACAB held collisions below $0.5\%$ where static reached
+  $14\%$, transmitted up to $93\%$ fewer beacons than static and $62\%$ fewer
+  than ADAB, and did so with a per-receiver PDR equal to or better than either
+  baseline.
+  \item \textbf{Per-link reliability and network awareness must be measured
+  apart.} Under a realistic path-loss channel, PDR is propagation-bounded and
+  hides the value of scheduling; the benefit of adaptation lives in collision
+  rate and channel airtime.
+  \item \textbf{Cheap passive awareness beats expensive active flooding.} Append
+  mode matched or exceeded forwarded mode's network discovery while generating
+  $3$--$5\times$ less traffic and up to an order of magnitude lower reaction latency;
+  multi-hop piggybacking magnified one-hop awareness roughly $8$-fold for the
+  cost of larger beacons alone.
+\end{enumerate}
+Underlying all three is one principle: in infrastructure-free broadcast,
+\emph{local information and channel parsimony} are sufficient, and usually
+optimal.
+
+\section{Limitations}
+The physical layer is deliberately simplified: a piecewise-constant reception
+probability, a single $1$\,Mbps rate, no capture effect and no explicit fading.
+The mobility model, though improved to Random Waypoint, does not capture
+correlated drift from currents or clustering of users. The scale tested
+($20$--$100$ nodes in a $500\times500$\,m arena) covers realistic coastal
+densities but not extreme crowding, and the energy analysis accounts for
+transmission energy only, omitting reception and idle-listening draw. ACAB's
+weights $(0.4,0.3,0.3)$ were fixed rather than tuned, and the append/forwarded
+comparison was made in a well-connected domain.
+
+\section{Future work}
+Several directions follow naturally. A packet-length-dependent loss model would
+let the study weigh append's growing beacons against forwarded's extra frames on
+equal footing, and would expose whether very large neighbour lists eventually
+hurt delivery. ACAB's weights and the forwarding gate's baseline invite
+systematic tuning, perhaps online. Evaluating both awareness modes in
+deliberately \emph{partitioned} topologies would test the hypothesis that
+forwarding earns its cost only when piggybacking physically cannot reach. Real
+GPS traces of swimmers and small craft would sharpen the mobility model, and a
+complete energy budget including the receive chain would refine the battery
+claims. Finally, the simulator and its findings transfer beyond the maritime
+case to any infrastructure-free broadcast discovery problem --- vehicular safety
+beacons, disaster-response ad-hoc networks, wildlife tracking and dense IoT.
+
+\section{Final remarks}
+A safe coastal network does not need a tower, a satellite, a SIM card or a
+central scheduler. It needs each buoy to listen, to speak only when speaking
+helps, and to share what it hears for free. This thesis has shown, on
+field-calibrated simulations, that those three habits --- realized as
+context-aware scheduling, passive multi-hop awareness and congestion-coupled
+relaying --- turn ordinary Wi-Fi broadcast into a beacon that scales, saves
+energy, and keeps the people in the water visible.
+
+% ================================================================
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{Bibliography}
+
+\bibitem{imo-ais} International Maritime Organization. \emph{AIS Transponders}.
+\url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}, accessed 2025.
+
+\bibitem{noaa-beacons} NOAA SARSAT. \emph{406\,MHz Emergency Distress Beacons}.
+\url{https://www.sarsat.noaa.gov/emergency-406-beacons/}, accessed 2025.
+
+\bibitem{ieee80211} IEEE 802.11 Working Group. \emph{The Working Group Setting
+the Standards for Wireless LANs}. \url{https://www.ieee802.org/11/}, accessed 2025.
+
+\bibitem{sharetechnote-dcf} ShareTechnote. \emph{WLAN DCF}.
+\url{https://www.sharetechnote.com/html/WLAN_DCF.html}, accessed 2025.
+
+\bibitem{csma-ca} Network Academy. \emph{Collision Avoidance (CSMA/CA)}.
+\url{https://www.networkacademy.io/ccna/wireless/collision-avoidance-csma-ca},
+accessed 2025.
+
+\bibitem{tobagi-hidden} F.~Tobagi and L.~Kleinrock. Packet switching in radio
+channels: Part II --- the hidden terminal problem in carrier sense
+multiple-access and the busy-tone solution. \emph{IEEE Transactions on
+Communications}, 23(12):1417--1433, 1975.
+
+\bibitem{ipcisco-ibss} IpCisco. \emph{Wireless Principles: BSS, ESS, IBSS}.
+\url{https://ipcisco.com/lesson/wireless-principles/}, accessed 2025.
+
+\bibitem{takai-dvcs} M.~Takai, J.~Martin, R.~Bagrodia, and A.~Ren. Directional
+virtual carrier sensing for directional antennas in mobile ad hoc networks. In
+\emph{Proc. ACM MobiHoc}, pages 183--193, 2002.
+
+\bibitem{alotaibi-adaptive} M.~M.~Alotaibi and H.~T.~Mouftah. Adaptive
+expiration time for dynamic beacon scheduling in vehicular ad-hoc networks. In
+\emph{IEEE VTC2015-Fall}, pages 1--6, 2015.
+
+\bibitem{sommer-adaptive} C.~Sommer, O.~K.~Tonguz, and F.~Dressler. Adaptive
+beaconing for delay-sensitive and congestion-aware traffic information systems.
+In \emph{IEEE Vehicular Networking Conference}, pages 1--8, 2010.
+
+\bibitem{chen-survey} L.~Chen and W.~Zhuang. Beacon scheduling for device
+discovery in wireless networks: a survey. \emph{IEEE Communications Surveys \&
+Tutorials}, 20(1):137--156, 2018.
+
+\bibitem{zhao-vanet} J.~Zhao, M.~Li, Y.~Wang, and J.~Wang. An adaptive beaconing
+strategy based on local topology and channel status in VANETs. \emph{IEEE
+Transactions on Mobile Computing}, 18(10):2354--2367, 2019.
+
+\bibitem{broadcaststorm} S.-Y.~Ni, Y.-C.~Tseng, Y.-S.~Chen, and J.-P.~Sheu. The
+broadcast storm problem in a mobile ad hoc network. In \emph{Proc. ACM
+MobiCom}, pages 151--162, 1999.
+
+\bibitem{goel-wifi} M.~Goel and S.~N.~Patel. Wi-Fi-based proximity detection in
+the wild. In \emph{Proc. ACM MobiSys}, pages 1--12, 2020.
+
+\bibitem{nsnam} nsnam.org. \emph{ns-3 Network Simulator}.
+\url{https://www.nsnam.org/}, accessed 2025.
+
+\bibitem{omnetpp} omnetpp.org. \emph{OMNeT++ Discrete Event Simulator}.
+\url{https://omnetpp.org/}, accessed 2025.
+
+\bibitem{raspberrypi} Raspberry Pi Ltd. \emph{Raspberry Pi}.
+\url{https://www.raspberrypi.com/}, accessed 2025.
+
+\bibitem{python} Python Software Foundation. \emph{Python}.
+\url{https://www.python.org/}, accessed 2025.
+
+\bibitem{heapq} Python docs. \emph{heapq --- Heap queue algorithm}.
+\url{https://docs.python.org/3/library/heapq.html}, accessed 2025.
+
+\end{thebibliography}
+
+\end{document}
