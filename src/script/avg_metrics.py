@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import re
 from collections import defaultdict
 
+from plot_mode_comparison import generate_comparison_plots
+
+# Multihop modes that may appear as the trailing token of a results-dir name
+MULTIHOP_MODES = ("none", "append", "forwarded")
+
 def average_metrics(input_dirs, output_dir):
     # Identify subdirectories in each input directory
     all_subdirs = set()
@@ -14,57 +19,82 @@ def average_metrics(input_dirs, output_dir):
                    if os.path.isdir(os.path.join(input_dir, d))]
         all_subdirs.update(subdirs)
     
+    # Accumulate the averaged results dirs so modes that differ only by the
+    # trailing multihop token can be compared once everything is averaged.
+    comparison_groups: dict[str, dict[str, str]] = defaultdict(dict)  # group -> {mode: dir}
+    group_interval: dict[str, float] = {}
+
     # Process each subdirectory separately
-    for subdir in all_subdirs:
-        # Extract the interval part from the subdirectory name
-        interval_part = re.search(r'(interval\d+.*)', subdir)
-        if interval_part:
-            interval_suffix = interval_part.group(1)
-        else:
-            interval_suffix = subdir
-        
+    for subdir in sorted(all_subdirs):
+        # Mirror the input naming for the averaged outputs (strip the leading
+        # "results_") so downstream tools recognise them identically, e.g.
+        # results_interval-1.0_random_forwarded.
+        suffix = subdir[len("results_"):] if subdir.startswith("results_") else subdir
+
         # Create results and plots directories directly in output_dir
-        results_dir = os.path.join(output_dir, f"results_{interval_suffix}")
-        plots_dir = os.path.join(output_dir, f"plots_{interval_suffix}")
-        
+        results_dir = os.path.join(output_dir, f"results_{suffix}")
+        plots_dir = os.path.join(output_dir, f"plots_{suffix}")
+
         os.makedirs(results_dir, exist_ok=True)
         os.makedirs(plots_dir, exist_ok=True)
-        
+
         # Collect input paths
-        subdir_input_paths = [os.path.join(input_dir, subdir) for input_dir in input_dirs 
+        subdir_input_paths = [os.path.join(input_dir, subdir) for input_dir in input_dirs
                              if os.path.isdir(os.path.join(input_dir, subdir))]
-        
+
         print(f"Processing {subdir}...")
         print(f"  Results will be saved to: {results_dir}")
         print(f"  Plots will be saved to: {plots_dir}")
-        
+
         # Process density files (static_density*.csv, dynamic_density*.csv)
         process_density_files(subdir_input_paths, results_dir)
-        
+
         # Process ramp timeseries files
         process_timeseries_files(subdir_input_paths, results_dir)
-        
+
         # Extract interval from subdirectory name for plotting
         interval = extract_interval_from_dirname(subdir)
-        
+
         # Generate plots in the plot directory
         plot_averaged_metrics(results_dir, plots_dir, interval)
 
+        # Register this averaged dir under its mode-agnostic group key
+        for mode in MULTIHOP_MODES:
+            if suffix.endswith(f"_{mode}"):
+                group_key = suffix[: -len(f"_{mode}")]
+                comparison_groups[group_key][mode] = results_dir
+                group_interval[group_key] = interval
+                break
+
+    # Build the cross-mode comparison figures from the averaged dirs
+    for group_key, mode_dirs in comparison_groups.items():
+        if len(mode_dirs) < 2:
+            continue
+        comparison_dir = os.path.join(output_dir, f"comparison_{group_key}")
+        print(f"Comparing multihop modes for {group_key}: {', '.join(mode_dirs)}")
+        generate_comparison_plots(mode_dirs, comparison_dir, group_interval[group_key])
+
 def extract_interval_from_dirname(dirname):
+    """Pull the beacon interval (seconds) out of a results-dir name.
+
+    Current convention encodes the literal value after a dash, e.g.
+    "...interval-1.0..." or "...interval-0.25...". A legacy tenths-style
+    encoding ("interval1" -> 1.0, "interval5" -> 0.5, "interval2_5" -> 0.25)
+    is kept as a fallback for older directories.
     """
-    Hard-coded interval mapping based on directory naming convention.
-    interval1_ideal -> 1.0s
-    interval2_5_ideal -> 0.25s  
-    interval5_ideal -> 0.5s
-    """
-    # Hard-coded mappings
+    # Current convention: literal seconds after a dash (interval-1.0, interval-0.25)
+    match = re.search(r'interval-(\d+(?:\.\d+)?)', dirname)
+    if match:
+        return float(match.group(1))
+
+    # Legacy tenths-style mappings
+    if 'interval2_5' in dirname or 'interval2.5' in dirname:
+        return 0.25
+    if 'interval5' in dirname:
+        return 0.5
     if 'interval1' in dirname:
         return 1.0
-    elif 'interval2_5' in dirname or 'interval2.5' in dirname:
-        return 0.25
-    elif 'interval5' in dirname:
-        return 0.5
-    
+
     # Fallback: try to parse from dirname if it doesn't match known patterns
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
@@ -73,7 +103,7 @@ def extract_interval_from_dirname(dirname):
             return float(interval_str)
         except ValueError:
             return None
-    
+
     return None
 
 def process_density_files(input_dirs, output_dir):

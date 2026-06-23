@@ -37,7 +37,7 @@ def load_mode_data(mode_dirs):
     rows = []
     for mode, results_dir in mode_dirs.items():
         if not os.path.isdir(results_dir):
-            print(f"  ⚠ Results dir for '{mode}' not found: {results_dir}")
+            print(f"  [!]Results dir for '{mode}' not found: {results_dir}")
             continue
 
         for f in glob.glob(os.path.join(results_dir, "*.csv")):
@@ -79,12 +79,12 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
     """Render one figure: a subplot per scheduler with mode-grouped bars over density."""
     modes_present = [m for m in MODE_ORDER if m in df["Mode"].unique()]
     if not modes_present:
-        print(f"  ⚠ No modes available for {value_col}")
+        print(f"  [!]No modes available for {value_col}")
         return
 
     metric_df = df[df[value_col].notna()]
     if metric_df.empty:
-        print(f"  ⚠ No {value_col} data found")
+        print(f"  [!]No {value_col} data found")
         return
 
     densities = sorted(metric_df["Density"].unique())
@@ -124,7 +124,61 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
     plt.tight_layout()
     plt.savefig(output_path, dpi=200)
     plt.close()
-    print(f"  ✓ Saved {os.path.basename(output_path)}")
+    print(f"  [OK]Saved {os.path.basename(output_path)}")
+
+
+def generate_comparison_plots(mode_dirs, output_dir, interval=None, schedulers=None):
+    """Render the PDR / collision / discovery cross-mode comparison figures.
+
+    mode_dirs maps a multihop mode name to a results directory holding density
+    summary CSVs (raw single-run or seed-averaged - both expose the same metric
+    rows). Returns True when at least the data load succeeded.
+    """
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    if not mode_dirs:
+        print("No mode dirs provided; nothing to compare.")
+        return False
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"\n{'='*60}")
+    print("Generating Multihop Mode Comparison Plots")
+    print(f"{'='*60}")
+    for mode, results_dir in mode_dirs.items():
+        print(f"  {mode:<10} -> {results_dir}")
+    print(f"  output     -> {output_dir}")
+    print(f"{'='*60}\n")
+
+    df = load_mode_data(mode_dirs)
+    if df.empty:
+        print("No comparable density data found across modes.")
+        return False
+
+    tag = str(interval).replace('.', '_') if interval else "NA"
+
+    plot_metric(
+        df, "PDR", "PDR",
+        "PDR Comparison: Multihop Modes by Protocol",
+        os.path.join(output_dir, f"mode_comparison_pdr_interval-{tag}.png"),
+        interval, schedulers, legend_loc="lower right",
+    )
+    plot_metric(
+        df, "CollisionRate", "Collision Rate",
+        "Collision Rate Comparison: Multihop Modes by Protocol",
+        os.path.join(output_dir, f"mode_comparison_collision_rate_interval-{tag}.png"),
+        interval, schedulers, legend_loc="upper left",
+    )
+    plot_metric(
+        df, "PercentageDiscovered", "Avg % of Network Discovered",
+        "Network Discovery Comparison: Multihop Modes by Protocol",
+        os.path.join(output_dir, f"mode_comparison_avg_percentage_network_discovered_interval-{tag}.png"),
+        interval, schedulers, ylim=(0, 100), legend_loc="upper left",
+    )
+
+    print(f"\n{'='*60}")
+    print(f"[OK]All comparison plots saved to: {output_dir}")
+    print(f"{'='*60}\n")
+    return True
 
 
 def main():
@@ -139,52 +193,8 @@ def main():
                         help=f"Schedulers to plot, one subplot each (default: {' '.join(DEFAULT_SCHEDULERS)})")
     args = parser.parse_args()
 
-    schedulers = args.schedulers or DEFAULT_SCHEDULERS
     mode_dirs = {mode: results_dir for mode, results_dir in args.mode_dir}
-    if not mode_dirs:
-        print("No --mode-dir entries provided; nothing to compare.")
-        return
-
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    print(f"\n{'='*60}")
-    print("Generating Multihop Mode Comparison Plots")
-    print(f"{'='*60}")
-    for mode, results_dir in mode_dirs.items():
-        print(f"  {mode:<10} -> {results_dir}")
-    print(f"  output     -> {args.output_dir}")
-    print(f"{'='*60}\n")
-
-    df = load_mode_data(mode_dirs)
-    if df.empty:
-        print("No comparable density data found across modes.")
-        return
-
-    interval = args.interval
-    tag = str(interval).replace('.', '_') if interval else "NA"
-
-    plot_metric(
-        df, "PDR", "PDR",
-        "PDR Comparison: Multihop Modes by Protocol",
-        os.path.join(args.output_dir, f"mode_comparison_pdr_interval-{tag}.png"),
-        interval, schedulers, legend_loc="lower right",
-    )
-    plot_metric(
-        df, "CollisionRate", "Collision Rate",
-        "Collision Rate Comparison: Multihop Modes by Protocol",
-        os.path.join(args.output_dir, f"mode_comparison_collision_rate_interval-{tag}.png"),
-        interval, schedulers, legend_loc="upper left",
-    )
-    plot_metric(
-        df, "PercentageDiscovered", "Avg % of Network Discovered",
-        "Network Discovery Comparison: Multihop Modes by Protocol",
-        os.path.join(args.output_dir, f"mode_comparison_avg_percentage_network_discovered_interval-{tag}.png"),
-        interval, schedulers, ylim=(0, 100), legend_loc="upper left",
-    )
-
-    print(f"\n{'='*60}")
-    print(f"✓ All comparison plots saved to: {args.output_dir}")
-    print(f"{'='*60}\n")
+    generate_comparison_plots(mode_dirs, args.output_dir, args.interval, args.schedulers)
 
 
 if __name__ == "__main__":

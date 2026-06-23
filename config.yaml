@@ -1,27 +1,27 @@
 simulation:
   schedulers:
   - static
-  # - dynamic_adab
-  # - dynamic_acab
+  - dynamic_adab
+  - dynamic_acab
   min_buoys: 20
-  max_buoys: 140
+  max_buoys: 100
   step_buoys: 20
   intervals:
    - 1.0   
    - 0.5
    - 0.25
-  duration: 100
+  duration: 60
   num_processes: 10
   ideal_channel: false
   # Options: static, ramp, random
-  scenario: static          
+  scenario: random          
   # Percentage of buoys that can change per update in random scenario 
   random_variability: 0.10
   enable_metrics: true
   enable_logging: false
   enable_file_logging: false
   # Options: none, append, forwarded
-  multihop_mode: append
+  multihop_mode: forwarded
   # Multihop modes swept and compared per run (subset of: none, append, forwarded)
   multihop_modes:
   # - none

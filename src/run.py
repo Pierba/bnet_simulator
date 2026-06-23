@@ -127,6 +127,20 @@ def parse_args() -> argparse.Namespace:
              "topologies and produce the cross-mode comparison plots. Without this flag "
              "a single batch is run using simulation.multihop_mode from config.yaml.",
     )
+    parser.add_argument(
+        "-n", "--no-plot",
+        action="store_true",
+        help="Only generate the result CSV files and skip all plotting. Useful when "
+             "collecting many runs to average and plot together later.",
+    )
+    parser.add_argument(
+        "-t", "--tag",
+        type=str,
+        default=None,
+        help="Write this run's output under metrics/<tag>/ instead of metrics/. Lets "
+             "repeated runs accumulate side by side (e.g. --tag run01) so they can be "
+             "fed to avg_metrics.py as separate input dirs without overwriting.",
+    )
     return parser.parse_args()
 
 def main():
@@ -134,6 +148,9 @@ def main():
 
     # Extracting configuration parameters
     cfg = ConfigHandler()
+
+    # Root for this run's output; --tag nests it so repeated runs don't overwrite
+    output_root = os.path.join("metrics", args.tag) if args.tag else "metrics"
 
     # Every simulation seed derives from it
     master_seed = int(time.time())
@@ -196,11 +213,12 @@ def main():
             for multihop_mode in multihop_modes: # ['none', 'append', 'forwarded']
                 multihop_suffix = f"_{multihop_mode}"
 
-                results_dir = os.path.join("metrics", f"results_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
+                results_dir = os.path.join(output_root, f"results_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
                 os.makedirs(results_dir, exist_ok=True)
 
-                plots_dir = os.path.join("metrics", f"plots_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
-                os.makedirs(plots_dir, exist_ok=True)
+                if not args.no_plot:
+                    plots_dir = os.path.join(output_root, f"plots_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
+                    os.makedirs(plots_dir, exist_ok=True)
 
                 print(f"Running simulations with interval = {interval}s, multihop mode = {multihop_mode}")
 
@@ -221,15 +239,16 @@ def main():
                         print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
                         run_simulations_parallel(tasks, num_processes)
 
-                print(f"Plotting results for interval = {interval}s, multihop mode = {multihop_mode}")
-                plot_results(results_dir, plots_dir, interval, schedulers)
+                if not args.no_plot:
+                    print(f"Plotting results for interval = {interval}s, multihop mode = {multihop_mode}")
+                    plot_results(results_dir, plots_dir, interval, schedulers)
 
                 # Store the results directory for this mode to feed the comparison plotter later
                 mode_results_dirs[multihop_mode] = results_dir
 
             # Build the cross-mode comparison histograms for density-based scenarios
-            if scenario in ('random', 'static') and len(mode_results_dirs) > 1:
-                comparison_dir = os.path.join("metrics", f"comparison_interval-{interval_str}{ideal_suffix}{scenario_suffix}")
+            if not args.no_plot and scenario in ('random', 'static') and len(mode_results_dirs) > 1:
+                comparison_dir = os.path.join(output_root, f"comparison_interval-{interval_str}{ideal_suffix}{scenario_suffix}")
                 os.makedirs(comparison_dir, exist_ok=True)
                 print(f"Plotting multihop mode comparison for interval = {interval}s")
                 plot_mode_comparison(mode_results_dirs, comparison_dir, interval, schedulers)
