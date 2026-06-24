@@ -59,7 +59,7 @@ class Buoy:
 
         # Network parameters for distance calculations
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
-        self.world_width: float      = cfg.get('world', 'width')  # They are not updated with the parsed arguments ?
+        self.world_width: float      = cfg.get('world', 'width')
         self.world_height: float     = cfg.get('world', 'height')
 
         # Random Waypoint mobility model state

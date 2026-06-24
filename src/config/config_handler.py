@@ -11,19 +11,19 @@ class ConfigHandler:
         'simulation': {
             'schedulers': ['static', 'dynamic_adab', 'dynamic_acab'],
             'min_buoys': 20,
-            'max_buoys': 140,
+            'max_buoys': 100,
             'step_buoys': 20,
             'intervals': [1.0, 0.5, 0.25],
-            'duration': 100,
+            'duration': 60,
             'num_processes': 10,
             'ideal_channel': False,
-            'scenario': 'static',           # Options: static, ramp, random
+            'scenario': 'random',           # Options: static, ramp, random
             'random_variability': 0.10,     # Fraction of total buoys that can change per update in random scenario
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
-            'multihop_mode': 'append',      # Options: none, append, forwarded
-            'multihop_modes': ['none', 'append', 'forwarded'],  # Modes swept and compared per run
+            'multihop_mode': 'forwarded',   # Options: none, append, forwarded
+            'multihop_modes': ['append', 'forwarded'],  # Modes swept and compared per run
             'multihop_limit': 1,            # Maximum hops for forwarded mode
             'append_hop_limit': 2,          # Append mode: max hop distance advertised (1 = direct only, 0 = unlimited)
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
@@ -90,10 +90,12 @@ class ConfigHandler:
     
     # Getter of configuration values
     def get(self, section: str, key: str) -> Any:
-        # Special case: neighbor_timeout is calculated as 3 * static_interval
+        # Special case: neighbor_timeout is derived as 3 * beacon_max_interval so a node
+        # that backs off to the dynamic ceiling is not aged out of its neighbours' tables
+        # before it re-announces (the max dynamic interval is beacon_max_interval).
         if section == 'scheduler' and key == 'neighbor_timeout':
-            static_interval = self._config.get('scheduler', {}).get('static_interval', 1.0)
-            return 3.0 * static_interval
+            max_interval = self._config.get('scheduler', {}).get('beacon_max_interval', 5.0)
+            return 3.0 * max_interval
         return self._config.get(section, {}).get(key)
 
     # Setter to override a configuration value at runtime (in-process only).

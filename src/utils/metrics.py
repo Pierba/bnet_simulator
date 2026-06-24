@@ -178,7 +178,7 @@ class Metrics:
         return self.avg_neighbors_sum / self.avg_neighbors_count
     
     # Generate a summary of all metrics for the simulation run
-    def summary(self, sim_time: float) -> dict[str]:
+    def summary(self, sim_time: float) -> dict[str, Any]:
         summary = {
             "Scheduler Type": self.scheduler_type,
             "Multihop Mode": self.multihop_mode,

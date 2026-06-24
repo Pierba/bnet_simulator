@@ -32,10 +32,8 @@ def _log(level: str, message: str, to_console: bool = True, to_file: bool = Fals
     color = COLORS.get(level, '')
     reset = COLORS['RESET']
 
-    # scheduler_type = ConfigHandler().get('scheduler', 'type')
-    # formatted = f"[{scheduler_type}] [{timestamp}] [{level}] {message}"
     formatted = f"[{timestamp}] [{level}] {message}"
-        
+
     # Print to console with color
     output = f"{color}{formatted}{reset}"
     if to_console:

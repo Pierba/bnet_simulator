@@ -10,7 +10,7 @@ from utils.metrics import Metrics
 
 class Channel:
     # Initialization of the Channel class with configuration parameters and state variables
-    def __init__(self, metrics = None, ideal_channel = None):
+    def __init__(self, metrics: Metrics = None, ideal_channel: bool = False):
         cfg = ConfigHandler()
         
         # Channel parameters

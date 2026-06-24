@@ -119,17 +119,19 @@ class Simulator:
 
             self._schedule_buoy_events(buoy)
 
-        # If the scenario is static, no buoy array updates are needed
-        if self.scenario == "static":
-            return
-        
-        # Schedule first buoy array update for dynamic scenarios (ramp/random)
-        self.schedule_event(FIRST_ARRAY_UPDATE_DELAY, EventType.BUOY_ARRAY_UPDATE, self)
-        
-        # Periodic metrics sampling: 5s for ramp (timepoint logs), 30s otherwise
+        # Periodic metrics sampling runs in every scenario: 5s for ramp (timepoint
+        # logs), 30s otherwise. Mobile buoys move even in the static scenario, so the
+        # average-neighbor count must be resampled there too (not just once at t=0).
         if self.metrics:
             sample_interval = SAMPLE_INTERVAL_RAMP if self.scenario == "ramp" else SAMPLE_INTERVAL_OTHER
             self.schedule_event(sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
+
+        # Buoy array updates only happen in the dynamic scenarios (ramp/random)
+        if self.scenario == "static":
+            return
+
+        # Schedule first buoy array update for dynamic scenarios (ramp/random)
+        self.schedule_event(FIRST_ARRAY_UPDATE_DELAY, EventType.BUOY_ARRAY_UPDATE, self)
 
     # Updates the buoy array based on the scenario type (ramp/random)
     def update_buoy_array(self, sim_time: float):

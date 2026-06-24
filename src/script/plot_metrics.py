@@ -344,18 +344,11 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file, schedulers=None):
             return 0
 
     group_labels = sorted(list(all_labels), key=label_key)
-    x = np.arange(len(group_labels))
-    bar_width = 0.8 / max(1, len(modes))
-    fig, ax = plt.subplots(figsize=(10, 6))
     grouped_data = {}
     for mode, color in valid_modes:
         values = [grouped_map.get(mode, {}).get(lbl, 0) for lbl in group_labels]
         grouped_data[mode] = values
-    
-    if not valid_modes:
-        print("No valid data to plot for any mode")
-        return
-    
+
     x = np.arange(len(group_labels))
     bar_width = 0.8 / max(1, len(valid_modes))
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -397,19 +390,37 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file, schedulers=None):
     plt.close()
 
 def extract_interval_from_dirname(dirname):
+    """Pull the beacon interval (seconds) out of a results-dir name.
+
+    Kept byte-for-byte in sync with the canonical version in
+    ``avg_metrics.extract_interval_from_dirname`` so the two tools never disagree.
+    Current convention encodes the literal value after a dash, e.g.
+    "...interval-1.0..." or "...interval-0.25...". A legacy tenths-style
+    encoding ("interval1" -> 1.0, "interval5" -> 0.5, "interval2_5" -> 0.25)
+    is kept as a fallback for older directories.
+    """
+    # Current convention: literal seconds after a dash (interval-1.0, interval-0.25)
+    match = re.search(r'interval-(\d+(?:\.\d+)?)', dirname)
+    if match:
+        return float(match.group(1))
+
+    # Legacy tenths-style mappings
+    if 'interval2_5' in dirname or 'interval2.5' in dirname:
+        return 0.25
+    if 'interval5' in dirname:
+        return 0.5
+    if 'interval1' in dirname:
+        return 1.0
+
+    # Fallback: try to parse from dirname if it doesn't match known patterns
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
         interval_str = match.group(1).replace('_', '.')
         try:
-            if int(interval_str) < 10:
-                return float(interval_str) / 10.0
-            else:
-                return float(interval_str)
+            return float(interval_str)
         except ValueError:
-            interval_value = int(match.group(1))
-            if interval_value < 10:
-                return interval_value / 10.0
-            return interval_value
+            return None
+
     return None
 
 def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None, schedulers=None):
