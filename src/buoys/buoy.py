@@ -95,6 +95,10 @@ class Buoy:
         # (last-contact ts, position, hop distance from this buoy)
         self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
 
+        # Metrics-only: cumulative set of every node this buoy has ever discovered.
+        # Kept here (not in Metrics) so the metrics layer only stores the count.
+        self.metrics_discovered_nodes: set[uuid.UUID] = set()
+
         # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline one at a time
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
         self.pending_forward_beacons: dict[uuid.UUID, Beacon]   = {}
@@ -309,13 +313,9 @@ class Buoy:
                     if neighbor_id in self.neighbors:
                         continue
 
-                    # This node sits one hop farther from us than from the beacon's sender.
-                    # Nodes beyond the advertisement bound would never be re-advertised,
-                    # so they are not stored at all (0 = unlimited)
+                    # This node sits one hop farther from us than from the beacon's sender
                     hops = neighbor_hops + 1
-                    if self.append_hop_limit and hops > self.append_hop_limit:
-                        continue
-
+                
                     # Update discovered nodes if beacon provides fresher information about this neighbor
                     if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None, 0))[0]:
                         self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos, hops)
@@ -325,15 +325,8 @@ class Buoy:
             case 'forwarded' if beacon.origin_id != self.id and beacon.hop_limit > 0:
                 # Only act on a beacon fresher than the last one decided for this origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
-                    # Density-based forward suppression is decided once here, at enqueue
-                    # time, so suppressed beacons never consume a CSMA contention. A
-                    # suppressed beacon is still recorded as seen to dedupe later copies.
-                    if not self.scheduler.should_forward(len(self.neighbors)):
-                        self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
-                        logging.log_info(f"Buoy {str(self.id)[:6]} suppressed forward of {str(beacon.origin_id)[:6]}")
-
                     # Queue the beacon if it is already pending or there is room left
-                    elif beacon.origin_id in self.pending_forward_beacons or len(self.pending_forward_beacons) < self.pending_queue_limit:
+                    if beacon.origin_id in self.pending_forward_beacons or len(self.pending_forward_beacons) < self.pending_queue_limit:
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
 
@@ -360,8 +353,10 @@ class Buoy:
 
             discovered_nodes.discard(self.id)  # Don't count self as discovered
 
-            # Track all unique nodes discovered from this beacon
-            self.set_unique_nodes_per_buoy_callback(self.id, discovered_nodes)
+            # Accumulate into this buoy's cumulative discovery set and report the
+            # de-duplicated count (its reachable-node count) to the metrics layer
+            self.metrics_discovered_nodes.update(discovered_nodes)
+            self.set_unique_nodes_per_buoy_callback(self.id, len(self.metrics_discovered_nodes))
 
             # Log the reception of this beacon, attributed to its origin: in forwarded
             # mode the sender is just the relay, while timestamp belongs to the origin

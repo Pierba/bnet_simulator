@@ -12,7 +12,7 @@ simulation:
    - 0.25
   duration: 60
   num_processes: 10
-  ideal_channel: false
+  ideal_channel: true
   # Options: static, ramp, random
   scenario: random          
   # Percentage of buoys that can change per update in random scenario 
@@ -70,6 +70,7 @@ scheduler:
   static_interval: 1.0
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
+  neighbor_timeout: 7.0
   # ADAB: neighbour count that maps to density factor = 1.0 (full backoff)
   adab_neighbors_threshold: 15.0
   # ACAB: neighbour count that maps density component to 1.0

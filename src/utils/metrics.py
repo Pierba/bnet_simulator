@@ -45,16 +45,15 @@ class Metrics:
         self.scheduler_latency_sum: float                 = 0.0
         self.time_series: list                            = []
         self.total_latency: float                         = 0.0
-        self.total_successful_receivers: int              = 0
-        self.unique_nodes_per_buoy: dict[UUID, set[UUID]] = {}
-        
-    # Set of unique nodes discovered by each buoy
-    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
-        nodes = self.unique_nodes_per_buoy.get(buoy_id)
-        if nodes is None:
-            self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
-        else:
-            nodes.update(unique_nodes)
+        self.total_successful_receivers: int          = 0
+        # Per-buoy count of unique nodes discovered (its reachable-node count).
+        # De-duplication is done buoy-side, which reports the running size here.
+        self.unique_nodes_per_buoy: dict[UUID, int]   = {}
+
+    # Record the number of unique nodes a buoy has discovered so far. The buoy
+    # owns the de-duplicated set and reports its (monotonically growing) size.
+    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_count: int):
+        self.unique_nodes_per_buoy[buoy_id] = unique_count
 
     # Log a sent beacon; forwarded copies are tracked separately so that
     # origin-generated and relayed transmissions can be distinguished
@@ -134,16 +133,16 @@ class Metrics:
         originated = self.beacons_sent - self.beacons_forwarded
         return self.beacons_received / originated if originated else 0.0
 
-    # Calculate the average number of unique nodes discovered per buoy
+    # Average number of unique nodes discovered per buoy: how many other nodes
+    # the average node in the network can reach (its reachability, as a count).
     def avg_unique_nodes_discovered(self) -> float:
         if not self.unique_nodes_per_buoy:
             return 0.0
-        
-        node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
-        return sum(node_counts) / len(node_counts)
 
-    # Average percentage of the network each buoy has discovered.
-    # density - 1 excludes the buoy itself from the set of discoverable nodes.
+        return sum(self.unique_nodes_per_buoy.values()) / len(self.unique_nodes_per_buoy)
+
+    # Reachability of the average node as a percentage of the whole network.
+    # density - 1 excludes the buoy itself from the set of reachable nodes.
     def avg_percentage_network_discovered(self) -> float:
         if self.density <= 1:
             return 0.0

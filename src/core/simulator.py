@@ -16,7 +16,7 @@ FIRST_ARRAY_UPDATE_DELAY: float = 30.0
 
 # Constants for metrics sampling intervals based on the scenario type
 SAMPLE_INTERVAL_RAMP: float = 5.0
-SAMPLE_INTERVAL_OTHER: float = 30.0
+SAMPLE_INTERVAL_OTHER: float = 16.0
 
 # Constants for random buoy array update intervals in the random scenario
 MIN_INTERVAL_RANDOM: float = 15.0

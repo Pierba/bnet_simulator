@@ -90,12 +90,6 @@ class ConfigHandler:
     
     # Getter of configuration values
     def get(self, section: str, key: str) -> Any:
-        # Special case: neighbor_timeout is derived as 3 * beacon_max_interval so a node
-        # that backs off to the dynamic ceiling is not aged out of its neighbours' tables
-        # before it re-announces (the max dynamic interval is beacon_max_interval).
-        if section == 'scheduler' and key == 'neighbor_timeout':
-            max_interval = self._config.get('scheduler', {}).get('beacon_max_interval', 5.0)
-            return 3.0 * max_interval
         return self._config.get(section, {}).get(key)
 
     # Setter to override a configuration value at runtime (in-process only).
