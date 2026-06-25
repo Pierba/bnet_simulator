@@ -39,6 +39,10 @@ class Metrics:
         self.delivered_beacons: dict[UUID, float]         = {}
         self.discovered_pairs: dict[UUID, set[UUID]]      = {}
         self.potentially_sent: int                        = 0
+        # Topology reachability samples (multi-hop, scheduler-independent)
+        self.reachability_count: int                      = 0
+        self.reachability_sum: float                      = 0.0
+        self.reachability_pct_sum: float                  = 0.0
         self.reaction_latency_count: int                  = 0
         self.reaction_latency_sum: float                  = 0.0
         self.scheduler_latency_count: int                 = 0
@@ -149,7 +153,14 @@ class Metrics:
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
 
     # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
-    def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
+    def log_timepoint(
+        self,
+        sim_time: float,
+        n_buoys: int,
+        avg_neighbors_sample: Optional[float] = None,
+        reachability_sample: Optional[float] = None,
+        reachability_pct_sample: Optional[float] = None,
+    ):
         timepoint = {
             "time": sim_time,
             # True packet delivery ratio (unique beacons delivered / beacons sent)
@@ -159,10 +170,15 @@ class Metrics:
             "n_buoys": n_buoys,
             "avg_unique_nodes": self.avg_unique_nodes_discovered()
         }
-        
+
         if avg_neighbors_sample is not None:
             timepoint["avg_neighbors"] = avg_neighbors_sample
-            
+
+        if reachability_sample is not None:
+            timepoint["reachability"] = reachability_sample
+        if reachability_pct_sample is not None:
+            timepoint["reachability_pct"] = reachability_pct_sample
+
         self.time_series.append(timepoint)
 
     # Record a sample of the average number of neighbors for time-series analysis
@@ -175,6 +191,27 @@ class Metrics:
         if not self.avg_neighbors_count:
             return 0.0
         return self.avg_neighbors_sum / self.avg_neighbors_count
+
+    # Record a topology-reachability sample: avg_reachable is the mean number of
+    # nodes reachable per active node (multi-hop), pct_reachable the same as a
+    # percentage of the currently active network. Both come from positions only,
+    # so they are independent of the scheduler and of what each node has heard.
+    def record_reachability_sample(self, avg_reachable: float, pct_reachable: float):
+        self.reachability_sum += avg_reachable
+        self.reachability_pct_sum += pct_reachable
+        self.reachability_count += 1
+
+    # Time-averaged reachability of the average node, as a node count
+    def get_avg_reachability(self) -> float:
+        if not self.reachability_count:
+            return 0.0
+        return self.reachability_sum / self.reachability_count
+
+    # Time-averaged reachability of the average node, as a percentage of the network
+    def get_avg_reachability_pct(self) -> float:
+        if not self.reachability_count:
+            return 0.0
+        return self.reachability_pct_sum / self.reachability_count
     
     # Generate a summary of all metrics for the simulation run
     def summary(self, sim_time: float) -> dict[str, Any]:
@@ -209,6 +246,8 @@ class Metrics:
             "Average Neighbors": self.get_final_avg_neighbors(),
             "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
             "Avg % Network Discovered": self.avg_percentage_network_discovered(),
+            "Avg Node Reachability": self.get_avg_reachability(),
+            "Avg % Node Reachability": self.get_avg_reachability_pct(),
             "Density": self.density,
         }
 

@@ -9,7 +9,10 @@ from core.channel import Channel
 from core.events import EventType, Event
 from config.config_handler import ConfigHandler
 from utils import logging
+import numpy as np
 from scipy.spatial import cKDTree
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 
 # Sim-time delay before the first buoy-array update in the ramp/random scenarios
 FIRST_ARRAY_UPDATE_DELAY: float = 30.0
@@ -254,7 +257,41 @@ class Simulator:
         # Each pair (i, j) counts as two directed neighbor relationships
         pairs = tree.query_pairs(self.comm_range_max)
         return (len(pairs) * 2) / self._active_count
-    
+
+    # Multi-hop reachability of the average node from the current topology alone.
+    # Two buoys share an edge when within communication range; a node reaches every
+    # other node in its connected component. Computed from positions only, so it is
+    # independent of the scheduler and of what each node has actually heard.
+    # Returns (avg reachable nodes per node, same as a % of the active network).
+    def calculate_reachability(self) -> tuple[float, float]:
+        points = [b.position for b in self.buoys if b.active]
+        n = len(points)
+        if n <= 1:
+            return 0.0, 0.0
+
+        tree = cKDTree(points)
+        pairs = tree.query_pairs(self.comm_range_max)
+
+        # Build the symmetric adjacency matrix from the in-range pairs
+        if pairs:
+            rows, cols = zip(*pairs)
+            data = np.ones(len(pairs) * 2)
+            adjacency = csr_matrix(
+                (data, (np.concatenate([rows, cols]), np.concatenate([cols, rows]))),
+                shape=(n, n),
+            )
+        else:
+            adjacency = csr_matrix((n, n))
+
+        # Each node reaches (size of its connected component - itself) other nodes
+        _, labels = connected_components(adjacency, directed=False)
+        component_sizes = np.bincount(labels)
+        reachable_per_node = component_sizes[labels] - 1
+
+        avg_reachable = float(reachable_per_node.mean())
+        pct_reachable = (avg_reachable / (n - 1)) * 100
+        return avg_reachable, pct_reachable
+
     # Samples avg_neighbors once and dispatches to metrics sinks (sample always; timepoint log for ramp)
     def _sample_metrics(self, sim_time: float):
         if not self.metrics:
@@ -262,5 +299,11 @@ class Simulator:
 
         avg_neighbors: float = self.calculate_avg_neighbors()
         self.metrics.record_avg_neighbors_sample(avg_neighbors)
+
+        avg_reachable, pct_reachable = self.calculate_reachability()
+        self.metrics.record_reachability_sample(avg_reachable, pct_reachable)
+
         if self.scenario == "ramp":
-            self.metrics.log_timepoint(sim_time, self._active_count, avg_neighbors)
+            self.metrics.log_timepoint(
+                sim_time, self._active_count, avg_neighbors, avg_reachable, pct_reachable
+            )
