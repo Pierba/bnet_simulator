@@ -20,15 +20,6 @@ dependencies = [
 [project.scripts]
 sim = "run:main"
 
-[dependency-groups]
-dev = ["pytest>=8"]
-
-[tool.pytest.ini_options]
-# Tests import the source packages (config, buoys, core, ...) the same way the
-# scripts do, so the src/ root must be on sys.path.
-pythonpath = ["src"]
-testpaths = ["tests"]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

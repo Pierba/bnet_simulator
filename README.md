@@ -47,12 +47,3 @@ plot them together:
 ```sh
 uv run src/script/avg_metrics.py --input-dirs metrics/run01 metrics/run02 --output-dir metrics/averaged
 ```
-
-## Tests
-
-```sh
-uv run pytest
-```
-
-Covers config consistency (`DEFAULT_CONFIG` vs `config.yaml`, `neighbor_timeout`
-derivation) and end-to-end simulation determinism and metric invariants.
