@@ -169,7 +169,8 @@ class Channel:
         comm_range_sq = self.comm_range_max_sq
 
         # Receiver coordinates resolved once instead of per (transmission x receiver) pair
-        receivers_pos = [(buoy.id, *buoy.position) for buoy, _ in receivers_data]
+        # Unpack each position once via the single-element-iterable trick (avoids a double attribute lookup)
+        receivers_pos = [(buoy.id, bx, by) for buoy, _ in receivers_data for bx, by in (buoy.position,)]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender
