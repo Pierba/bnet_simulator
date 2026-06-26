@@ -121,13 +121,6 @@ def plot_mode_comparison(mode_results_dirs: dict[str, str], comparison_dir: str,
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="BNet simulator batch runner")
     parser.add_argument(
-        "-c", "--compare",
-        action="store_true",
-        help="Run every multihop mode listed in simulation.multihop_modes on identical "
-             "topologies and produce the cross-mode comparison plots. Without this flag "
-             "a single batch is run using simulation.multihop_mode from config.yaml.",
-    )
-    parser.add_argument(
         "-n", "--no-plot",
         action="store_true",
         help="Only generate the result CSV files and skip all plotting. Useful when "
@@ -179,15 +172,10 @@ def main():
     world_width: float     = cfg.get('world', 'width')              # Width of the simulation world
     world_height: float    = cfg.get('world', 'height')             # Height of the simulation world
     
-    # If the compare flage is set it will run every multihope_mode and eventually plot thier comparision
-    if args.compare:
-        multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes')
-        print(f"Comparison mode: sweeping multihop modes {multihop_modes}")
-    
-    # Otherwise it will run only the multihope_mode selected and plot its results
-    else:
-        multihop_modes: list[str] = [cfg.get('simulation', 'multihop_mode')]
-        print(f"Single run mode: multihop mode '{multihop_modes[0]}'")
+    # Multihop modes are swept like intervals and schedulers: one batch per mode.
+    # When more than one is listed the cross-mode comparison plots are produced too.
+    multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes')
+    print(f"Sweeping multihop modes: {multihop_modes}")
 
     try:
         # For each beacon interval: 

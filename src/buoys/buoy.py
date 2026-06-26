@@ -460,8 +460,8 @@ class Buoy:
             # Add discovered nodes to the neighbor list
             case 'append':
                 all_neighbors.extend(
-                    (node_id, ts, pos, hops) 
-                    for node_id, (ts, pos, hops) in self.discovered_nodes.items()
+                    (id, *data)
+                    for id, data in self.discovered_nodes.items()
                 )
             
             # Set origin and hop limit

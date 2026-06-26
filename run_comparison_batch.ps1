@@ -4,9 +4,9 @@
     final multihop-mode comparison plots.
 
 .DESCRIPTION
-    For each batch this invokes:  uv run src/run.py -c -n --tag run<NN>
-      -c      sweep every multihop mode listed in config.yaml (simulation.multihop_modes)
-      -n      CSV only, skip all per-run plotting
+    For each batch this invokes:  uv run src/run.py -n --tag run<NN>
+      -n      CSV only, skip all per-run plotting (every mode in
+              simulation.multihop_modes is swept regardless)
       --tag   write under metrics/run<NN>/ so batches do not overwrite each other
 
     After all batches it runs avg_metrics.py over every metrics/run* directory,
@@ -62,7 +62,7 @@ for ($i = 1; $i -le $Runs; $i++) {
     $tag = "run" + $i.ToString("D$pad")
     Write-Host "`n=== Batch $i / $Runs  (tag: $tag) ===" -ForegroundColor Cyan
 
-    uv run src/run.py -c -n --tag $tag
+    uv run src/run.py -n --tag $tag
     if ($LASTEXITCODE -ne 0) {
         throw "Batch $i (tag $tag) failed with exit code $LASTEXITCODE. Aborting."
     }

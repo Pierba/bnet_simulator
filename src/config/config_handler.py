@@ -22,9 +22,8 @@ class ConfigHandler:
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
-            'multihop_mode': 'forwarded',   # Options: none, append, forwarded
-            'multihop_modes': ['append', 'forwarded'],  # Modes swept and compared per run
-            'multihop_limit': 1,            # Maximum hops for forwarded mode
+            'multihop_modes': ['none', 'append', 'forwarded'], # Multihop modes to run; one batch per mode
+            'multihop_limit': 1,                               # Maximum hops for forwarded mode
             'append_hop_limit': 2,          # Append mode: max hop distance advertised (1 = direct only, 0 = unlimited)
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
             'forward_density_baseline': 5,  # Expected forwarders per cascade (probabilistic gate)

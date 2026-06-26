@@ -3,9 +3,9 @@
 # Run N independent comparison batches (CSV only) and average them into the
 # final multihop-mode comparison plots.
 #
-# For each batch this invokes:  uv run src/run.py -c -n --tag run<NN>
-#   -c      sweep every multihop mode listed in config.yaml (simulation.multihop_modes)
-#   -n      CSV only, skip all per-run plotting
+# For each batch this invokes:  uv run src/run.py -n --tag run<NN>
+#   -n      CSV only, skip all per-run plotting (every mode in
+#           simulation.multihop_modes is swept regardless)
 #   --tag   write under metrics/run<NN>/ so batches do not overwrite each other
 #
 # After all batches it runs avg_metrics.py over every metrics/run* directory,
@@ -91,7 +91,7 @@ for (( i = 1; i <= RUNS; i++ )); do
     echo
     echo "${C_CYAN}=== Batch $i / $RUNS  (tag: $tag) ===${C_RESET}"
 
-    if ! uv run src/run.py -c -n --tag "$tag"; then
+    if ! uv run src/run.py -n --tag "$tag"; then
         echo "Batch $i (tag $tag) failed. Aborting." >&2
         exit 1
     fi

@@ -119,8 +119,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--multihop-mode",
         choices=["none", "append", "forwarded"],
-        default=cfg.get('simulation', 'multihop_mode'),
-        help="Multihop mode to use for the simulation (default: from config)"
+        default=(cfg.get('simulation', 'multihop_modes') or ['none'])[0],
+        help="Multihop mode to use for the simulation (default: first of simulation.multihop_modes)"
     )
 
     # Parse the command-line arguments and return them as a namespace object

@@ -58,9 +58,10 @@ re-transmitted.
 - **Scenarios** (`simulation.scenario`): `static` (fixed buoy count), `ramp`
   (buoys activate one at a time), `random` (buoys randomly activate/deactivate
   over time).
-- **Multihop modes** (`simulation.multihop_mode`): `none` (1-hop), `append`
+- **Multihop modes** (`simulation.multihop_modes`): `none` (1-hop), `append`
   (piggyback learned topology onto own beacons), `forwarded` (re-broadcast
-  others' beacons with a TTL).
+  others' beacons with a TTL). Listing more than one runs a batch per mode and
+  produces the cross-mode comparison plots.
 
 The batch runner ([`src/run.py`](src/run.py)) builds the topology for each
 density, then for every beacon interval launches one simulation per
@@ -102,14 +103,17 @@ To stop early, press `Ctrl-C`; the runner cleans up its temporary files and exit
 
 ## Batch runner flags
 
+Every mode in `simulation.multihop_modes` is swept on identical topologies, one
+batch per mode; the cross-mode comparison plots are produced automatically when
+more than one mode is listed.
+
 | Flag | Effect |
 |------|--------|
-| `-c`, `--compare` | Run every mode in `simulation.multihop_modes` on identical topologies and produce the cross-mode comparison plots. Without it, a single batch uses `simulation.multihop_mode`. |
 | `-n`, `--no-plot` | Only generate the result CSVs, skip all plotting. Useful when collecting many runs to average later. |
 | `-t TAG`, `--tag TAG` | Write this run's output under `metrics/<TAG>/` so repeated runs accumulate side by side (e.g. for `avg_metrics.py`). |
 
 ```sh
-uv run sim --compare --tag run01
+uv run sim --tag run01
 ```
 
 ## Configuration
@@ -129,8 +133,7 @@ Every run is driven by [`config.yaml`](config.yaml). The most relevant keys:
 | `scenario` | `static`, `ramp`, or `random`. |
 | `random_variability` | Fraction of buoys that can toggle per update (`random` scenario). |
 | `enable_metrics` / `enable_logging` / `enable_file_logging` | Output toggles. |
-| `multihop_mode` | Mode used for a single (non-compare) run. |
-| `multihop_modes` | Modes swept and compared with `--compare`. |
+| `multihop_modes` | Multihop modes to run; one batch per mode, compared when more than one is listed. |
 | `multihop_limit` | Maximum hops for `forwarded` mode. |
 | `append_hop_limit` | Hop horizon advertised in `append` mode (`1` = direct neighbours, `0` = unlimited). |
 | `pending_queue_limit` | Maximum beacons held in the pending queue. |
@@ -153,8 +156,8 @@ interval, scenario, and multihop mode:
 
 - `results_interval-*/` — per-run metric CSVs (one per scheduler × density).
 - `plots_interval-*/` — per-mode plots of those metrics.
-- `comparison_interval-*/` — cross-mode comparison histograms (when `--compare`
-  sweeps more than one mode).
+- `comparison_interval-*/` — cross-mode comparison histograms (when
+  `multihop_modes` lists more than one mode).
 
 ## Averaging multiple runs
 

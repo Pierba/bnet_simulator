@@ -31,7 +31,7 @@ class BeaconScheduler:
         self.next_dynamic_interval: float  = self.min_interval
 
         # Forwarding gate baseline (expected forwarders per cascade)
-        self.forward_density_baseline: int = cfg.get('simulation', 'forward_density_baseline')
+        # self.forward_density_baseline: int = cfg.get('simulation', 'forward_density_baseline')
 
         # Scheduler-specific thresholds and weights
         self.acab_contact_threshold: float            = cfg.get('scheduler', 'acab_contact_threshold')
@@ -131,13 +131,13 @@ class BeaconScheduler:
         return max(self.min_interval, min(self.max_interval, jittered))
 
     # Forwarding gate decision based on neighbor density and scheduler type
-    def should_forward(self, n_neighbors: int) -> bool:
-        if self.forward_density_baseline <= 0 or n_neighbors <= self.forward_density_baseline:
-            return True
+    # def should_forward(self, n_neighbors: int) -> bool:
+    #     if self.forward_density_baseline <= 0 or n_neighbors <= self.forward_density_baseline:
+    #         return True
 
-        # P = forward_density_baseline / n_neighbors, 
-        # with a reduction factor for dynamic schedulers based on last back-off intensity
-        p = self.forward_density_baseline / n_neighbors
-        if self.scheduler_type != "static":
-            p *= max(0.3, 1.0 - self.last_fq)
-        return random.random() < p
+    #     # P = forward_density_baseline / n_neighbors, 
+    #     # with a reduction factor for dynamic schedulers based on last back-off intensity
+    #     p = self.forward_density_baseline / n_neighbors
+    #     if self.scheduler_type != "static":
+    #         p *= max(0.3, 1.0 - self.last_fq)
+    #     return random.random() < p
