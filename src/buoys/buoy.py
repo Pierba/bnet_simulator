@@ -6,7 +6,7 @@ from protocols.beacon import Beacon
 from protocols.scheduler import BeaconScheduler
 import random
 from utils import logging
-import uuid
+from itertools import count
 
 # Max random delay before a receiver forwards a beacon: desynchronizes
 # the receivers of the same beacon, which would otherwise all start contending at once
@@ -19,6 +19,12 @@ class BuoyState(Enum):
     BACKOFF = 3
 
 class Buoy:
+    # Monotonic source of buoy ids. Plain ints replace uuid4 here: they are only ever
+    # used as identity / dict keys, and int hashing is a free C-level op whereas
+    # uuid.UUID.__hash__ is pure Python and dominated the hot path. Never reset, so ids
+    # stay globally unique even when several simulations run in one process (e.g. tests).
+    _id_counter = count()
+
     def __init__(
         self,
         scheduler: BeaconScheduler,
@@ -30,7 +36,7 @@ class Buoy:
         cfg = ConfigHandler()
 
         # Buoy properties
-        self.id: uuid.UUID                 = uuid.uuid4()
+        self.id: int                       = next(Buoy._id_counter)
         self.scheduler: BeaconScheduler    = scheduler
         self.position: tuple[float, float] = position
         self.is_mobile: bool               = is_mobile
@@ -42,7 +48,7 @@ class Buoy:
         self._generation: int       = 0  # Incremented on each deactivation for lazy cancellation of scheduled events
         self.last_contact_ts: float = None
         self.state: BuoyState       = BuoyState.RECEIVING # Default state is RECEIVING
-        self.neighbors: dict[uuid.UUID, tuple[float, tuple[float, float]]] = {}  # Direct neighbors (1-hop)
+        self.neighbors: dict[int, tuple[float, tuple[float, float]]] = {}  # Direct neighbors (1-hop)
         
         # Callbacks to be set for event scheduling, channel interactions and metrics tracking
         self.schedule_callback: callable                  = None
@@ -95,13 +101,13 @@ class Buoy:
 
         # Multihop append mode: store discovered nodes from neighbor lists as
         # (last-contact ts, position, hop distance from this buoy)
-        self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
+        self.discovered_nodes: dict[int, tuple[float, tuple[float, float], int]] = {}
 
         # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline one at a time
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
-        self.pending_forward_beacons: dict[uuid.UUID, Beacon]   = {}
+        self.pending_forward_beacons: dict[int, Beacon]         = {}
         # forwarded_beacons records the latest timestamp decided per origin so duplicates aren't re-evaluated
-        self.forwarded_beacons: dict[uuid.UUID, float]          = {}
+        self.forwarded_beacons: dict[int, float]                = {}
 
         # Event dispatch table for handling different event types with their corresponding methods
         self._event_handlers = {

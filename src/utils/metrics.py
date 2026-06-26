@@ -2,7 +2,6 @@ from typing import Any, Optional
 import os
 import csv
 from utils import logging
-from uuid import UUID
 
 # Class to track and summarize metrics for the BNet simulation
 class Metrics:
@@ -36,8 +35,8 @@ class Metrics:
         self.beacons_received: int                        = 0
         self.beacons_lost: int                            = 0
         self.beacons_collided: int                        = 0
-        self.delivered_beacons: dict[UUID, float]         = {}
-        self.discovered_pairs: dict[UUID, set[UUID]]      = {}
+        self.delivered_beacons: dict[int, float]          = {}
+        self.discovered_pairs: dict[int, set[int]]        = {}
         self.potentially_sent: int                        = 0
         self.reaction_latency_count: int                  = 0
         self.reaction_latency_sum: float                  = 0.0
@@ -48,10 +47,10 @@ class Metrics:
         self.total_successful_receivers: int          = 0
         # Per-buoy count of unique nodes discovered (its reachable-node count).
         # De-duplication is done buoy-side, which reports the running size here.
-        self.unique_nodes_per_buoy: dict[UUID, set[UUID]]   = {}
+        self.unique_nodes_per_buoy: dict[int, set[int]]     = {}
 
     # Set of unique nodes discovered by each buoy
-    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
+    def set_unique_nodes_per_buoy(self, buoy_id: int, unique_nodes: set[int]):
         nodes = self.unique_nodes_per_buoy.get(buoy_id)
         if nodes is None:
             self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
@@ -66,7 +65,7 @@ class Metrics:
             self.beacons_forwarded += 1
 
     # Log a received beacon and tracks unique deliveries and latency
-    def log_received(self, origin_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
+    def log_received(self, origin_id: int, timestamp: float, receive_time: float, receiver_id: int):
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
