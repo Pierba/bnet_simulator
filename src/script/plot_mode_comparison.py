@@ -87,14 +87,21 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
         print(f"  [!]No {value_col} data found")
         return
 
+    # Only keep schedulers that actually have data for this metric so absent
+    # protocols don't render as empty subplots.
+    schedulers_present = [s for s in schedulers if s in set(metric_df["Scheduler"].unique())]
+    if not schedulers_present:
+        print(f"  [!]No scheduler data found for {value_col}")
+        return
+
     densities = sorted(metric_df["Density"].unique())
     x = np.arange(len(densities))
     bar_width = 0.8 / len(modes_present)
 
-    fig, axes = plt.subplots(1, len(schedulers), figsize=(6 * len(schedulers), 6), squeeze=False)
+    fig, axes = plt.subplots(1, len(schedulers_present), figsize=(6 * len(schedulers_present), 6), squeeze=False)
     axes = axes[0]
 
-    for ax, sched in zip(axes, schedulers):
+    for ax, sched in zip(axes, schedulers_present):
         offset = -(len(modes_present) - 1) * bar_width / 2
         for i, mode in enumerate(modes_present):
             values = []
@@ -119,7 +126,8 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
     suptitle = title
     if interval:
         suptitle += f" (Static Interval: {interval}s)"
-    fig.suptitle(suptitle, fontsize=14, fontweight="bold")
+    # wrap so the title still fits when only one scheduler subplot is drawn
+    fig.suptitle(suptitle, fontsize=14, fontweight="bold", wrap=True)
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=200)

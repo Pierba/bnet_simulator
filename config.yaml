@@ -22,9 +22,9 @@ simulation:
   enable_file_logging: false
   # Multihop modes to run; one batch per mode (subset of: none, append, forwarded)
   multihop_modes:
-  - none
-  # - append
-  # - forwarded
+  # - none
+  - append
+  - forwarded
   # Maximum hops for forwarded mode
   multihop_limit: 1
   # Append mode: discovered nodes farther than this many hops from the sender are
