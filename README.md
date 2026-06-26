@@ -69,8 +69,8 @@ density, then for every beacon interval launches one simulation per
 Each subprocess runs a single discrete-event simulation and writes its metrics to
 CSV; the runner then drives the plotting scripts.
 
-See [docs/transmission_pipeline.md](docs/transmission_pipeline.md) for a detailed
-walk-through of the per-buoy CSMA pipeline, the scheduler's role, and per-mode
+See [ARCHITECTURE.md](ARCHITECTURE.md) (§4 execution pipeline, §5.4 buoy / CSMA) for a
+detailed walk-through of the per-buoy CSMA pipeline, the scheduler's role, and per-mode
 behaviour.
 
 ## Requirements
@@ -135,9 +135,9 @@ Every run is driven by [`config.yaml`](config.yaml). The most relevant keys:
 | `enable_metrics` / `enable_logging` / `enable_file_logging` | Output toggles. |
 | `multihop_modes` | Multihop modes to run; one batch per mode, compared when more than one is listed. |
 | `multihop_limit` | Maximum hops for `forwarded` mode. |
-| `append_hop_limit` | Hop horizon advertised in `append` mode (`1` = direct neighbours, `0` = unlimited). |
+| `append_hop_limit` | Hop horizon advertised in `append` mode (`1` = direct neighbours, `0` = unlimited). _Currently inactive — not enforced in code._ |
 | `pending_queue_limit` | Maximum beacons held in the pending queue. |
-| `forward_density_baseline` | `n0` for probabilistic forwarding: queue a beacon with `p = min(1, n0 / n_neighbors)`. |
+| `forward_density_baseline` | `n0` for probabilistic forwarding (`p = min(1, n0 / n_neighbors)`). _Currently inactive — the forward gate was removed; all fresh beacons are relayed._ |
 
 ### `world`, `buoys`, `network`, `csma`, `scheduler`
 
@@ -176,8 +176,7 @@ uv run src/script/avg_metrics.py \
 bnet_simulator/
 ├── config.yaml              # Single source of truth for every run
 ├── pyproject.toml           # Project metadata & dependencies (uv / hatchling)
-├── docs/
-│   └── transmission_pipeline.md
+├── ARCHITECTURE.md          # Full architecture & per-buoy pipeline walk-through
 └── src/
     ├── run.py               # `sim` entry point — sweep orchestrator / batch runner
     ├── config/
@@ -203,7 +202,7 @@ bnet_simulator/
 
 ## Documentation
 
-- [docs/transmission_pipeline.md](docs/transmission_pipeline.md) — how a buoy
+- [ARCHITECTURE.md](ARCHITECTURE.md) — full architecture reference: how a buoy
   decides what to transmit, when, and how a beacon travels through the CSMA
   pipeline across all three multihop modes.
 

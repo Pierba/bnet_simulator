@@ -88,7 +88,9 @@ class Buoy:
         self.multihop_mode: str = cfg.get('simulation', 'multihop_mode')
         # Forwarded mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
-        # Append mode: hop limit for nodes to be included in the neighbor list (0 = unlimited, 1 = only direct neighbors, etc.)
+        # Append mode hop limit (0 = unlimited, 1 = only direct neighbors, etc.).
+        # NOTE: currently inactive — append stores/advertises all discovered nodes
+        # regardless of hop distance; this value is loaded but not enforced anywhere.
         self.append_hop_limit: int = cfg.get('simulation', 'append_hop_limit')
 
         # Multihop append mode: store discovered nodes from neighbor lists as
@@ -151,27 +153,20 @@ class Buoy:
 
     # Scheduler check handler: asks the scheduler if we should send a beacon and schedules next check
     def _handle_scheduler_check(self, event: Event, sim_time: float):
-        # Schedule the next scheduler check
+        # If the scheduler decides to send, set want_to_send and start a CSMA pipeline if one isn't already running
+        if not self.want_to_send and self.scheduler.should_send(
+            self.velocity, len(self.neighbors), self.last_contact_ts, sim_time
+        ):
+            self.want_to_send = True
+            self.scheduler_decision_time = sim_time
+
+            # Start a fresh CSMA pipeline only if one isn't already in flight
+            if not self.processing:
+                self.processing = True
+                self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
+
+        # Periodically check the scheduler again for new decisions, may considering also the new dynamic interval 
         self._schedule_event(sim_time + self.scheduler.get_next_check_interval(), EventType.SCHEDULER_CHECK)
-
-        # An own beacon is already queued for the current pipeline => don't re-roll the scheduler decision
-        if self.want_to_send:
-            return
-
-        # Ask the scheduler whether an own beacon is due. This runs even while a forward
-        # pipeline is draining, so the buoy's own advertisement is never starved by relay
-        # traffic: the decision is recorded here and the in-flight pipeline (which always
-        # prioritizes own beacons) sends it at its next contention.
-        if not self.scheduler.should_send(self.velocity, len(self.neighbors), self.last_contact_ts, sim_time):
-            return
-
-        self.want_to_send = True
-        self.scheduler_decision_time = sim_time
-
-        # Start a fresh CSMA pipeline only if one isn't already in flight
-        if not self.processing:
-            self.processing = True
-            self._schedule_event(sim_time, EventType.CHANNEL_SENSE)
 
     # Channel sense handler: checks if the channel is busy and either schedules a retry or proceeds with DIFS/backoff
     def _handle_channel_sense(self, event: Event, sim_time: float):
@@ -279,7 +274,8 @@ class Buoy:
         # Forward the beacon and log the action
         forwarded = self.forward_beacon(forward_beacon, sim_time)
         self.channel_broadcast(forwarded, sim_time)
-        logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
+        if logging.LOGGING_ENABLED:
+            logging.log_info(f"Buoy {str(self.id)[:6]} forwarded beacon from {str(forward_beacon.origin_id)[:6]}, hops left: {forwarded.hop_limit}")
 
     # Reception handler: processes incoming beacon, updates neighbors and either appends discovered nodes or forwards the beacon
     def _handle_reception(self, event: Event, sim_time: float):
@@ -338,7 +334,7 @@ class Buoy:
                             self._schedule_event(sim_time + jitter, EventType.CHANNEL_SENSE)
 
                     # Queue full => drop without recording, so a retry can land if room frees
-                    else:
+                    elif logging.LOGGING_ENABLED:
                         logging.log_info(f"Queue full, dropping beacon {str(beacon.origin_id)[:6]} from {str(beacon.sender_id)[:6]}")
 
         if self.metrics:

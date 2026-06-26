@@ -10,9 +10,9 @@ simulation:
    - 1.0   
    - 0.5
    - 0.25
-  duration: 10
+  duration: 120
   num_processes: 10
-  ideal_channel: false
+  ideal_channel: true
   # Options: static, ramp, random
   scenario: random          
   # Percentage of buoys that can change per update in random scenario 
@@ -27,12 +27,14 @@ simulation:
   - forwarded
   # Maximum hops for forwarded mode
   multihop_limit: 1
-  # Append mode: discovered nodes farther than this many hops from the sender are
-  # not advertised in its beacons (1 = direct neighbors only, 0 = unlimited)
+  # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
+  # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
   pending_queue_limit: 50
-  # Probabilistic forwarding: queue a received beacon with p = min(1, n0/n_neighbors)
+  # Probabilistic forwarding baseline n0 (queue p = min(1, n0/n_neighbors)).
+  # CURRENTLY INACTIVE — the probabilistic forward gate was removed; every fresh,
+  # in-TTL, non-own beacon is queued (subject to pending_queue_limit) and relayed.
   forward_density_baseline: 5
 
 world:

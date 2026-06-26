@@ -119,9 +119,10 @@ class Simulator:
 
             self._schedule_buoy_events(buoy)
 
-        # Periodic metrics sampling runs in every scenario: 5s for ramp (timepoint
-        # logs), 30s otherwise. Mobile buoys move even in the static scenario, so the
-        # average-neighbor count must be resampled there too (not just once at t=0).
+        # Periodic metrics sampling runs in every scenario: SAMPLE_INTERVAL_RAMP (5s) for
+        # ramp (timepoint logs), SAMPLE_INTERVAL_OTHER (16s) otherwise. Mobile buoys move
+        # even in the static scenario, so the average-neighbor count must be resampled
+        # there too (not just once at t=0).
         if self.metrics:
             sample_interval = SAMPLE_INTERVAL_RAMP if self.scenario == "ramp" else SAMPLE_INTERVAL_OTHER
             self.schedule_event(sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
