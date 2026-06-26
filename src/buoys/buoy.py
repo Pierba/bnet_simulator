@@ -95,10 +95,6 @@ class Buoy:
         # (last-contact ts, position, hop distance from this buoy)
         self.discovered_nodes: dict[uuid.UUID, tuple[float, tuple[float, float], int]] = {}
 
-        # Metrics-only: cumulative set of every node this buoy has ever discovered.
-        # Kept here (not in Metrics) so the metrics layer only stores the count.
-        self.metrics_discovered_nodes: set[uuid.UUID] = set()
-
         # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline one at a time
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
         self.pending_forward_beacons: dict[uuid.UUID, Beacon]   = {}
@@ -302,7 +298,7 @@ class Buoy:
             # Multihop append mode: collect discovered nodes from beacon's neighbor list
             # These are NOT direct neighbors, but nodes we learned about indirectly
             case 'append':
-                # Remove from discovered nodes if it was there
+                # Don't keep discovered nodes that are now direct neighbors: {discovered_nodes} \ {neighbors} 
                 self.discovered_nodes.pop(beacon.sender_id, None)
 
                 for neighbor_id, neighbor_ts, neighbor_pos, neighbor_hops in beacon.neighbors:
@@ -326,15 +322,18 @@ class Buoy:
                 # Only act on a beacon fresher than the last one decided for this origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
                     # Queue the beacon if it is already pending or there is room left
-                    if beacon.origin_id in self.pending_forward_beacons or len(self.pending_forward_beacons) < self.pending_queue_limit:
+                    if beacon.origin_id in self.pending_forward_beacons or \
+                        len(self.pending_forward_beacons) < self.pending_queue_limit:
+                        
+                        # Update/insert the latest timestamp for this origin and queue the beacon for forwarding
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
 
-                        # Forwarding is paced like an own beacon: start a CSMA pipeline if
-                        # one isn't already running. The jitter desynchronizes the many
-                        # receivers of this beacon so they don't all contend at once
+                        # Forwarding is paced like an own beacon: start a CSMA pipeline if one isn't already running
                         if not self.processing:
                             self.processing = True
+
+                            # Jitter desynchronizes the receivers so they don't all contend at once
                             jitter = random.uniform(0, FORWARD_JITTER_MAX)
                             self._schedule_event(sim_time + jitter, EventType.CHANNEL_SENSE)
 
@@ -345,18 +344,16 @@ class Buoy:
         if self.metrics:
             # Track all unique nodes discovered from this beacon: its neighbor list,
             # the sender, and - in forward mode - the origin
-            discovered_nodes = {neighbor_id for neighbor_id, _, _, _ in beacon.neighbors}
+            discovered_nodes = {b[0] for b in beacon.neighbors}
             discovered_nodes.add(beacon.sender_id)
 
-            if self.multihop_mode == 'forwarded' and beacon.origin_id != beacon.sender_id:
+            if self.multihop_mode == 'forwarded' and beacon.origin_id is not None:
                 discovered_nodes.add(beacon.origin_id)
 
             discovered_nodes.discard(self.id)  # Don't count self as discovered
 
-            # Accumulate into this buoy's cumulative discovery set and report the
-            # de-duplicated count (its reachable-node count) to the metrics layer
-            self.metrics_discovered_nodes.update(discovered_nodes)
-            self.set_unique_nodes_per_buoy_callback(self.id, len(self.metrics_discovered_nodes))
+            # Track all unique nodes discovered from this beacon
+            self.set_unique_nodes_per_buoy_callback(self.id, discovered_nodes)
 
             # Log the reception of this beacon, attributed to its origin: in forwarded
             # mode the sender is just the relay, while timestamp belongs to the origin

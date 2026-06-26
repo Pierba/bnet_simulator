@@ -48,12 +48,15 @@ class Metrics:
         self.total_successful_receivers: int          = 0
         # Per-buoy count of unique nodes discovered (its reachable-node count).
         # De-duplication is done buoy-side, which reports the running size here.
-        self.unique_nodes_per_buoy: dict[UUID, int]   = {}
+        self.unique_nodes_per_buoy: dict[UUID, set[UUID]]   = {}
 
-    # Record the number of unique nodes a buoy has discovered so far. The buoy
-    # owns the de-duplicated set and reports its (monotonically growing) size.
-    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_count: int):
-        self.unique_nodes_per_buoy[buoy_id] = unique_count
+    # Set of unique nodes discovered by each buoy
+    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
+        nodes = self.unique_nodes_per_buoy.get(buoy_id)
+        if nodes is None:
+            self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
+        else:
+            nodes.update(unique_nodes)
 
     # Log a sent beacon; forwarded copies are tracked separately so that
     # origin-generated and relayed transmissions can be distinguished
@@ -139,7 +142,8 @@ class Metrics:
         if not self.unique_nodes_per_buoy:
             return 0.0
 
-        return sum(self.unique_nodes_per_buoy.values()) / len(self.unique_nodes_per_buoy)
+        node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
+        return sum(node_counts) / len(node_counts)
 
     # Reachability of the average node as a percentage of the whole network.
     # density - 1 excludes the buoy itself from the set of reachable nodes.

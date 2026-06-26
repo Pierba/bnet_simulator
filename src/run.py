@@ -165,19 +165,19 @@ def main():
     #======================
     # BUOYS DISTRIBUTION 
     #======================
-    min_buoys: int = cfg.get('simulation', 'min_buoys')             # Minimum number of buoys to simulate
-    max_buoys: int = cfg.get('simulation', 'max_buoys')             # Maximum number of buoys to simulate
+    min_buoys: int  = cfg.get('simulation', 'min_buoys')             # Minimum number of buoys to simulate
+    max_buoys: int  = cfg.get('simulation', 'max_buoys')             # Maximum number of buoys to simulate
     step_buoys: int = cfg.get('simulation', 'step_buoys')           # Step size for buoy density
 
     #=======================
     # SIMULATION PARAMETERS
     #=======================
     intervals: list[float] = cfg.get('simulation', 'intervals')     # List of beacon intervals to simulate
-    num_processes: int = cfg.get('simulation', 'num_processes')     # Number of parallel processes to use for parallel simulations
-    ideal: bool = cfg.get('simulation', 'ideal_channel')            # Whether to simulate with an ideal channel (no collisions)
-    scenario: str = cfg.get('simulation', 'scenario')               # Scenario to run (static, ramp, random)
-    world_width: float = cfg.get('world', 'width')                  # Width of the simulation world
-    world_height: float = cfg.get('world', 'height')                # Height of the simulation world
+    num_processes: int     = cfg.get('simulation', 'num_processes') # Number of parallel processes to use for parallel simulations
+    ideal: bool            = cfg.get('simulation', 'ideal_channel') # Whether to simulate with an ideal channel (no collisions)
+    scenario: str          = cfg.get('simulation', 'scenario')      # Scenario to run (static, ramp, random)
+    world_width: float     = cfg.get('world', 'width')              # Width of the simulation world
+    world_height: float    = cfg.get('world', 'height')             # Height of the simulation world
     
     # If the compare flage is set it will run every multihope_mode and eventually plot thier comparision
     if args.compare:

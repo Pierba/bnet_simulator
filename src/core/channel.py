@@ -76,7 +76,7 @@ class Channel:
         )
 
     # Broadcasts a beacon, handles collisions, schedules receptions, and updates metrics
-    def broadcast(self, beacon: Beacon, sim_time: float) -> float:
+    def broadcast(self, beacon: Beacon, sim_time: float):
         if logging.LOGGING_ENABLED:
             logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
 
@@ -125,8 +125,6 @@ class Channel:
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
             self.metrics.log_collision(collision_lost + poisoned_count)
             self.metrics.log_lost(total_lost + poisoned_count)
-
-        return new_end_time
 
     # Returns active buoys (excluding the sender) within communication range of the beacon
     def _receivers_in_range(self, beacon: Beacon) -> list[tuple[Buoy, float]]:
