@@ -274,6 +274,10 @@ def main():
             case "random" | "static":
                 summary = metrics.summary(sim_time=simulated_time)
                 metrics.export_metrics_to_csv(summary, args.result_file)
+                # Side-car series of how the network-discovery % grew over time, so the
+                # densest run of the sweep can be plotted as a growth curve.
+                discovery_file = args.result_file.replace(".csv", "_discovery.csv")
+                metrics.export_discovery_time_series(discovery_file)
 
 if __name__ == "__main__":
     main()

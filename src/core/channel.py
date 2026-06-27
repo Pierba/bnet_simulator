@@ -129,6 +129,8 @@ class Channel:
             # Total error counts every lost beacon: collisions, probabilistic
             # channel loss and poisoned receptions.
             self.metrics.log_lost(total_lost + poisoned_count)
+            # Sample the network-discovery growth curve (throttled inside metrics)
+            self.metrics.log_discovery_timepoint(sim_time)
 
     # Returns active buoys (excluding the sender) within communication range of the beacon
     def _receivers_in_range(self, beacon: Beacon) -> list[tuple[Buoy, float]]:

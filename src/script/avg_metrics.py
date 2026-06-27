@@ -52,6 +52,9 @@ def average_metrics(input_dirs, output_dir):
         # Process ramp timeseries files
         process_timeseries_files(subdir_input_paths, results_dir)
 
+        # Process network-discovery growth side-car series (*_density*_discovery.csv)
+        process_discovery_files(subdir_input_paths, results_dir)
+
         # Extract interval from subdirectory name for plotting
         interval = extract_interval_from_dirname(subdir)
 
@@ -112,8 +115,12 @@ def process_density_files(input_dirs, output_dir):
     
     # Collect all CSV files from input directories
     for input_dir in input_dirs:
-        csv_files = glob.glob(os.path.join(input_dir, "*_density*.csv"))
-        
+        # The discovery side-car series (*_density*_discovery.csv) also match this
+        # glob, but they are time-series rather than Metric/Value summaries; they
+        # are averaged separately in process_discovery_files.
+        csv_files = [f for f in glob.glob(os.path.join(input_dir, "*_density*.csv"))
+                     if not f.endswith("_discovery.csv")]
+
         for csv_file in csv_files:
             # Extract base filename (e.g., "static_density10.csv")
             base_name = os.path.basename(csv_file)
@@ -212,6 +219,40 @@ def process_timeseries_files(input_dirs, output_dir):
         
         # Save the averaged timeseries
         avg_df.to_csv(os.path.join(output_dir, f"{mode}_ramp_timeseries.csv"), index=False)
+
+def process_discovery_files(input_dirs, output_dir):
+    """Seed-average the network-discovery growth series across runs.
+
+    Each run drops one ``{scheduler}_..._density{D}_discovery.csv`` side-car per
+    scheduler/density holding (time, avg_percentage_discovered). Runs sample at
+    slightly different times, so we align them onto the union of time points by
+    linear interpolation (mirroring process_timeseries_files) and write the mean
+    plus a std column the comparison plotter renders as an error band.
+    """
+    # Group the per-run discovery dataframes by their (identical) file name
+    all_data = defaultdict(list)
+    for input_dir in input_dirs:
+        for csv_file in glob.glob(os.path.join(input_dir, "*_discovery.csv")):
+            df = pd.read_csv(csv_file)
+            if "time" in df.columns and "avg_percentage_discovered" in df.columns and not df.empty:
+                all_data[os.path.basename(csv_file)].append(df)
+
+    for base_name, dataframes in all_data.items():
+        # Align all runs onto the union of their sampled time points
+        all_times = sorted(set().union(*[set(df["time"]) for df in dataframes]))
+
+        aligned = []
+        for df in dataframes:
+            # Outside a run's own time span contributes NaN so it is ignored by nanmean
+            aligned.append(np.interp(all_times, df["time"], df["avg_percentage_discovered"],
+                                     left=np.nan, right=np.nan))
+
+        values_array = np.array(aligned)
+        avg_df = pd.DataFrame({"time": all_times})
+        avg_df["avg_percentage_discovered"] = np.nanmean(values_array, axis=0)
+        avg_df["avg_percentage_discovered_std"] = np.nanstd(values_array, axis=0)
+
+        avg_df.to_csv(os.path.join(output_dir, base_name), index=False)
 
 def plot_averaged_metrics(data_dir, plot_dir, interval=None):
     # Plot block by density with error bars

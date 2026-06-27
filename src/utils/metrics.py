@@ -3,6 +3,11 @@ import os
 import csv
 from utils import logging
 
+# Minimum sim-time gap between two samples of the network-discovery growth curve.
+# Discovery only ever grows, so coarse sampling still captures the full curve while
+# keeping the series small and the per-broadcast bookkeeping cost bounded.
+DISCOVERY_SAMPLE_INTERVAL: float = 2.0
+
 # Class to track and summarize metrics for the BNet simulation
 class Metrics:
     def __init__(
@@ -43,6 +48,11 @@ class Metrics:
         self.scheduler_latency_count: int                 = 0
         self.scheduler_latency_sum: float                 = 0.0
         self.time_series: list                            = []
+        # Growth of the average % of network discovered over sim time. Sampled on
+        # broadcast (throttled by DISCOVERY_SAMPLE_INTERVAL) so the discovery curve
+        # can be plotted for the densest run of a sweep.
+        self.discovery_time_series: list                  = []
+        self._last_discovery_sample_time: float           = -1.0
         self.total_latency: float                         = 0.0
         self.total_successful_receivers: int          = 0
         # Per-buoy count of unique nodes discovered (its reachable-node count).
@@ -151,6 +161,22 @@ class Metrics:
             return 0.0
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
 
+    # Sample the current avg % of network discovered for the growth-over-time curve.
+    # Called on every broadcast but throttled to one sample per DISCOVERY_SAMPLE_INTERVAL
+    # of sim time, so the densest run can be plotted without bloating the series.
+    def log_discovery_timepoint(self, sim_time: float):
+        if (
+            self._last_discovery_sample_time >= 0
+            and (sim_time - self._last_discovery_sample_time) < DISCOVERY_SAMPLE_INTERVAL
+        ):
+            return
+
+        self._last_discovery_sample_time = sim_time
+        self.discovery_time_series.append({
+            "time": sim_time,
+            "avg_percentage_discovered": self.avg_percentage_network_discovered(),
+        })
+
     # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
     def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
         timepoint = {
@@ -237,3 +263,12 @@ class Metrics:
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)
         logging.log_info(f"Time series exported to {filepath}")
+
+    # Export the network-discovery growth series (time, avg % discovered) to CSV
+    def export_discovery_time_series(self, filepath: str):
+        import pandas as pd
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        df = pd.DataFrame(self.discovery_time_series)
+        df.to_csv(filepath, index=False)
+        logging.log_info(f"Discovery time series exported to {filepath}")

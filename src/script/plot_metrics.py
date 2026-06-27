@@ -786,6 +786,91 @@ def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None, schedulers=
     plt.savefig(plot_file)
     plt.close()
 
+def plot_network_discovery_growth(results_dir, plot_file, interval=None, schedulers=None):
+    """Plot how the avg % of network discovered grows over time, for the densest run.
+
+    For density-based scenarios (static/random) every run drops a
+    ``{mode}_..._density{D}_discovery.csv`` side-car series. We pick, per scheduler,
+    the file with the largest density (the last value of the densities sweep) and
+    plot its discovery growth curve.
+    """
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    files = [f for f in os.listdir(results_dir) if f.endswith("_discovery.csv")]
+    if not files:
+        print("No discovery time-series files found for plotting.")
+        return
+
+    plt.figure(figsize=(10, 6))
+    found = False
+    max_density = None
+    multihop_mode = None
+
+    for mode in schedulers:
+        # Collect this scheduler's discovery files and the density encoded in each name
+        candidates = []
+        for f in files:
+            if not f.startswith(f"{mode}_"):
+                continue
+            m = re.search(r"density(\d+(?:\.\d+)?)_discovery\.csv$", f)
+            if m:
+                candidates.append((float(m.group(1)), f))
+
+        if not candidates:
+            continue
+
+        # Densest run = last value of the densities sweep
+        density, densest_file = max(candidates, key=lambda c: c[0])
+        df = pd.read_csv(os.path.join(results_dir, densest_file))
+        if "time" not in df.columns or "avg_percentage_discovered" not in df.columns or df.empty:
+            continue
+
+        plt.plot(df["time"], df["avg_percentage_discovered"],
+                 label=SCHEDULER_LABELS.get(mode, mode), color=SCHEDULER_COLORS.get(mode, None))
+        found = True
+        max_density = density if max_density is None else max(max_density, density)
+
+        # Pull the multihop mode from the matching summary CSV (drop the _discovery suffix)
+        if multihop_mode is None:
+            main_csv = densest_file.replace("_discovery.csv", ".csv")
+            main_path = os.path.join(results_dir, main_csv)
+            if os.path.exists(main_path):
+                main_df = pd.read_csv(main_path, index_col=0)
+                if "Multihop Mode" in main_df.index:
+                    multihop_mode = str(main_df.loc["Multihop Mode", "Value"]).lower()
+
+    if not found:
+        print("No valid discovery time-series data to plot.")
+        plt.close()
+        return
+
+    ax = plt.gca()
+    ax.set_xlabel("Time (s)", fontsize=12)
+    ax.set_ylabel("Avg % of Network Discovered", fontsize=12)
+    ax.set_ylim(0, 100)
+
+    density_str = f" — {int(max_density)} Buoys" if max_density is not None else ""
+    title_parts = [f"Network Discovery Growth (Densest Run{density_str}"]
+    if multihop_mode:
+        if multihop_mode == "none":
+            title_parts.append(", Single-Hop")
+        elif multihop_mode == "append":
+            title_parts.append(", Append Mode")
+        elif multihop_mode == "forwarded":
+            title_parts.append(", Forward Mode")
+        else:
+            title_parts.append(f", {multihop_mode.capitalize()}")
+    if interval:
+        title_parts.append(f", Static Interval: {interval}s)")
+    else:
+        title_parts.append(")")
+    plt.title("".join(title_parts))
+
+    ax.legend(loc="lower right", fontsize=11)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig(plot_file)
+    plt.close()
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
@@ -827,6 +912,10 @@ def main():
     print("Plotting unique nodes vs time for ramp scenarios...")
     plot_file = os.path.join(plot_dir, "avg_unique_nodes_vs_time_ramp.png")
     plot_unique_nodes_vs_time(results_dir, plot_file, interval=interval, schedulers=schedulers)
+
+    print("Plotting network discovery growth over time for densest run...")
+    plot_file = os.path.join(plot_dir, "network_discovery_growth_densest.png")
+    plot_network_discovery_growth(results_dir, plot_file, interval=interval, schedulers=schedulers)
 
     print("Plotting PDR grouped by buoy count for ramp scenario...")
     plot_group_file = os.path.join(plot_dir, "b_pdr_grouped_by_buoy_count_ramp.png")
