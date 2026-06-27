@@ -32,7 +32,7 @@ def scheduler_from(df, filename):
 def load_mode_data(mode_dirs):
     """Load every density summary CSV across all modes into a single long DataFrame.
 
-    Returns columns: Density, Scheduler, Mode, PDR, CollisionRate, PercentageDiscovered.
+    Returns columns: Density, Scheduler, Mode, PDR, CollisionRate, LossRate, PercentageDiscovered.
     """
     rows = []
     for mode, results_dir in mode_dirs.items():
@@ -54,6 +54,7 @@ def load_mode_data(mode_dirs):
 
             pdr = float(df.loc["PDR", "Value"]) if "PDR" in df.index else np.nan
             collision = float(df.loc["Collision Rate", "Value"]) if "Collision Rate" in df.index else np.nan
+            loss = float(df.loc["Loss Rate", "Value"]) if "Loss Rate" in df.index else np.nan
 
             # Prefer the directly-exported percentage; otherwise derive it
             if "Avg % Network Discovered" in df.index:
@@ -69,6 +70,7 @@ def load_mode_data(mode_dirs):
                 "Mode": mode,
                 "PDR": pdr,
                 "CollisionRate": collision,
+                "LossRate": loss,
                 "PercentageDiscovered": pct,
             })
 
@@ -174,6 +176,12 @@ def generate_comparison_plots(mode_dirs, output_dir, interval=None, schedulers=N
         df, "CollisionRate", "Collision Rate",
         "Collision Rate Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_collision_rate_interval-{tag}.png"),
+        interval, schedulers, legend_loc="upper left",
+    )
+    plot_metric(
+        df, "LossRate", "Loss Rate",
+        "Loss Rate (Total Error) Comparison: Multihop Modes by Protocol",
+        os.path.join(output_dir, f"mode_comparison_loss_rate_interval-{tag}.png"),
         interval, schedulers, legend_loc="upper left",
     )
     plot_metric(

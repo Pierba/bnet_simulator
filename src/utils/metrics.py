@@ -94,7 +94,7 @@ class Metrics:
         self.total_latency += latency
 
 
-    # Log a lost beacon
+    # Log lost beacons (total error: collisions + probabilistic loss + poisoned receptions)
     def log_lost(self, count: int = 1):
         self.beacons_lost += count
 
@@ -198,6 +198,7 @@ class Metrics:
             "Delivery Ratio": self.delivery_ratio(),
             "PDR": self.packet_delivery_ratio(),
             "Collision Rate": self.beacons_collided / self.potentially_sent if self.potentially_sent else 0,
+            "Loss Rate": self.beacons_lost / self.potentially_sent if self.potentially_sent else 0,
             "Avg Reaction Latency": (
                 self.reaction_latency_sum / self.reaction_latency_count
                 if self.reaction_latency_count else 0
