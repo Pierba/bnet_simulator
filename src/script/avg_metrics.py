@@ -458,6 +458,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     
     ax.set_xlabel("Total Buoys")
     ax.set_ylabel("PDR")
+    ax.set_ylim(0, 1)
 
     # Update title to include mode
     title_parts = ["PDR vs Buoy Count"]
@@ -517,6 +518,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
 
         ax.set_xlabel("Total Buoys")
         ax.set_ylabel("Collision Rate")
+        ax.set_ylim(0, 1)
 
         # Update title to include mode
         title_parts = ["Collision Rate vs Buoy Count"]
@@ -575,6 +577,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
 
         ax.set_xlabel("Total Buoys")
         ax.set_ylabel("Loss Rate")
+        ax.set_ylim(0, 1)
 
         # Update title to include mode
         title_parts = ["Loss Rate vs Buoy Count"]
@@ -801,7 +804,8 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
     
     ax.set_xlabel("Buoy Count Group")
     ax.set_ylabel("Average PDR")
-    
+    ax.set_ylim(0, 1)
+
     # Update title to include mode
     title = "Average PDR vs Buoy Count Group (Ramp Scenario"
     if multihop_mode:
@@ -911,7 +915,8 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
 
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("PDR", fontsize=12)
-    
+    ax.set_ylim(0, 1)
+
     # Update title to include mode
     title_parts = ["PDR vs Time (Ramp Scenario"]
     if multihop_mode:
