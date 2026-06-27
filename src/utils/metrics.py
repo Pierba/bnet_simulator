@@ -2,20 +2,24 @@ from typing import Any, Optional
 import os
 import csv
 from utils import logging
-from uuid import UUID
+
+# Minimum sim-time gap between two samples of the network-discovery growth curve.
+# Discovery only ever grows, so coarse sampling still captures the full curve while
+# keeping the series small and the per-broadcast bookkeeping cost bounded.
+DISCOVERY_SAMPLE_INTERVAL: float = 2.0
 
 # Class to track and summarize metrics for the BNet simulation
 class Metrics:
     def __init__(
         self,
-        density=None,
-        scheduler_type=None,
-        world_width=None,
-        world_height=None,
-        mobile_count=None,
-        fixed_count=None,
-        duration=None,
-        multihop_mode=None,
+        density: float,
+        scheduler_type: str,
+        world_width: float,
+        world_height: float,
+        mobile_count: int,
+        fixed_count: int,
+        duration: float,
+        multihop_mode: str,
     ):
         # Store configuration parameters for context in the summary
         self.density: float             = density
@@ -28,64 +32,79 @@ class Metrics:
         self.multihop_mode: str         = multihop_mode
         
         # Metrics tracking
-        self.actually_received: int                         = 0
-        self.avg_neighbors_count: int                       = 0
-        self.avg_neighbors_sum: float                       = 0.0
-        self.beacons_sent: int                              = 0
-        self.beacons_received: int                          = 0
-        self.beacons_lost: int                              = 0
-        self.beacons_collided: int                          = 0
-        self.delivered_beacons: dict[UUID, float]           = {}
-        self.discovered_pairs: dict[UUID, set[UUID]]        = {}
-        self.potentially_sent: int                          = 0
-        self.reaction_latency_count: int                    = 0
-        self.reaction_latency_sum: float                    = 0.0
-        self.scheduler_latency_count: int                   = 0
-        self.scheduler_latency_sum: float                   = 0.0
-        self.time_series: list                              = []
-        self.total_latency: float                           = 0.0
-        self.total_successful_receivers: int                = 0
-        self.unique_nodes_per_buoy: dict[UUID, set[UUID]]   = {} 
-        
-    # Set of unique nodes discovered by each buoy
-    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
-        if buoy_id not in self.unique_nodes_per_buoy:
-            self.unique_nodes_per_buoy[buoy_id] = set()
-        self.unique_nodes_per_buoy[buoy_id].update(unique_nodes)
+        self.actually_received: int                       = 0
+        self.avg_neighbors_count: int                     = 0
+        self.avg_neighbors_sum: float                     = 0.0
+        self.beacons_sent: int                            = 0
+        self.beacons_forwarded: int                       = 0
+        self.beacons_received: int                        = 0
+        self.beacons_lost: int                            = 0
+        self.beacons_collided: int                        = 0
+        self.delivered_beacons: dict[int, float]          = {}
+        self.discovered_pairs: dict[int, set[int]]        = {}
+        self.potentially_sent: int                        = 0
+        self.reaction_latency_count: int                  = 0
+        self.reaction_latency_sum: float                  = 0.0
+        self.scheduler_latency_count: int                 = 0
+        self.scheduler_latency_sum: float                 = 0.0
+        self.time_series: list                            = []
+        # Growth of the average % of network discovered over sim time. Sampled on
+        # broadcast (throttled by DISCOVERY_SAMPLE_INTERVAL) so the discovery curve
+        # can be plotted for the densest run of a sweep.
+        self.discovery_time_series: list                  = []
+        self._last_discovery_sample_time: float           = -1.0
+        self.total_latency: float                         = 0.0
+        self.total_successful_receivers: int          = 0
+        # Per-buoy count of unique nodes discovered (its reachable-node count).
+        # De-duplication is done buoy-side, which reports the running size here.
+        self.unique_nodes_per_buoy: dict[int, set[int]]     = {}
 
-    # Log a sent beacon
-    def log_sent(self):
+    # Set of unique nodes discovered by each buoy
+    def set_unique_nodes_per_buoy(self, buoy_id: int, unique_nodes: set[int]):
+        nodes = self.unique_nodes_per_buoy.get(buoy_id)
+        if nodes is None:
+            self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
+        else:
+            nodes.update(unique_nodes)
+
+    # Log a sent beacon; forwarded copies are tracked separately so that
+    # origin-generated and relayed transmissions can be distinguished
+    def log_sent(self, is_forward: bool = False):
         self.beacons_sent += 1
+        if is_forward:
+            self.beacons_forwarded += 1
 
     # Log a received beacon and tracks unique deliveries and latency
-    def log_received(self, sender_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
+    def log_received(self, origin_id: int, timestamp: float, receive_time: float, receiver_id: int):
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
-        # If this beacon has already been counted as delivered, skip it
-        last_ts = self.delivered_beacons.get(sender_id)
-        if last_ts is not None and last_ts >= timestamp:
-            return
-
-        # Update the number of unique beacons received and total latency
-        self.delivered_beacons[sender_id] = timestamp
-        self.beacons_received += 1
-        self.total_latency += receive_time - timestamp
-
-        # Only count the reaction latency for the first time this receiver discovers this sender
+        # Reaction latency: the first time THIS receiver discovers THIS origin. 
+        # It is tracked per receiver, so it must be evaluated on every reception
         seen_senders = self.discovered_pairs.get(receiver_id)
         if seen_senders is None:
             seen_senders = set()
             self.discovered_pairs[receiver_id] = seen_senders
-        elif sender_id in seen_senders:
+        
+        latency = receive_time - timestamp
+        if origin_id not in seen_senders:
+            seen_senders.add(origin_id)
+            self.reaction_latency_count += 1
+            self.reaction_latency_sum += latency
+
+        # Unique-beacon accounting: count each generated beacon (origin, timestamp) once,
+        # the first time it reaches anyone. If already counted as delivered, skip it.
+        last_ts = self.delivered_beacons.get(origin_id)
+        if last_ts is not None and last_ts >= timestamp:
             return
 
-        seen_senders.add(sender_id)
-        self.reaction_latency_count += 1
-        self.reaction_latency_sum += receive_time - timestamp
-                
+        # Update the number of unique beacons received and total latency
+        self.delivered_beacons[origin_id] = timestamp
+        self.beacons_received += 1
+        self.total_latency += latency
 
-    # Log a lost beacon
+
+    # Log lost beacons (total error: collisions + probabilistic loss + poisoned receptions)
     def log_lost(self, count: int = 1):
         self.beacons_lost += count
 
@@ -113,9 +132,50 @@ class Metrics:
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
 
-    # Calculate Packet Delivery Ratio: successful receivers / potential receivers
+    # Calculate Packet Delivery Ratio: packets actually received / packets sent.
+    # Both counts are at the per-receiver (transmission x in-range receiver) granularity
+    # and include forwarded beacons as individual packets, just like origin beacons.
     def packet_delivery_ratio(self) -> float:
-        return self.total_successful_receivers / self.potentially_sent if self.potentially_sent else 0.0
+        return self.actually_received / self.potentially_sent if self.potentially_sent else 0.0
+
+    # Calculate True Packet Delivery Ratio: unique beacons delivered / unique beacons
+    # generated. Forwarded copies are excluded from the denominator: they re-transmit
+    # existing beacons, and counting them made the ratio incomparable across modes
+    def delivery_ratio(self) -> float:
+        originated = self.beacons_sent - self.beacons_forwarded
+        return self.beacons_received / originated if originated else 0.0
+
+    # Average number of unique nodes discovered per buoy: how many other nodes
+    # the average node in the network can reach (its reachability, as a count).
+    def avg_unique_nodes_discovered(self) -> float:
+        if not self.unique_nodes_per_buoy:
+            return 0.0
+
+        node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
+        return sum(node_counts) / len(node_counts)
+
+    # Reachability of the average node as a percentage of the whole network.
+    # density - 1 excludes the buoy itself from the set of reachable nodes.
+    def avg_percentage_network_discovered(self) -> float:
+        if self.density <= 1:
+            return 0.0
+        return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
+
+    # Sample the current avg % of network discovered for the growth-over-time curve.
+    # Called on every broadcast but throttled to one sample per DISCOVERY_SAMPLE_INTERVAL
+    # of sim time, so the densest run can be plotted without bloating the series.
+    def log_discovery_timepoint(self, sim_time: float):
+        if (
+            self._last_discovery_sample_time >= 0
+            and (sim_time - self._last_discovery_sample_time) < DISCOVERY_SAMPLE_INTERVAL
+        ):
+            return
+
+        self._last_discovery_sample_time = sim_time
+        self.discovery_time_series.append({
+            "time": sim_time,
+            "avg_percentage_discovered": self.avg_percentage_network_discovered(),
+        })
 
     # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
     def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
@@ -134,18 +194,6 @@ class Metrics:
             
         self.time_series.append(timepoint)
 
-    # Calculate True Packet Delivery Ratio: unique beacons delivered / beacons sent
-    def delivery_ratio(self) -> float:
-        return self.beacons_received / self.beacons_sent if self.beacons_sent else 0.0
-
-    # Calculate the average number of unique nodes discovered per buoy
-    def avg_unique_nodes_discovered(self) -> float:
-        if not self.unique_nodes_per_buoy:
-            return 0.0
-        
-        node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
-        return sum(node_counts) / len(node_counts)
-    
     # Record a sample of the average number of neighbors for time-series analysis
     def record_avg_neighbors_sample(self, avg_neighbors_value: float):
         self.avg_neighbors_sum += avg_neighbors_value
@@ -158,15 +206,16 @@ class Metrics:
         return self.avg_neighbors_sum / self.avg_neighbors_count
     
     # Generate a summary of all metrics for the simulation run
-    def summary(self, sim_time: float) -> dict[str]:
+    def summary(self, sim_time: float) -> dict[str, Any]:
         summary = {
-            "Scheduler Type": self.scheduler_type or "unknown",
-            "Multihop Mode": self.multihop_mode or "none",
-            "World Size": f"{self.world_width}x{self.world_height}" if self.world_width else "unknown",
-            "Mobile Buoys": self.mobile_buoy_count or 0,
-            "Fixed Buoys": self.fixed_buoy_count or 0,
-            "Simulation Duration": self.simulation_duration or sim_time,
+            "Scheduler Type": self.scheduler_type,
+            "Multihop Mode": self.multihop_mode,
+            "World Size": f"{self.world_width}x{self.world_height}",
+            "Mobile Buoys": self.mobile_buoy_count,
+            "Fixed Buoys": self.fixed_buoy_count,
+            "Simulation Duration": self.simulation_duration,
             "Sent": self.beacons_sent,
+            "Forwards Sent": self.beacons_forwarded,
             "Unique Beacons Received": self.beacons_received,
             "Lost": self.beacons_lost,
             "Collisions": self.beacons_collided,
@@ -175,6 +224,7 @@ class Metrics:
             "Delivery Ratio": self.delivery_ratio(),
             "PDR": self.packet_delivery_ratio(),
             "Collision Rate": self.beacons_collided / self.potentially_sent if self.potentially_sent else 0,
+            "Loss Rate": self.beacons_lost / self.potentially_sent if self.potentially_sent else 0,
             "Avg Reaction Latency": (
                 self.reaction_latency_sum / self.reaction_latency_count
                 if self.reaction_latency_count else 0
@@ -188,27 +238,15 @@ class Metrics:
             "Successful Receivers": self.total_successful_receivers,
             "Average Neighbors": self.get_final_avg_neighbors(),
             "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
+            "Avg % Network Discovered": self.avg_percentage_network_discovered(),
+            "Density": self.density,
         }
 
-        if self.density is not None:
-            summary["Density"] = self.density
-            
         return summary
 
     # Export the summary metrics to a CSV file for later plotting
-    def export_metrics_to_csv(self, summary, filename=None):
-        if filename is None:
-            results_dir = os.path.join("metrics", "test_results")
-            os.makedirs(results_dir, exist_ok=True)
-            filename = (
-                f"{self.scheduler_type or 'unknown'}_"
-                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
-                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}.csv"
-            )
-            filepath = os.path.join(results_dir, filename)
-        else:
-            filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    def export_metrics_to_csv(self, summary, filepath: str):
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         with open(filepath, mode="w", newline="") as csvfile:
             writer = csv.writer(csvfile)
@@ -218,21 +256,19 @@ class Metrics:
         logging.log_info(f"Metrics exported to {filepath}")
 
     # Export the time-series data to a CSV file for later plotting
-    def export_time_series(self, filename=None):
+    def export_time_series(self, filepath: str):
         import pandas as pd
-        if filename is None:
-            results_dir = os.path.join("metrics", "test_results")
-            os.makedirs(results_dir, exist_ok=True)
-            filename = (
-                f"{self.scheduler_type or 'unknown'}_"
-                f"{int(self.world_width or 0)}x{int(self.world_height or 0)}_"
-                f"mob{self.mobile_buoy_count or 0}_fix{self.fixed_buoy_count or 0}_timeseries.csv"
-            )
-            filepath = os.path.join(results_dir, filename)
-        else:
-            filepath = filename
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)
         logging.log_info(f"Time series exported to {filepath}")
+
+    # Export the network-discovery growth series (time, avg % discovered) to CSV
+    def export_discovery_time_series(self, filepath: str):
+        import pandas as pd
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        df = pd.DataFrame(self.discovery_time_series)
+        df.to_csv(filepath, index=False)
+        logging.log_info(f"Discovery time series exported to {filepath}")

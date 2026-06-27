@@ -6,43 +6,44 @@ class ConfigHandler:
     _instance = None
     _config = None
     
-    # Default configuration sets for the simulation
+    # Default configuration sets for the simulation (kept in sync with config.yaml)
     DEFAULT_CONFIG = {
         'simulation': {
             'schedulers': ['static', 'dynamic_adab', 'dynamic_acab'],
             'min_buoys': 20,
-            'max_buoys': 30,
+            'max_buoys': 100,
             'step_buoys': 20,
             'intervals': [1.0, 0.5, 0.25],
-            'duration': 600,
-            'num_processes': 4,
-            'ideal_channel': True,
-            'scenario': 'static',           # Options: static, ramp, random
-            'random_variability': 0.05,     # Fraction of total buoys that can change per update in random scenario
+            'duration': 60,
+            'num_processes': 10,
+            'ideal_channel': False,
+            'scenario': 'random',           # Options: static, ramp, random
+            'random_variability': 0.10,     # Fraction of total buoys that can change per update in random scenario
             'enable_metrics': True,
             'enable_logging': False,
             'enable_file_logging': False,
-            'multihop_mode': 'none',        # Options: none, append, forwarded
-            'multihop_limit': 2,            # Maximum hops for forwarded mode
+            'multihop_modes': ['none', 'append', 'forwarded'], # Multihop modes to run; one batch per mode
+            'multihop_limit': 1,                               # Maximum hops for forwarded mode
+            'append_hop_limit': 2,          # Append hop horizon (1 = direct only, 0 = unlimited). INACTIVE: not enforced in code
             'pending_queue_limit': 20,      # Maximum number of beacons that can be stored in pending queue
+            'forward_density_baseline': 5,  # Probabilistic forward gate baseline. INACTIVE: gate removed, all fresh beacons relayed
         },
         'world': {
-            'width': 800.0,
-            'height': 800.0
+            'width': 500.0,
+            'height': 500.0
         },
         'buoys': {
-            'mobile': True,
-            'mobile_percentage': 1.0,
+            'mobile_percentage': 0.4,
             'default_velocity': 15.0,
-            'rwp_speed_min': 5.0,
-            'rwp_speed_max': 20.0,
-            'rwp_pause_min': 0.0,
-            'rwp_pause_max': 10.0,
+            'rwp_speed_min': 5.0,           # m/s - lower bound per leg
+            'rwp_speed_max': 20.0,          # m/s - upper bound per leg
+            'rwp_pause_min': 0.0,           # seconds - minimum pause at waypoint
+            'rwp_pause_max': 10.0,          # seconds - maximum pause at waypoint
         },
         'network': {
             'bit_rate': 1000000,
             'speed_of_light': 300000000.0,
-            'communication_range_max': 120.0,
+            'communication_range_max': 80.0,
             'communication_range_high_prob': 70.0,
             'delivery_prob_high': 0.9,
             'delivery_prob_low': 0.15
@@ -50,14 +51,16 @@ class ConfigHandler:
         'csma': {
             'slot_time': 0.000020,
             'difs_time': 0.000050,
-            'cw': 16,
-            'backoff_time_min': 0.001,
-            'backoff_time_max': 0.016
+            'cw': 16
         },
         'scheduler': {
+            'static_interval': 1.0,
             'beacon_min_interval': 1.0,
             'beacon_max_interval': 5.0,
-            'static_interval': 1.0
+            'adab_neighbors_threshold': 15.0,   # ADAB: neighbour count that maps to density factor = 1.0 (full backoff)
+            'acab_neighbors_threshold': 10.0,   # ACAB: neighbour count that maps density component to 1.0
+            'acab_contact_threshold': 20.0,     # ACAB: seconds since last contact at which contact-recency score decays to 0
+            'acab_weights': [0.4, 0.3, 0.3],    # ACAB blend weights: [density, contact, mobility] - must sum to 1.0
         }
     }
     
@@ -86,8 +89,10 @@ class ConfigHandler:
     
     # Getter of configuration values
     def get(self, section: str, key: str) -> Any:
-        # Special case: neighbor_timeout is calculated as 3 * static_interval
-        if section == 'scheduler' and key == 'neighbor_timeout':
-            static_interval = self._config.get('scheduler', {}).get('static_interval', 1.0)
-            return 3.0 * static_interval
         return self._config.get(section, {}).get(key)
+
+    # Setter to override a configuration value at runtime (in-process only).
+    # Used to inject per-simulation parameters (e.g. multihop_mode) that must be
+    # honored by behavior code reading directly from the config singleton.
+    def set(self, section: str, key: str, value: Any) -> None:
+        self._config.setdefault(section, {})[key] = value

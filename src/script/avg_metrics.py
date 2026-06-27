@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import re
 from collections import defaultdict
 
+from plot_mode_comparison import generate_comparison_plots
+
+# Multihop modes that may appear as the trailing token of a results-dir name
+MULTIHOP_MODES = ("none", "append", "forwarded")
+
 def average_metrics(input_dirs, output_dir):
     # Identify subdirectories in each input directory
     all_subdirs = set()
@@ -14,57 +19,85 @@ def average_metrics(input_dirs, output_dir):
                    if os.path.isdir(os.path.join(input_dir, d))]
         all_subdirs.update(subdirs)
     
+    # Accumulate the averaged results dirs so modes that differ only by the
+    # trailing multihop token can be compared once everything is averaged.
+    comparison_groups: dict[str, dict[str, str]] = defaultdict(dict)  # group -> {mode: dir}
+    group_interval: dict[str, float] = {}
+
     # Process each subdirectory separately
-    for subdir in all_subdirs:
-        # Extract the interval part from the subdirectory name
-        interval_part = re.search(r'(interval\d+.*)', subdir)
-        if interval_part:
-            interval_suffix = interval_part.group(1)
-        else:
-            interval_suffix = subdir
-        
+    for subdir in sorted(all_subdirs):
+        # Mirror the input naming for the averaged outputs (strip the leading
+        # "results_") so downstream tools recognise them identically, e.g.
+        # results_interval-1.0_random_forwarded.
+        suffix = subdir[len("results_"):] if subdir.startswith("results_") else subdir
+
         # Create results and plots directories directly in output_dir
-        results_dir = os.path.join(output_dir, f"results_{interval_suffix}")
-        plots_dir = os.path.join(output_dir, f"plots_{interval_suffix}")
-        
+        results_dir = os.path.join(output_dir, f"results_{suffix}")
+        plots_dir = os.path.join(output_dir, f"plots_{suffix}")
+
         os.makedirs(results_dir, exist_ok=True)
         os.makedirs(plots_dir, exist_ok=True)
-        
+
         # Collect input paths
-        subdir_input_paths = [os.path.join(input_dir, subdir) for input_dir in input_dirs 
+        subdir_input_paths = [os.path.join(input_dir, subdir) for input_dir in input_dirs
                              if os.path.isdir(os.path.join(input_dir, subdir))]
-        
+
         print(f"Processing {subdir}...")
         print(f"  Results will be saved to: {results_dir}")
         print(f"  Plots will be saved to: {plots_dir}")
-        
+
         # Process density files (static_density*.csv, dynamic_density*.csv)
         process_density_files(subdir_input_paths, results_dir)
-        
+
         # Process ramp timeseries files
         process_timeseries_files(subdir_input_paths, results_dir)
-        
+
+        # Process network-discovery growth side-car series (*_density*_discovery.csv)
+        process_discovery_files(subdir_input_paths, results_dir)
+
         # Extract interval from subdirectory name for plotting
         interval = extract_interval_from_dirname(subdir)
-        
+
         # Generate plots in the plot directory
         plot_averaged_metrics(results_dir, plots_dir, interval)
 
+        # Register this averaged dir under its mode-agnostic group key
+        for mode in MULTIHOP_MODES:
+            if suffix.endswith(f"_{mode}"):
+                group_key = suffix[: -len(f"_{mode}")]
+                comparison_groups[group_key][mode] = results_dir
+                group_interval[group_key] = interval
+                break
+
+    # Build the cross-mode comparison figures from the averaged dirs
+    for group_key, mode_dirs in comparison_groups.items():
+        if len(mode_dirs) < 2:
+            continue
+        comparison_dir = os.path.join(output_dir, f"comparison_{group_key}")
+        print(f"Comparing multihop modes for {group_key}: {', '.join(mode_dirs)}")
+        generate_comparison_plots(mode_dirs, comparison_dir, group_interval[group_key])
+
 def extract_interval_from_dirname(dirname):
+    """Pull the beacon interval (seconds) out of a results-dir name.
+
+    Current convention encodes the literal value after a dash, e.g.
+    "...interval-1.0..." or "...interval-0.25...". A legacy tenths-style
+    encoding ("interval1" -> 1.0, "interval5" -> 0.5, "interval2_5" -> 0.25)
+    is kept as a fallback for older directories.
     """
-    Hard-coded interval mapping based on directory naming convention.
-    interval1_ideal -> 1.0s
-    interval2_5_ideal -> 0.25s  
-    interval5_ideal -> 0.5s
-    """
-    # Hard-coded mappings
+    # Current convention: literal seconds after a dash (interval-1.0, interval-0.25)
+    match = re.search(r'interval-(\d+(?:\.\d+)?)', dirname)
+    if match:
+        return float(match.group(1))
+
+    # Legacy tenths-style mappings
+    if 'interval2_5' in dirname or 'interval2.5' in dirname:
+        return 0.25
+    if 'interval5' in dirname:
+        return 0.5
     if 'interval1' in dirname:
         return 1.0
-    elif 'interval2_5' in dirname or 'interval2.5' in dirname:
-        return 0.25
-    elif 'interval5' in dirname:
-        return 0.5
-    
+
     # Fallback: try to parse from dirname if it doesn't match known patterns
     match = re.search(r'interval(\d+(?:_\d+)?)', dirname)
     if match:
@@ -73,7 +106,7 @@ def extract_interval_from_dirname(dirname):
             return float(interval_str)
         except ValueError:
             return None
-    
+
     return None
 
 def process_density_files(input_dirs, output_dir):
@@ -82,8 +115,12 @@ def process_density_files(input_dirs, output_dir):
     
     # Collect all CSV files from input directories
     for input_dir in input_dirs:
-        csv_files = glob.glob(os.path.join(input_dir, "*_density*.csv"))
-        
+        # The discovery side-car series (*_density*_discovery.csv) also match this
+        # glob, but they are time-series rather than Metric/Value summaries; they
+        # are averaged separately in process_discovery_files.
+        csv_files = [f for f in glob.glob(os.path.join(input_dir, "*_density*.csv"))
+                     if not f.endswith("_discovery.csv")]
+
         for csv_file in csv_files:
             # Extract base filename (e.g., "static_density10.csv")
             base_name = os.path.basename(csv_file)
@@ -183,6 +220,40 @@ def process_timeseries_files(input_dirs, output_dir):
         # Save the averaged timeseries
         avg_df.to_csv(os.path.join(output_dir, f"{mode}_ramp_timeseries.csv"), index=False)
 
+def process_discovery_files(input_dirs, output_dir):
+    """Seed-average the network-discovery growth series across runs.
+
+    Each run drops one ``{scheduler}_..._density{D}_discovery.csv`` side-car per
+    scheduler/density holding (time, avg_percentage_discovered). Runs sample at
+    slightly different times, so we align them onto the union of time points by
+    linear interpolation (mirroring process_timeseries_files) and write the mean
+    plus a std column the comparison plotter renders as an error band.
+    """
+    # Group the per-run discovery dataframes by their (identical) file name
+    all_data = defaultdict(list)
+    for input_dir in input_dirs:
+        for csv_file in glob.glob(os.path.join(input_dir, "*_discovery.csv")):
+            df = pd.read_csv(csv_file)
+            if "time" in df.columns and "avg_percentage_discovered" in df.columns and not df.empty:
+                all_data[os.path.basename(csv_file)].append(df)
+
+    for base_name, dataframes in all_data.items():
+        # Align all runs onto the union of their sampled time points
+        all_times = sorted(set().union(*[set(df["time"]) for df in dataframes]))
+
+        aligned = []
+        for df in dataframes:
+            # Outside a run's own time span contributes NaN so it is ignored by nanmean
+            aligned.append(np.interp(all_times, df["time"], df["avg_percentage_discovered"],
+                                     left=np.nan, right=np.nan))
+
+        values_array = np.array(aligned)
+        avg_df = pd.DataFrame({"time": all_times})
+        avg_df["avg_percentage_discovered"] = np.nanmean(values_array, axis=0)
+        avg_df["avg_percentage_discovered_std"] = np.nanstd(values_array, axis=0)
+
+        avg_df.to_csv(os.path.join(output_dir, base_name), index=False)
+
 def plot_averaged_metrics(data_dir, plot_dir, interval=None):
     # Plot block by density with error bars
     plot_block_by_density_with_errors(data_dir, plot_dir, interval)
@@ -204,6 +275,7 @@ def get_density_dataframes(data_dir):
     files = glob.glob(os.path.join(data_dir, "*_density*.csv"))
     pdr_data = []
     collision_data = []
+    loss_data = []
     unique_nodes_data = []
     
     # Extract data from CSV files
@@ -229,11 +301,12 @@ def get_density_dataframes(data_dir):
         else:
             sched_type = "unknown"
         
-        # Extract B-PDR data
-        if "Density" in df.index and ("Delivery Ratio" in df.index or "B-PDR" in df.index):
+        # Extract per-copy PDR: each forward beacon counts as a normal beacon,
+        # computed with the same formula as single-hop (actually_received / potentially_sent)
+        if "Density" in df.index and "PDR" in df.index:
             density = float(df.loc["Density", "Value"])
-            pdr = float(df.loc["B-PDR", "Value"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "Value"])
-            pdr_std = float(df.loc["B-PDR", "StdDev"]) if "B-PDR" in df.index else float(df.loc["Delivery Ratio", "StdDev"])
+            pdr = float(df.loc["PDR", "Value"])
+            pdr_std = float(df.loc["PDR", "StdDev"])
             
             avg_neighbors = None
             if "Average Neighbors" in df.index:
@@ -256,7 +329,21 @@ def get_density_dataframes(data_dir):
                 avg_neighbors = float(df.loc["Avg Neighbors", "Value"])
             
             collision_data.append((density, collision_rate, collision_std, sched_type, avg_neighbors, multihop_mode))
-        
+
+        # Extract loss rate (total error) data
+        if "Density" in df.index and "Loss Rate" in df.index:
+            density = float(df.loc["Density", "Value"])
+            loss_rate = float(df.loc["Loss Rate", "Value"])
+            loss_std = float(df.loc["Loss Rate", "StdDev"])
+
+            avg_neighbors = None
+            if "Average Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Average Neighbors", "Value"])
+            elif "Avg Neighbors" in df.index:
+                avg_neighbors = float(df.loc["Avg Neighbors", "Value"])
+
+            loss_data.append((density, loss_rate, loss_std, sched_type, avg_neighbors, multihop_mode))
+
         # Extract unique nodes data
         if "Density" in df.index and "Avg Unique Nodes Discovered" in df.index:
             density = float(df.loc["Density", "Value"])
@@ -266,21 +353,22 @@ def get_density_dataframes(data_dir):
             unique_nodes_data.append((density, avg_unique, avg_unique_std, sched_type, multihop_mode))
     
     # Create dataframes
-    pdr_df = pd.DataFrame(pdr_data, columns=["Density", "B-PDR", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
+    pdr_df = pd.DataFrame(pdr_data, columns=["Density", "PDR", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
     coll_df = pd.DataFrame(collision_data, columns=["Density", "CollisionRate", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
+    loss_df = pd.DataFrame(loss_data, columns=["Density", "LossRate", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
     unique_df = pd.DataFrame(unique_nodes_data, columns=["Density", "AvgUniqueNodes", "StdDev", "Scheduler", "MultihopMode"])
-    
-    return pdr_df, coll_df, unique_df
+
+    return pdr_df, coll_df, loss_df, unique_df
 
 def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     try:
-        pdr_df, coll_df, _ = get_density_dataframes(data_dir)
+        pdr_df, coll_df, loss_df, _ = get_density_dataframes(data_dir)
     except Exception as e:
         print(f"Error getting density data: {e}")
         return
     
     if pdr_df.empty:
-        print("No B-PDR data with density found.")
+        print("No PDR data with density found.")
         return
     
     # Get multihop mode for title
@@ -299,7 +387,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     elif len(multihop_modes) > 1:
         mode_str = "Mixed Modes"
     
-    # Create B-PDR by density plot with error bars
+    # Create PDR by density plot with error bars
     densities = sorted(pdr_df["Density"].unique())
     schedulers = ["dynamic_acab", "dynamic_adab", "static"]
     scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
@@ -322,7 +410,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
         for d in densities:
             rows = pdr_df[(pdr_df["Density"] == d) & (pdr_df["Scheduler"] == sched)]
             if not rows.empty:
-                values.append(rows["B-PDR"].mean())
+                values.append(rows["PDR"].mean())
                 errors.append(rows["StdDev"].mean())
             else:
                 values.append(0)
@@ -369,10 +457,11 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
             ax2.set_ylim(0, max_avg_neighbors * 1.2)
     
     ax.set_xlabel("Total Buoys")
-    ax.set_ylabel("B-PDR")
-    
+    ax.set_ylabel("PDR")
+    ax.set_ylim(0, 1)
+
     # Update title to include mode
-    title_parts = ["B-PDR vs Buoy Count"]
+    title_parts = ["PDR vs Buoy Count"]
     if mode_str:
         title_parts.append(f"({mode_str}")
         if interval:
@@ -399,69 +488,128 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, "b_pdr_block_by_density.png"))
     plt.close()
     
-    if coll_df.empty:
-        print("No collision rate data with density found.")
-        return
-    
     # Create collision rate by density plot with error bars
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    offset = -(len(schedulers) - 1) * bar_width / 2
-    for i, sched in enumerate(schedulers):
-        values = []
-        errors = []
-        for d in densities:
-            rows = coll_df[(coll_df["Density"] == d) & (coll_df["Scheduler"] == sched)]
-            if not rows.empty:
-                values.append(rows["CollisionRate"].mean())
-                errors.append(rows["StdDev"].mean())
+    if not coll_df.empty:
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        offset = -(len(schedulers) - 1) * bar_width / 2
+        for i, sched in enumerate(schedulers):
+            values = []
+            errors = []
+            for d in densities:
+                rows = coll_df[(coll_df["Density"] == d) & (coll_df["Scheduler"] == sched)]
+                if not rows.empty:
+                    values.append(rows["CollisionRate"].mean())
+                    errors.append(rows["StdDev"].mean())
+                else:
+                    values.append(0)
+                    errors.append(0)
+
+            values_arr = np.array(values)
+            errors_arr = np.array(errors)
+            lower_errors = np.minimum(errors_arr, values_arr)
+            upper_errors = errors_arr
+
+            ax.bar(x + offset + i * bar_width, values_arr, bar_width,
+                   label=scheduler_labels[sched], color=color_map[sched])
+            ax.errorbar(x + offset + i * bar_width, values_arr,
+                       yerr=[lower_errors, upper_errors], fmt='none',
+                       ecolor='black', capsize=5, alpha=0.7)
+
+        ax.set_xlabel("Total Buoys")
+        ax.set_ylabel("Collision Rate")
+        ax.set_ylim(0, 1)
+
+        # Update title to include mode
+        title_parts = ["Collision Rate vs Buoy Count"]
+        if mode_str:
+            title_parts.append(f"({mode_str}")
+            if interval:
+                title_parts.append(f", Static Interval: {interval}s)")
             else:
-                values.append(0)
-                errors.append(0)
-        
-        values_arr = np.array(values)
-        errors_arr = np.array(errors)
-        lower_errors = np.minimum(errors_arr, values_arr)
-        upper_errors = errors_arr
-        
-        ax.bar(x + offset + i * bar_width, values_arr, bar_width, 
-               label=scheduler_labels[sched], color=color_map[sched])
-        ax.errorbar(x + offset + i * bar_width, values_arr, 
-                   yerr=[lower_errors, upper_errors], fmt='none', 
-                   ecolor='black', capsize=5, alpha=0.7)
-    
-    ax.set_xlabel("Total Buoys")
-    ax.set_ylabel("Collision Rate")
-    
-    # Update title to include mode
-    title_parts = ["Collision Rate vs Buoy Count"]
-    if mode_str:
-        title_parts.append(f"({mode_str}")
+                title_parts.append(")")
+        elif interval:
+            title_parts.append(f"(Static Interval: {interval}s)")
+        ax.set_title(" ".join(title_parts))
+
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(int(d)) for d in densities])
+        ax.legend(loc='upper left')
+        ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+        plt.tight_layout()
+
         if interval:
-            title_parts.append(f", Static Interval: {interval}s)")
+            plt.savefig(os.path.join(plot_dir, f"collision_rate_interval{int(interval*10)}.png"))
         else:
-            title_parts.append(")")
-    elif interval:
-        title_parts.append(f"(Static Interval: {interval}s)")
-    ax.set_title(" ".join(title_parts))
-    
-    ax.set_xticks(x)
-    ax.set_xticklabels([str(int(d)) for d in densities])
-    ax.legend(loc='upper left')
-    ax.grid(axis="y", linestyle="--", alpha=0.6)
-    
-    plt.tight_layout()
-    
-    if interval:
-        plt.savefig(os.path.join(plot_dir, f"collision_rate_interval{int(interval*10)}.png"))
+            plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
+        plt.close()
     else:
-        plt.savefig(os.path.join(plot_dir, "collision_rate_block_by_density.png"))
-    plt.close()
+        print("No collision rate data with density found.")
+
+    # Create loss rate (total error) by density plot with error bars
+    if not loss_df.empty:
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        offset = -(len(schedulers) - 1) * bar_width / 2
+        for i, sched in enumerate(schedulers):
+            values = []
+            errors = []
+            for d in densities:
+                rows = loss_df[(loss_df["Density"] == d) & (loss_df["Scheduler"] == sched)]
+                if not rows.empty:
+                    values.append(rows["LossRate"].mean())
+                    errors.append(rows["StdDev"].mean())
+                else:
+                    values.append(0)
+                    errors.append(0)
+
+            values_arr = np.array(values)
+            errors_arr = np.array(errors)
+            lower_errors = np.minimum(errors_arr, values_arr)
+            upper_errors = errors_arr
+
+            ax.bar(x + offset + i * bar_width, values_arr, bar_width,
+                   label=scheduler_labels[sched], color=color_map[sched])
+            ax.errorbar(x + offset + i * bar_width, values_arr,
+                       yerr=[lower_errors, upper_errors], fmt='none',
+                       ecolor='black', capsize=5, alpha=0.7)
+
+        ax.set_xlabel("Total Buoys")
+        ax.set_ylabel("Loss Rate")
+        ax.set_ylim(0, 1)
+
+        # Update title to include mode
+        title_parts = ["Loss Rate vs Buoy Count"]
+        if mode_str:
+            title_parts.append(f"({mode_str}")
+            if interval:
+                title_parts.append(f", Static Interval: {interval}s)")
+            else:
+                title_parts.append(")")
+        elif interval:
+            title_parts.append(f"(Static Interval: {interval}s)")
+        ax.set_title(" ".join(title_parts))
+
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(int(d)) for d in densities])
+        ax.legend(loc='upper left')
+        ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+        plt.tight_layout()
+
+        if interval:
+            plt.savefig(os.path.join(plot_dir, f"loss_rate_interval{int(interval*10)}.png"))
+        else:
+            plt.savefig(os.path.join(plot_dir, "loss_rate_block_by_density.png"))
+        plt.close()
+    else:
+        print("No loss rate data with density found.")
 
 def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
     """Plot average unique nodes discovered (as percentage) vs density with error bars"""
     try:
-        _, _, unique_df = get_density_dataframes(data_dir)
+        _, _, _, unique_df = get_density_dataframes(data_dir)
     except Exception as e:
         print(f"Error getting unique nodes data: {e}")
         return
@@ -597,16 +745,16 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
         if mode in all_data:
             df = all_data[mode]
             
-            if "B-PDR" in df.columns:
-                y_col = "B-PDR"
-                std_col = "B-PDR_std"
+            if "pdr" in df.columns:
+                y_col = "pdr"
+                std_col = "pdr_std"
             elif "delivery_ratio" in df.columns:
                 y_col = "delivery_ratio"
                 std_col = "delivery_ratio_std"
             else:
-                print(f"Warning: No B-PDR or delivery_ratio column in data for {mode}")
+                print(f"Warning: No pdr or delivery_ratio column in data for {mode}")
                 continue
-            
+
             df["group"] = pd.cut(df["n_buoys"], bins=group_edges, labels=group_labels, right=False)
             grouped = df.groupby("group", observed=False)[y_col].mean().reindex(group_labels)
             
@@ -655,10 +803,11 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
             print(f"Warning: Data length mismatch for {mode}. Expected {len(x)}, got {len(data)}")
     
     ax.set_xlabel("Buoy Count Group")
-    ax.set_ylabel("Average B-PDR")
-    
+    ax.set_ylabel("Average PDR")
+    ax.set_ylim(0, 1)
+
     # Update title to include mode
-    title = "Average B-PDR vs Buoy Count Group (Ramp Scenario"
+    title = "Average PDR vs Buoy Count Group (Ramp Scenario"
     if multihop_mode:
         if multihop_mode == "none":
             title += ", Single-Hop)"
@@ -695,16 +844,16 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
         csv_file = os.path.join(data_dir, f"{mode}_ramp_timeseries.csv")
         if os.path.exists(csv_file):
             df = pd.read_csv(csv_file)
-            if "B-PDR" in df.columns:
-                y_col = "B-PDR"
-                std_col = "B-PDR_std"
+            if "pdr" in df.columns:
+                y_col = "pdr"
+                std_col = "pdr_std"
             elif "delivery_ratio" in df.columns:
                 y_col = "delivery_ratio"
                 std_col = "delivery_ratio_std"
             else:
-                print(f"Warning: No B-PDR or delivery_ratio column in {csv_file}")
+                print(f"Warning: No pdr or delivery_ratio column in {csv_file}")
                 continue
-                
+
             label = mode_labels.get(mode, mode.capitalize())
             plt.plot(df["time"], df[y_col], label=label, color=color)
             
@@ -765,10 +914,11 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
             labels += ["Avg. Neighbors"]
 
     ax.set_xlabel("Time (s)", fontsize=12)
-    ax.set_ylabel("B-PDR", fontsize=12)
-    
+    ax.set_ylabel("PDR", fontsize=12)
+    ax.set_ylim(0, 1)
+
     # Update title to include mode
-    title_parts = ["B-PDR vs Time (Ramp Scenario"]
+    title_parts = ["PDR vs Time (Ramp Scenario"]
     if multihop_mode:
         if multihop_mode == "none":
             title_parts.append(", Single-Hop")

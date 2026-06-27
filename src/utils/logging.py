@@ -1,4 +1,3 @@
-from email import message
 import os
 import sys
 
@@ -26,17 +25,15 @@ LOG_FILE = Path("logs/simulator.log")
 
 def _log(level: str, message: str, to_console: bool = True, to_file: bool = False):
     # Errors and critical messages are always logged regardless of enable_logging setting
-    if not LOGGING_ENABLED:
+    if not LOGGING_ENABLED and level not in ("ERROR", "CRITICAL"):
         return
     
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = COLORS.get(level, '')
     reset = COLORS['RESET']
 
-    # scheduler_type = ConfigHandler().get('scheduler', 'type')
-    # formatted = f"[{scheduler_type}] [{timestamp}] [{level}] {message}"
     formatted = f"[{timestamp}] [{level}] {message}"
-        
+
     # Print to console with color
     output = f"{color}{formatted}{reset}"
     if to_console:

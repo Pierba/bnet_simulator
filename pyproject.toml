@@ -1,7 +1,7 @@
 [project]
 name = "bnet_simulator"
 version = "0.1.0"
-description = "Add your description here"
+description = "Discrete-event simulator for comparing beacon-scheduling and multihop strategies in a buoy network"
 readme = "README.md"
 authors = [
     { name = "CesareDev", email = "corsicesare.lavoro@gmail.com" },
