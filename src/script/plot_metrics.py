@@ -187,7 +187,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None, schedulers=None)
     
     ax.set_xlabel("Total Buoys")
     ax.set_ylabel("PDR")
-    ax.set_ylim(0, 1)
 
     # Update title to include mode
     title_parts = ["PDR vs Buoy Count"]
@@ -234,7 +233,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None, schedulers=None)
 
         ax.set_xlabel("Total Buoys")
         ax.set_ylabel("Collision Rate")
-        ax.set_ylim(0, 1)
 
         # Update title to include mode
         title_parts = ["Collision Rate vs Buoy Count"]
@@ -279,7 +277,6 @@ def plot_block_by_density(results_dir, plot_dir, interval=None, schedulers=None)
 
         ax.set_xlabel("Total Buoys")
         ax.set_ylabel("Loss Rate")
-        ax.set_ylim(0, 1)
 
         # Update title to include mode
         title_parts = ["Loss Rate vs Buoy Count"]
@@ -431,7 +428,6 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file, schedulers=None):
     
     ax.set_xlabel("Buoy Count Group")
     ax.set_ylabel("Average PDR")
-    ax.set_ylim(0, 1)
 
     # Update title to include mode
     title = "Average PDR vs Buoy Count Group (Ramp Scenario"
@@ -562,7 +558,6 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None, scheduler
 
     ax.set_xlabel("Time (s)", fontsize=12)
     ax.set_ylabel("PDR", fontsize=12)
-    ax.set_ylim(0, 1)
 
     # Update title to include mode
     title_parts = ["PDR vs Time (Ramp Scenario"]

@@ -254,19 +254,19 @@ def generate_comparison_plots(mode_dirs, output_dir, interval=None, schedulers=N
         df, "PDR", "PDR",
         "PDR Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_pdr_interval-{tag}.png"),
-        interval, schedulers, ylim=(0, 1), legend_loc="lower right",
+        interval, schedulers, legend_loc="lower right",
     )
     plot_metric(
         df, "CollisionRate", "Collision Rate",
         "Collision Rate Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_collision_rate_interval-{tag}.png"),
-        interval, schedulers, ylim=(0, 1), legend_loc="upper left",
+        interval, schedulers, legend_loc="upper left",
     )
     plot_metric(
         df, "LossRate", "Loss Rate",
         "Loss Rate (Total Error) Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_loss_rate_interval-{tag}.png"),
-        interval, schedulers, ylim=(0, 1), legend_loc="upper left",
+        interval, schedulers, legend_loc="upper left",
     )
     plot_metric(
         df, "PercentageDiscovered", "Avg % of Network Discovered",
