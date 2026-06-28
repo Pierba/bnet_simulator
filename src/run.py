@@ -117,6 +117,14 @@ def plot_mode_comparison(mode_results_dirs: dict[str, str], comparison_dir: str,
 
     subprocess.run(plot_cmd) # -> script/plot_mode_comparison.py
 
+# Plot the initial buoy positions (one scatter per density) using the plot_initial_positions.py script
+def plot_initial_positions(positions_file: str, output_dir: str):
+    plot_cmd = ["uv", "run", "src/script/plot_initial_positions.py",
+                "--positions-file", positions_file,
+                "--output-dir", output_dir]
+
+    subprocess.run(plot_cmd) # -> script/plot_initial_positions.py
+
 # Parse command line arguments to choose between a single run and a comparison sweep
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="BNet simulator batch runner")
@@ -186,22 +194,38 @@ def main():
               "comparison plots will be generated (per-mode plots skipped).")
 
     try:
-        # For each beacon interval: 
+        # Suffixes shared by every output dir (only the interval part changes per loop)
+        ideal_suffix = "_ideal" if ideal else ""
+        scenario_suffix = f"_{scenario}"
+
+        # Density values and the initial buoy layout, generated ONCE before the loops so
+        # every interval/multihop run shares the same topology per density.
+        densities = list(range(min_buoys, max_buoys + 1, step_buoys))
+        if scenario == 'ramp':
+            ramp_positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
+            positions_by_density = {max_buoys: ramp_positions}
+        else:
+            positions_by_density = {
+                density: arrange_buoys_randomly(density, world_width, world_height)
+                for density in densities
+            }
+
+        # Write the layout to a single JSON file and plot it once (it no longer varies
+        # per interval). The file feeds the plot_initial_positions.py subprocess.
+        if not args.no_plot:
+            positions_file = "initial_positions.json"
+            with open(positions_file, "w") as f:
+                json.dump(positions_by_density, f)
+            init_positions_dir = os.path.join(output_root, f"initial_positions{ideal_suffix}{scenario_suffix}")
+            print("Plotting initial buoy positions")
+            plot_initial_positions(positions_file, init_positions_dir)
+            if os.path.exists(positions_file):
+                os.remove(positions_file)
+
+        # For each beacon interval:
         # run the simulations for every multihop mode => plot per-mode results => plot the cross-mode comparison
         for interval in intervals: # [1.0, 0.5, 0.25]
             interval_str = f"{interval}"
-            ideal_suffix = "_ideal" if ideal else ""
-            scenario_suffix = f"_{scenario}"
-
-            # Setting up the density values and buoy positions for the scenario
-            densities = list(range(min_buoys, max_buoys + 1, step_buoys))
-            if scenario == 'ramp':
-                ramp_positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
-            else:
-                positions_by_density = {
-                    density: arrange_buoys_randomly(density, world_width, world_height)
-                    for density in densities
-                }
 
             # Track each mode's results directory to feed the comparison plotter
             mode_results_dirs: dict[str, str] = {}
@@ -264,9 +288,10 @@ def main():
     except KeyboardInterrupt:
         print("\n\n[!] Simulation batch interrupted by user. Exiting cleanly...")
         
-        # Clean up any leftover position files written by run_simulation
+        # Clean up any leftover position files written by run_simulation or the
+        # initial-position plotter
         for f in os.listdir('.'):
-            if f.startswith('positions_') and f.endswith('.json'):
+            if (f.startswith('positions_') or f.startswith('initial_positions')) and f.endswith('.json'):
                 try:
                     os.remove(f)
                 except OSError as e:
