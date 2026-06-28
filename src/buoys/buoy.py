@@ -19,10 +19,7 @@ class BuoyState(Enum):
     BACKOFF = 3
 
 class Buoy:
-    # Monotonic source of buoy ids. Plain ints replace uuid4 here: they are only ever
-    # used as identity / dict keys, and int hashing is a free C-level op whereas
-    # uuid.UUID.__hash__ is pure Python and dominated the hot path. Never reset, so ids
-    # stay globally unique even when several simulations run in one process (e.g. tests).
+    # Static incremental counter for assigning unique IDs to each buoy instance
     _id_counter = count()
 
     def __init__(
@@ -130,8 +127,9 @@ class Buoy:
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 
-        # When deactivated the buoy drops the pending forward queue entirely
+        # When deactivated the buoy drops the data structures for forwarded beacons
         self.pending_forward_beacons.clear()
+        self.forwarded_beacons.clear()
 
     # Schedules a generation-gated event targeting this buoy: events scheduled before a
     # deactivation are lazily discarded by handle_event once the buoy is reactivated
@@ -263,19 +261,10 @@ class Buoy:
 
     # Relays a single pending beacon, discarding any stale entries it skips past
     def _transmit_forward_beacon(self, sim_time: float):
-        # Take the first still-valid beacon from the queue (insertion-ordered dict)
-        forward_beacon = None
-        while self.pending_forward_beacons:
-            origin_id, b = next(iter(self.pending_forward_beacons.items()))
-            del self.pending_forward_beacons[origin_id]
-
-            if sim_time - b.timestamp <= self.neighbor_timeout:
-                forward_beacon = b
-                break
-
-        # If no valid beacon was found, return without transmitting
-        if not forward_beacon:
-            return
+        # Take the next beacon from the queue (insertion-ordered dict). 
+        # Stale entries are deleted periodically by neighbor cleanup
+        origin_id, forward_beacon = next(iter(self.pending_forward_beacons.items()))
+        del self.pending_forward_beacons[origin_id]
 
         # Forward the beacon and log the action
         forwarded = self.forward_beacon(forward_beacon, sim_time)
@@ -321,13 +310,13 @@ class Buoy:
             # Multihop forwarded mode: queue beacon WITHOUT modification if beacon.origin_id != self.id and beacon.hop_limit > 0:
             # Never re-forward a beacon this buoy originated (echo received via a neighbor)
             case 'forwarded' if beacon.origin_id != self.id and beacon.hop_limit > 0:
-                # Only act on a beacon fresher than the last one decided for this origin
+                # Only queue the beacon if it is fresher than the last one we forwarded from the same origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
-                    # Queue the beacon if it is already pending or there is room left
+                    # Update/Insert the beacon in the pending queue if it's already there or there's room for it
                     if beacon.origin_id in self.pending_forward_beacons or \
                         len(self.pending_forward_beacons) < self.pending_queue_limit:
-                        
-                        # Update/insert the latest timestamp for this origin and queue the beacon for forwarding
+
+                        # Record the decision and queue the beacon for forwarding
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
                         self.pending_forward_beacons[beacon.origin_id] = beacon
 
@@ -383,13 +372,19 @@ class Buoy:
                     if sim_time - data[0] <= self.neighbor_timeout
                 }
 
-            # In forwarded mode => cleanup old forwarded beacons
+            # In forwarded mode => cleanup the pending queue and the stale dedup memory
             case 'forwarded':
                 self.forwarded_beacons = {
-                    key: ts 
-                    for key, ts in self.forwarded_beacons.items()
+                    nid: ts
+                    for nid, ts in self.forwarded_beacons.items()
                     if sim_time - ts <= self.neighbor_timeout
                 }
+                self.pending_forward_beacons = {
+                    nid: b
+                    for nid, b in self.pending_forward_beacons.items()
+                    if sim_time - b.timestamp <= self.neighbor_timeout
+                }
+            
             case _:
                 pass
         
