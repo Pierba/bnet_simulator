@@ -177,6 +177,14 @@ def main():
     multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes')
     print(f"Sweeping multihop modes: {multihop_modes}")
 
+    # When several multihop modes are swept for a density-based scenario we only emit
+    # the cross-mode comparison figures (mirroring the batch-run workflow) and skip
+    # the per-mode individual plots, which are redundant and slow to render.
+    compare_modes = scenario in ('random', 'static') and len(multihop_modes) > 1
+    if compare_modes and not args.no_plot:
+        print("Multiple multihop modes on a density scenario: only the cross-mode "
+              "comparison plots will be generated (per-mode plots skipped).")
+
     try:
         # For each beacon interval: 
         # run the simulations for every multihop mode => plot per-mode results => plot the cross-mode comparison
@@ -204,7 +212,7 @@ def main():
                 results_dir = os.path.join(output_root, f"results_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
                 os.makedirs(results_dir, exist_ok=True)
 
-                if not args.no_plot:
+                if not args.no_plot and not compare_modes:
                     plots_dir = os.path.join(output_root, f"plots_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")
                     os.makedirs(plots_dir, exist_ok=True)
 
@@ -227,7 +235,7 @@ def main():
                         print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
                         run_simulations_parallel(tasks, num_processes)
 
-                if not args.no_plot:
+                if not args.no_plot and not compare_modes:
                     print(f"Plotting results for interval = {interval}s, multihop mode = {multihop_mode}")
                     plot_results(results_dir, plots_dir, interval, schedulers)
 
@@ -235,7 +243,7 @@ def main():
                 mode_results_dirs[multihop_mode] = results_dir
 
             # Build the cross-mode comparison histograms for density-based scenarios
-            if not args.no_plot and scenario in ('random', 'static') and len(mode_results_dirs) > 1:
+            if not args.no_plot and compare_modes:
                 comparison_dir = os.path.join(output_root, f"comparison_interval-{interval_str}{ideal_suffix}{scenario_suffix}")
                 os.makedirs(comparison_dir, exist_ok=True)
                 print(f"Plotting multihop mode comparison for interval = {interval}s")
