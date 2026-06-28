@@ -313,8 +313,10 @@ class Buoy:
                 # Only queue the beacon if it is fresher than the last one we forwarded from the same origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
                     # Update/Insert the beacon in the pending queue if it's already there or there's room for it
-                    if beacon.origin_id in self.pending_forward_beacons or \
-                        len(self.pending_forward_beacons) < self.pending_queue_limit:
+                    if (
+                        beacon.origin_id in self.pending_forward_beacons
+                        or len(self.pending_forward_beacons) < self.pending_queue_limit
+                    ):
 
                         # Record the decision and queue the beacon for forwarding
                         self.forwarded_beacons[beacon.origin_id] = beacon.timestamp
