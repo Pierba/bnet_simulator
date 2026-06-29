@@ -1,0 +1,417 @@
+% =====================================================================
+%  BOZZA - Capitolo 4 (italiano)
+%  Progettazione e implementazione del simulatore
+%
+%  Richiede i pacchetti gia' presenti nel preambolo di main.tex:
+%  amsmath, amssymb, siunitx, enumitem, listings, booktabs.
+% =====================================================================
+\chapter{Progettazione e implementazione del simulatore}
+\label{ch:simulatore}
+
+Questo capitolo descrive il simulatore sviluppato per la tesi, che permette di
+valutare i protocolli di prossimit\`a in modo controllato e riproducibile sotto
+diverse condizioni di rete e densit\`a. Si presentano l'architettura a eventi
+discreti, il modello del nodo e la sua macchina a stati, il modello di mobilit\`a
+Random Waypoint, il modello di canale calibrato sul campo, la pipeline di
+trasmissione, le modalit\`a multihop, le metriche, la gestione della popolazione
+dinamica e la configurazione.
+
+% ---------------------------------------------------------------------
+\section{Motivazione per un simulatore custom}
+\label{sec:why}
+I simulatori generalisti come ns-3 e OMNeT++ offrono stack protocollari ampi, ma
+per uno studio focalizzato su un singolo meccanismo MAC richiedono di gestire
+complessit\`a e overhead non necessari. Un simulatore custom a eventi discreti
+contiene solo ci\`o che serve (comportamento delle boe, canale, logica di
+beaconing e metriche), \`e abbastanza piccolo da poter essere letto per intero,
+\`e facile da estendere con un nuovo scheduler o una nuova modalit\`a, ed \`e
+riproducibile perch\'e ogni parametro \`e nella configurazione. Il simulatore \`e
+scritto in Python ed \`e diviso in moduli con responsabilit\`a singola:
+\texttt{simulator.py} (motore e coda eventi), \texttt{events.py},
+\texttt{channel.py}, \texttt{buoy.py}, \texttt{beacon.py}, \texttt{scheduler.py},
+\texttt{metrics.py} e \texttt{config\_handler.py}.
+
+% ---------------------------------------------------------------------
+\section{Architettura a eventi discreti}
+\label{sec:arch}
+
+\subsection{Modello a eventi discreti e coda a priorit\`a}
+Il motore avanza estraendo eventi da una coda a priorit\`a ordinata per tempo di
+simulazione, realizzata con il modulo \texttt{heapq} di Python (inserimento ed
+estrazione del minimo in $\mathcal{O}(\log n)$). Ogni evento porta con s\'e
+l'istante di attivazione, un tipo, l'oggetto destinatario (una boa, il canale o il
+simulatore) e un payload opzionale (ad esempio i dati del beacon). Un contatore
+monotono fa da chiave di ordinamento secondaria per gli eventi con lo stesso
+timestamp: l'ordine \`e quindi deterministico (FIFO) e le esecuzioni sono
+riproducibili a parit\`a di seme casuale.
+
+\subsection{Tipi di evento}
+Il simulatore definisce undici tipi di evento, ciascuno corrispondente a una
+transizione di stato o a un'azione del sistema:
+\begin{enumerate}[leftmargin=1.6em,nosep]
+  \item \texttt{SCHEDULER\_CHECK}: verifica periodica se una boa debba trasmettere;
+  \item \texttt{CHANNEL\_SENSE}: controllo che il canale sia libero;
+  \item \texttt{DIFS\_COMPLETION}: fine dell'attesa DIFS;
+  \item \texttt{BACKOFF\_COMPLETION}: fine del backoff;
+  \item \texttt{TRANSMISSION\_START}: inizio della trasmissione di un beacon;
+  \item \texttt{TRANSMISSION\_END}: fine della trasmissione;
+  \item \texttt{RECEPTION}: ricezione di un beacon;
+  \item \texttt{NEIGHBOR\_CLEANUP}: rimozione delle voci obsolete dalla tabella
+  dei vicini;
+  \item \texttt{BUOY\_MOVEMENT}: aggiornamento della posizione delle boe mobili;
+  \item \texttt{BUOY\_ARRAY\_UPDATE}: aggiunta o rimozione di boe (popolazione
+  dinamica);
+  \item \texttt{AVG\_NEIGHBORS\_CALCULATION}: campionamento del numero medio di
+  vicini per le metriche.
+\end{enumerate}
+Questa struttura separa le responsabilit\`a: logica di protocollo (scheduler
+check), MAC (sensing, DIFS, backoff), trasmissione fisica (start/end), ricezioni,
+mobilit\`a e aggiornamenti di sistema.
+
+\subsection{Struttura modulare dei componenti}
+I moduli hanno responsabilit\`a distinte: \texttt{simulator.py} gestisce il ciclo
+principale e la coda eventi; \texttt{channel.py} il canale, le collisioni e la
+propagazione; \texttt{buoy.py} il comportamento del nodo, la macchina a stati e la
+gestione dei vicini; \texttt{scheduler.py} i protocolli di beaconing;
+\texttt{beacon.py} la struttura del frame; \texttt{metrics.py} la misurazione
+delle prestazioni; \texttt{config\_handler.py} l'accesso ai parametri. Questa
+divisione facilita lo sviluppo e l'estensione dei singoli componenti.
+
+% ---------------------------------------------------------------------
+\section{Il modello del nodo: la classe Buoy}
+\label{sec:buoy}
+
+\subsection{Stato del nodo}
+Ogni boa mantiene: un identificatore; una posizione $(x,y)$ nell'area simulata; un
+flag di mobilit\`a e un vettore velocit\`a $(v_x,v_y)$; un livello di batteria; una
+tabella dei vicini diretti a stato leggero; l'istante dell'ultimo contatto
+ricevuto; un'istanza dello scheduler; lo stato corrente (\texttt{SLEEPING},
+\texttt{RECEIVING}, \texttt{WAITING\_DIFS}, \texttt{BACKOFF}); e le strutture dati
+della modalit\`a di consapevolezza attiva (una tabella di nodi scoperti per
+l'append; una coda di rilancio e una memoria di deduplicazione per il forwarded).
+Un contatore di \emph{generazione} per boa permette la cancellazione lazy degli
+eventi ricorrenti programmati prima di una disattivazione: quando la popolazione
+cambia, gli eventi obsoleti vengono ignorati alla loro estrazione.
+
+\subsection{Macchina a stati di trasmissione (DCF)}
+\label{sec:fsm}
+Il comportamento in trasmissione segue la macchina a stati DCF di
+Figura~\ref{fig:fsm}. Le transizioni principali sono:
+\begin{enumerate}[leftmargin=1.6em,nosep]
+  \item \textsc{receiving} $\rightarrow$ \textsc{channel\_sense}: lo scheduler
+  decide di trasmettere e parte il carrier sensing;
+  \item se il canale \`e occupato, il nodo riprova quando si libera;
+  \item se il canale \`e libero $\rightarrow$ \textsc{waiting\_difs}: attesa del
+  DIFS ($\SI{50}{\micro\second}$);
+  \item \textsc{difs\_completion}: nuovo controllo del canale; se ancora libero si
+  estrae un backoff e si entra in \textsc{backoff}; se occupato si torna al
+  sensing;
+  \item \textsc{backoff\_completion} $\rightarrow$ \textsc{transmission\_start}: se
+  il canale \`e libero si trasmette un frame, poi si torna a \textsc{receiving}.
+\end{enumerate}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\textwidth}{\small
+\textsc{receiving} $\xrightarrow{\text{lo scheduler decide di inviare}}$
+\textsc{channel\_sense}: se occupato, ri-rileva al rilascio del mezzo; se libero
+$\rightarrow$ \textsc{waiting\_difs} (attesa DIFS).
+\textsc{difs\_completion}: se ancora libero, estrai un backoff ed entra in
+\textsc{backoff}; se occupato, torna al sensing.
+\textsc{backoff}: al termine, se il canale \`e diventato occupato, rientra
+nell'intera catena sense--DIFS--backoff.
+\textsc{backoff\_completion} $\rightarrow$ \textsc{transmission\_start}: trasmetti
+un frame, poi torna a \textsc{receiving}.
+}}
+\caption{Resa testuale della macchina a stati CSMA/CA della boa.}
+\label{fig:fsm}
+\end{figure}
+
+Rispetto al meccanismo da manuale 802.11 con backoff ``congelato e ripreso'', il
+modello adotta una semplificazione: a ogni tentativo si estrae un nuovo backoff da
+$[0,CW-1]$, modellato come un'unica posticipazione di
+$\text{backoff\_slots}\times\text{slot\_time}$; se al termine il canale \`e
+occupato, il nodo riavvia l'intera procedura (sense, DIFS, nuovo backoff) invece
+di riprendere un contatore congelato. La contention window resta fissa a $CW=16$,
+perch\'e i frame broadcast non sono confermati e quindi non si applica il backoff
+esponenziale binario.
+
+\subsection{Gestione della tabella dei vicini e dei nodi scoperti}
+Alla ricezione di un beacon (e solo se la boa \`e ancora un ricevitore valido per
+quel frame, Sezione~\ref{sec:collision}), la boa aggiorna la tabella dei vicini
+diretti con il mittente (timestamp e posizione) e l'istante dell'ultimo contatto.
+In modalit\`a append integra anche la lista dei vicini annunciata nella tabella
+dei nodi scoperti, incrementando di uno la distanza in hop e aggiornando una voce
+solo se il beacon porta informazione pi\`u fresca; i nodi gi\`a noti come vicini
+diretti non vengono duplicati. In modalit\`a forwarded valuta se accodare il
+beacon per il rilancio (Sezione~\ref{sec:multihop-impl}). Periodicamente, un
+evento \texttt{NEIGHBOR\_CLEANUP} toglie le voci non aggiornate entro il
+\texttt{neighbor\_timeout} (qui $\SI{7}{\second}$) e ripulisce anche la tabella dei
+nodi scoperti, la coda di rilancio e la memoria di deduplicazione.
+
+\subsection{Modello di mobilit\`a (Random Waypoint)}
+\label{sec:rwp}
+Una frazione configurabile delle boe (qui il $40\%$) \`e mobile; le altre sono
+ancorate. I nodi mobili seguono il modello Random Waypoint (RWP): una boa sceglie
+un waypoint casuale nell'area e una velocit\`a uniforme in $[v_{\min},v_{\max}]$,
+avanza verso il waypoint a passi di tempo fissi ($\Delta t = \SI{0.5}{\second}$) e,
+all'arrivo, si ferma per un tempo di pausa casuale prima di scegliere un nuovo
+waypoint e una nuova velocit\`a. RWP riproduce le traiettorie con cambi di
+direzione e fasi di sosta tipiche delle persone in acqua meglio del moto
+rettilineo con rimbalzo ai bordi, e fornisce una distribuzione realistica di
+velocit\`a istantanee per il punteggio di mobilit\`a di ACAB
+(Eq.~\ref{eq:acab-mob}). I parametri RWP usati sono
+$v\in[5,20]\,\si{\metre\per\second}$ e pausa in $[0,10]\,\si{\second}$.
+
+% ---------------------------------------------------------------------
+\section{Il modello del canale}
+\label{sec:channel}
+
+Il modello di canale implementa la propagazione del segnale, la ricezione basata
+sulla distanza e la rilevazione delle collisioni.
+
+\subsection{Propagazione del segnale e probabilit\`a di ricezione}
+Quando una boa trasmette, il canale individua i ricevitori attivi entro range e
+programma per ciascuno un evento \texttt{RECEPTION}. La ricezione \`e
+probabilistica e calibrata su misure in mare aperto: detta $d$ la distanza fra
+mittente e ricevitore,
+\begin{equation}
+  P_{\text{rx}}(d) =
+  \begin{cases}
+    0.9  & d \le \SI{70}{\metre} \quad(\text{zona ad alta probabilit\`a}),\\
+    0.15 & \SI{70}{\metre} < d \le \SI{80}{\metre} \quad(\text{zona marginale}),\\
+    0    & d > \SI{80}{\metre} \quad(\text{fuori range}).
+  \end{cases}
+  \label{eq:prx}
+\end{equation}
+Le ricezioni accettate sono ritardate del tempo di propagazione $d/c$, con
+$c=3\times10^{8}\,\si{\metre\per\second}$. Questa struttura di path loss conta
+nell'interpretazione dei risultati: poich\'e anche un link senza collisioni
+consegna con probabilit\`a inferiore a uno, la PDR per ricevitore \`e limitata
+dalla propagazione e il beneficio della schedulazione si vede altrove
+(Capitolo~\ref{ch:risultati}).
+
+\subsection{Rilevazione delle collisioni e terminali nascosti}
+\label{sec:collision}
+Il canale traccia le trasmissioni attive come tuple (beacon, inizio, fine). Una
+nuova trasmissione collide con una esistente presso un ricevitore $R$ quando le
+loro finestre temporali si sovrappongono e $R$ \`e entro range dell'altro
+mittente, oppure quando i due mittenti sono a loro volta entro range. Un
+ricevitore entro range di un mittente gi\`a attivo perde il nuovo frame anche se i
+due mittenti non si sentono: questo \`e il caso del terminale nascosto, qui
+modellato esplicitamente. Se una trasmissione successiva collide con una
+precedente presso un ricevitore gi\`a programmato per ricevere il frame
+precedente, quella ricezione precedente viene revocata (``avvelenata''),
+riproducendo la corruzione che vedrebbe una radio reale.
+
+\subsection{Canale ideale vs probabilistico}
+Il simulatore supporta due modalit\`a di canale con la stessa rilevazione delle
+collisioni. Nel canale \emph{ideale} tutte le trasmissioni entro range vengono
+ricevute a meno che non collidano ($P_{\text{rx}}=1$ entro range): serve a isolare
+le collisioni MAC dagli effetti del livello fisico. Nel canale
+\emph{probabilistico} si applicano le probabilit\`a calibrate
+dell'Eq.~(\ref{eq:prx}), che modellano la propagazione sopra l'acqua. Il canale
+ideale d\`a un limite superiore alle prestazioni; quello probabilistico riflette
+condizioni realistiche.
+
+\subsection{Carrier sensing}
+Il carrier sensing \`e modellato con un fronte d'onda che si propaga: una
+posizione percepisce il mezzo occupato solo dopo che il segnale di una
+trasmissione, viaggiando a $c$, l'ha raggiunta, e finch\'e non l'ha oltrepassata.
+Detta $d$ la distanza dal mittente, la posizione \`e occupata nell'intervallo
+$[\,t_{\text{inizio}} + d/c,\; t_{\text{fine}} + d/c\,)$. Quando rileva il canale
+occupato, la boa riprova al primo istante di liberazione, tenendo il tempo di
+liberazione pi\`u tardivo fra le trasmissioni che la coprono, cos\`i da riprovare
+una sola volta.
+
+% ---------------------------------------------------------------------
+\section{Implementazione dello scheduler (SBP, ADAB, ACAB)}
+\label{sec:scheduler-impl}
+La classe \texttt{BeaconScheduler} incapsula la logica del protocollo, cio\`e la
+decisione su \emph{quando} trasmettere. Un unico metodo \texttt{should\_send}
+smista la decisione in base al tipo di scheduler. Per l'SBP la decisione \`e solo
+temporale: si invia se \`e trascorso almeno \texttt{static\_interval} dall'ultimo
+invio. Per ADAB e ACAB la decisione usa l'intervallo dinamico corrente e, all'atto
+dell'invio, ricalcola l'intervallo successivo con \texttt{compute\_interval}, che
+realizza il calcolo descritto nel capitolo precedente: ADAB deriva il punteggio
+dalla sola densit\`a (Eq.~\ref{eq:adab-density}), ACAB lo costruisce combinando
+densit\`a, recency del contatto e mobilit\`a (Eq.~\ref{eq:acab-blend}). In
+entrambi i casi il punteggio \`e elevato al quadrato, mappato sull'intervallo
+$[\bimin,\bimax]$ e perturbato dal jitter. Il Listato~\ref{lst:acab} mostra il
+nucleo del calcolo per ACAB.
+
+\begin{lstlisting}[caption={Calcolo dell'intervallo per ACAB (estratto).},label={lst:acab}]
+def compute_interval(self, velocity, n_neighbors, last_contact_ts, current_time):
+    # Componente di densita'
+    density_score = min(1.0, n_neighbors / self.acab_neighbors_threshold)
+    # Componente di contact-recency
+    if n_neighbors > 0 and last_contact_ts is not None:
+        delta = current_time - last_contact_ts
+        contact_score = max(0.0, 1.0 - (delta / self.acab_contact_threshold))
+    else:
+        contact_score = 0.0
+    # Componente di mobilita'
+    speed = math.hypot(*velocity)
+    mobility_score = min(1.0, speed / self.default_velocity)
+    # Combinazione pesata (density, contact, mobility)
+    w_d, w_c, w_m = self.acab_weights
+    combined = w_d*density_score + w_c*contact_score + w_m*(1.0 - mobility_score)
+    # Mapping quadratico + jitter, con clamp finale
+    fq = combined * combined
+    bi = self.min_interval + fq * self.interval_range
+    jittered = bi * (1.0 + random.uniform(-JITTER_FRACTION, JITTER_FRACTION))
+    return max(self.min_interval, min(self.max_interval, jittered))
+\end{lstlisting}
+
+% ---------------------------------------------------------------------
+\section{Implementazione delle modalit\`a multihop}
+\label{sec:multihop-impl}
+
+\subsection{Pipeline di trasmissione interlacciata e coda dei beacon}
+Una boa deve servire due tipi di traffico: i propri beacon schedulati e, in
+modalit\`a forwarded, i beacon da rilanciare. L'implementazione usa un'unica
+pipeline CSMA protetta da un lock di \texttt{processing}, con una regola di
+priorit\`a: vinta una contesa, si invia un beacon proprio se ce n'\`e uno in
+attesa, altrimenti un singolo rilancio in coda; se resta altro, la pipeline
+rientra subito in contesa. Cos\`i il traffico di rilancio non blocca mai
+l'annuncio proprio della boa, e la coda di rilancio si svuota un frame per
+contesa, in modo regolare e non a raffica.
+
+\subsection{Logica di inoltro e deduplicazione}
+In modalit\`a forwarded, alla ricezione di un beacon non proprio e con TTL
+positivo, la boa lo accoda solo se pi\`u fresco dell'ultimo gi\`a inoltrato dalla
+stessa origine (deduplicazione per origine tramite il timestamp) e solo se la coda
+non ha superato \texttt{pending\_queue\_limit}. L'accodamento avvia, se non gi\`a
+in corso, una pipeline CSMA dopo un jitter casuale che desincronizza i ricevitori
+dello stesso frame. Al rilancio, il beacon \`e ritrasmesso senza modifiche al
+payload, con il solo TTL decrementato, e la boa che rilancia diventa il mittente
+ai fini del calcolo del range. In modalit\`a append, invece, non si invia nessun
+frame in pi\`u: la lista dei nodi scoperti viene aggiunta ai vicini diretti nel
+beacon costruito alla prossima trasmissione propria. Nel codice attuale ogni
+beacon fresco, entro TTL e non proprio, viene accodato e rilanciato, con il solo
+limite della coda; una possibile estensione che riduce i rilanci in base alla
+densit\`a \`e discussa fra i lavori futuri.
+
+% ---------------------------------------------------------------------
+\section{Raccolta delle metriche}
+\label{sec:metrics}
+Il modulo delle metriche registra, per ogni esecuzione, un insieme di indicatori
+che separano gli effetti della schedulazione da quelli della propagazione della
+consapevolezza.
+\begin{description}[leftmargin=1.6em,style=nextline]
+  \item[PDR per ricevitore (B-PDR)]
+  $=\dfrac{\text{ricevuti effettivi}}{\text{potenzialmente inviati}}$, contata
+  alla granularit\`a (trasmissione $\times$ ricevitore entro range). Misura
+  l'affidabilit\`a di link ed \`e sensibile a collisioni e path loss.
+  \item[Delivery ratio di rete]
+  $=\dfrac{\text{beacon unici ricevuti}}{\text{beacon originati}}$, contando ogni
+  beacon generato una sola volta, la prima che raggiunge qualcuno, ed escludendo
+  le copie inoltrate dal denominatore, cos\`i da poter confrontare le modalit\`a.
+  Indica se l'informazione di un nodo raggiunge la rete.
+  \item[Tasso di collisione]
+  $=\dfrac{\text{ricezioni collise}}{\text{potenzialmente inviati}}$, misura
+  diretta della contesa MAC.
+  \item[Percentuale di rete scoperta] --- frazione media degli altri nodi che una
+  boa ha scoperto (direttamente o tramite multihop), normalizzata su $N-1$; \`e la
+  metrica principale di consapevolezza.
+  \item[Latenza di reazione] --- tempo fra la generazione di un beacon e il primo
+  istante in cui la sua origine viene scoperta da un ricevitore (il ``tempo alla
+  prima rilevazione'').
+  \item[Carico di canale] --- beacon inviati e, a parte, rilanci inviati; proxy
+  del carico di canale (airtime).
+\end{description}
+Ci sono poi indicatori di supporto (latenza media, latenza dello scheduler,
+throughput, numero medio di vicini). Il numero medio di vicini \`e calcolato con
+un albero k-d (\texttt{cKDTree}) interrogato per coppie entro range, in
+$\mathcal{O}(n\log n)$.
+
+% ---------------------------------------------------------------------
+\section{Gestione della popolazione dinamica}
+\label{sec:churn}
+Per imitare gli utenti che entrano ed escono dall'acqua, la popolazione di boe
+varia nel tempo. Il simulatore supporta tre scenari: \emph{static} (tutte le boe
+attive per l'intera esecuzione), \emph{ramp} (si parte da due boe e se ne attiva
+una alla volta a intervalli regolari fino a esaurirle) e \emph{random}, lo
+scenario dinamico usato negli esperimenti. Nello scenario random, dopo un ritardo
+iniziale di assestamento, a intervalli casuali di $15$--$20\,\si{\second}$ il
+simulatore con probabilit\`a $0.5$ rimuove un numero casuale di boe attive
+(rispettando un minimo di $\max(3,\,0.2\,N_{\text{tot}})$) oppure attiva alcune
+boe inattive (fino al totale). La variazione massima per aggiornamento \`e
+$\max(1, \lceil 0.1\,N_{\text{tot}}\rceil)$. Le boe appena attivate hanno i propri
+eventi ricorrenti riprogrammati. Cos\`i la densit\`a varia nel tempo all'interno
+di una stessa esecuzione, e si mette alla prova la reattivit\`a degli scheduler
+invece di collaudarli solo in un punto di lavoro statico.
+
+% ---------------------------------------------------------------------
+\section{Gestione della configurazione}
+\label{sec:config}
+Tutti i parametri (dimensioni del mondo, densit\`a, intervalli, calibrazione del
+canale, tempistiche CSMA, soglie e pesi degli scheduler, modalit\`a multihop e
+relativi limiti) stanno in un unico file YAML, letto da un \texttt{ConfigHandler}
+realizzato come singleton. Questo separa la configurazione dall'implementazione e
+rende immediato eseguire pi\`u simulazioni con impostazioni diverse. Il
+Listato~\ref{lst:config} ne mostra un estratto.
+
+\begin{lstlisting}[language=,caption={Estratto del file di configurazione (config.yaml).},label={lst:config}]
+network:
+  bit_rate: 1000000                    # tasso PHY in bps
+  communication_range_max: 80.0        # range massimo (m)
+  communication_range_high_prob: 70.0  # range ad alta probabilita' (m)
+  delivery_prob_high: 0.9              # prob. di consegna in zona vicina
+  delivery_prob_low: 0.15             # prob. di consegna in zona marginale
+csma:
+  difs_time: 5.0e-05                   # DIFS (s)
+  slot_time: 2.0e-05                   # slot time (s)
+  cw: 16                               # contention window
+scheduler:
+  beacon_min_interval: 1.0             # BI_min (s)
+  beacon_max_interval: 5.0             # BI_max (s)
+  static_interval: 1.0                 # intervallo SBP (s)
+  neighbor_timeout: 7.0                # timeout dei vicini (s)
+  adab_neighbors_threshold: 15.0       # soglia densita' ADAB
+  acab_neighbors_threshold: 10.0       # soglia densita' ACAB
+  acab_contact_threshold: 20.0         # orizzonte di recency ACAB (s)
+  acab_weights: [0.4, 0.3, 0.3]        # pesi ACAB [densita', contatto, mobilita']
+\end{lstlisting}
+
+Per la riproducibilit\`a, un seme principale viene derivato una volta per campagna
+e ogni simulazione riceve un proprio seme derivato, cos\`i che una campagna possa
+essere ripetuta in modo identico. Il batch runner percorre densit\`a, intervalli e
+modalit\`a multihop in parallelo, mentre uno script di supporto media le esecuzioni
+ripetute e produce i grafici usati nel capitolo successivo.
+
+% ---------------------------------------------------------------------
+\section{Calibrazione con misure reali}
+\label{sec:calib}
+Il modello di canale \`e calibrato su misure raccolte in prove in mare. Due unit\`a
+Raspberry~Pi~4 Model~B, con adattatore Wi-Fi USB basato su AR9271, antenna
+omnidirezionale da $2\,$dBi, modulo GPS e batteria, sono state usate in acqua
+aperta con beaconing statico. I tassi di successo della ricezione in funzione
+della distanza ($\sim\!90\%$ entro $\SI{70}{\metre}$, $\sim\!15\%$ fra $70$ e
+$\SI{80}{\metre}$, quasi nullo oltre) parametrizzano il modello probabilistico
+dell'Eq.~(\ref{eq:prx}). I parametri derivano quindi da misure reali di
+propagazione sull'acqua.
+
+% ---------------------------------------------------------------------
+\section{Tecnologie di implementazione e limitazioni}
+\label{sec:limits}
+Il simulatore \`e scritto in Python (3.10+), per la sintassi semplice e l'ampio
+ecosistema di librerie per analisi dati e grafici. Il modello adotta alcune
+semplificazioni, concentrate al livello fisico: non si modellano l'altitudine n\'e
+la propagazione tridimensionale; si usa un tasso PHY fisso ($1\,$Mbps); si assume
+una temporizzazione perfetta (niente clock drift); il backoff \`e modellato come
+singola posticipazione invece che con congelamento slot-per-slot
+(Sezione~\ref{sec:fsm}). Queste scelte riducono la complessit\`a mantenendo i
+fenomeni che interessano la tesi (contesa MAC, collisioni, effetti della densit\`a)
+e andrebbero raffinate per studi sul livello fisico.
+
+% ---------------------------------------------------------------------
+\section*{Sintesi del capitolo}
+Questo capitolo ha presentato il simulatore a eventi discreti: la coda di
+priorit\`a con ordinamento deterministico; la macchina a stati DCF della boa; il
+modello di mobilit\`a Random Waypoint; il modello di canale calibrato sul campo con
+collisioni e terminali nascosti; la pipeline di trasmissione interlacciata e le
+modalit\`a multihop; le metriche; la gestione della popolazione dinamica e della
+configurazione. Il simulatore offre una piattaforma controllata e riproducibile per
+valutare i protocolli di broadcast. Il prossimo capitolo presenta la metodologia
+sperimentale e i risultati.

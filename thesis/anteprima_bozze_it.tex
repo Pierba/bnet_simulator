@@ -1,0 +1,62 @@
+% =====================================================================
+%  Documento "wrapper" per l'ANTEPRIMA delle bozze italiane dei
+%  Capitoli 3 e 4. NON e' la tesi finale: serve solo a compilare in PDF
+%  i frammenti di capitolo (che da soli non hanno un preambolo).
+%
+%  Compilazione:
+%     pdflatex anteprima_bozze_it.tex      (due volte, per ToC e riferimenti)
+%  oppure:
+%     latexmk -pdf anteprima_bozze_it.tex
+% =====================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.7cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+\definecolor{codekw}{rgb}{0.10,0.30,0.65}
+\definecolor{codecm}{rgb}{0.30,0.55,0.30}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecm}\itshape,
+  stringstyle=\color{purple},
+  numbers=left, numberstyle=\tiny\color{gray},
+  breaklines=true, frame=single, framesep=4pt,
+  showstringspaces=false, captionpos=b, language=Python,
+}
+
+\newcommand{\bimin}{BI_{\min}}
+\newcommand{\bimax}{BI_{\max}}
+\newcommand{\nthr}{N_{\mathrm{thr}}}
+\renewcommand{\arraystretch}{1.15}
+
+% Placeholder per il riferimento al Capitolo dei risultati (non ancora scritto),
+% cosi' \ref{ch:risultati} non resta "??" in anteprima.
+\newcommand{\chrisultati}{5}
+
+\begin{document}
+
+\tableofcontents
+\clearpage
+
+\input{bozza_capitolo3_it}
+\input{bozza_capitolo4_it}
+
+\end{document}
