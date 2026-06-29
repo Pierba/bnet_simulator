@@ -1,0 +1,168 @@
+% =====================================================================
+%  BOZZA - Capitolo 2 (italiano)
+%  Background e lavori correlati
+%
+%  Usa \cite con le chiavi della thebibliography di main.tex. In
+%  anteprima i \cite si risolvono grazie alla bibliografia aggiunta nel
+%  wrapper anteprima_bozze_it.tex.
+%  Richiede i pacchetti gia' presenti nel preambolo di main.tex.
+% =====================================================================
+\chapter{Background e lavori correlati}
+\label{ch:background}
+
+Questo capitolo fornisce il background necessario a inquadrare il problema e le
+soluzioni proposte. Ripercorre i motivi per cui le tecnologie di sicurezza
+marittima esistenti non colmano il divario di rilevazione di prossimit\`a,
+richiama le parti del MAC IEEE~802.11 che governano il comportamento broadcast,
+passa in rassegna le strategie di beaconing e di propagazione della
+consapevolezza, e motiva l'uso di un simulatore dedicato.
+
+% ---------------------------------------------------------------------
+\section{Tecnologie di sicurezza marittima e costiera}
+\label{sec:bg-safety}
+
+\subsection{Automatic Identification System (AIS)}
+L'AIS \`e un sistema di transponder VHF imposto dall'Organizzazione Marittima
+Internazionale per le navi sopra le $300$ tonnellate di stazza e per tutte le
+navi passeggeri~\cite{imo-ais}. Trasmette periodicamente identit\`a, posizione,
+rotta e velocit\`a di una nave, cos\`i che navi e stazioni costiere possano
+tracciarsi a vicenda. L'AIS \`e ottimo per la consapevolezza fra navi in mare
+aperto, ma per la rilevazione di prossimit\`a costiera ha limiti decisivi: i
+transponder sono costosi e assorbono molta energia, non sono usati dagli utenti
+ricreativi, in molte giurisdizioni il loro uso \`e soggetto a licenza, e il loro
+periodo di aggiornamento (da pochi secondi a decine di secondi per i mezzi in
+movimento) mira alla navigazione dei grandi mezzi, non alla consapevolezza
+immediata a corto raggio.
+
+\subsection{Beacon di emergenza e tracciamento cellulare}
+EPIRB e PLB~\cite{noaa-beacons} trasmettono a $406\,$MHz verso la costellazione
+satellitare Cospas--Sarsat quando attivati manualmente. Salvano la vita in una
+vera emergenza, ma non sono adatti alla consapevolezza di routine:
+un'attivazione accidentale \`e costosa, il rilancio satellitare aggiunge minuti
+di ritardo, e il segnale raggiunge i centri di coordinamento dei soccorsi
+anzich\'e i mezzi vicini che potrebbero davvero evitare una collisione. Le
+applicazioni per smartphone basate su GPS e dati cellulari possono in teoria
+avvisare della prossimit\`a, ma ereditano l'inaffidabilit\`a della copertura
+cellulare al largo, dipendono da un'infrastruttura e da un piano dati, e
+scaricano in fretta la batteria.
+
+\subsection{Il divario}
+Ognuna di queste tecnologie \`e troppo costosa, legata a un'infrastruttura,
+oppure pensata per un problema diverso dalla rilevazione continua a corto raggio.
+Le persone pi\`u a rischio, quelle in acqua, restano invisibili. Il divario
+richiede una soluzione a basso costo, senza infrastruttura e attenta ai consumi,
+che operi a raggi da decine a un paio di centinaia di metri.
+
+% ---------------------------------------------------------------------
+\section{Il Wi-Fi come beacon senza infrastruttura}
+\label{sec:bg-wifi}
+I dispositivi Wi-Fi possono associarsi a un access point (modalit\`a a
+infrastruttura) oppure comunicare peer-to-peer (modalit\`a ad hoc /
+IBSS)~\cite{ipcisco-ibss}. Per la rilevazione di prossimit\`a ci\`o che conta \`e
+che un dispositivo possa trasmettere frame \emph{broadcast} che ogni ricevitore
+in range decodifica senza associazione. Riusando questa capacit\`a, una boa pu\`o
+emettere un beacon personalizzato che porta un identificatore di dispositivo, una
+posizione GPS, un flag di ruolo e una breve lista dei vicini sentiti di recente.
+I vantaggi sono concreti: non serve alcun access point, l'hardware \`e diffuso ed
+economico, e il raggio tipico del funzionamento a $2{,}4\,$GHz si adatta al caso
+d'uso costiero. Le difficolt\`a sono altrettanto concrete e motivano il resto
+della tesi: il broadcast non scala con grazia, i frame broadcast non sono
+confermati, il MAC distribuito collide sotto carico e il canale sopra l'acqua \`e
+ostile.
+
+% ---------------------------------------------------------------------
+\section{Fondamenti del MAC IEEE~802.11}
+\label{sec:bg-mac}
+
+\subsection{Distributed Coordination Function}
+Il MAC 802.11 arbitra il mezzo con la DCF~\cite{sharetechnote-dcf}, costruita sul
+Carrier-Sense Multiple Access with Collision Avoidance (CSMA/CA)~\cite{csma-ca}.
+Prima di trasmettere, un nodo rileva il canale; se \`e occupato, posticipa.
+Quando il canale \`e rimasto libero per un DCF Interframe Space (DIFS), il nodo
+estrae un contatore di backoff casuale dalla contention window $[0,CW-1]$ e lo
+decrementa slot per slot finch\'e il canale resta libero, congelandolo quando il
+canale diventa occupato e riprendendolo quando si libera. Quando il contatore
+arriva a zero, il nodo trasmette. Il simulatore adotta una variante semplificata
+di questa procedura, descritta nel Capitolo~\ref{ch:simulatore}.
+
+\subsection{Contention window e handicap del broadcast}
+Per il traffico unicast il ricevitore restituisce un acknowledgement; un ACK
+mancante viene letto come collisione e fa raddoppiare la contention window
+(backoff esponenziale binario). Il traffico \emph{broadcast} non ha ACK. Di
+conseguenza il mittente non ha riscontro sulle collisioni, la contention window
+non pu\`o crescere in risposta al carico, e le collisioni diventano perdite
+silenziose. Nel sistema studiato qui la contention window \`e quindi tenuta fissa
+a $CW=16$, e l'affidabilit\`a va difesa con altri mezzi, soprattutto controllando
+\emph{quanto spesso} i nodi scelgono di trasmettere.
+
+\subsection{Il problema del terminale nascosto}
+Due mittenti fuori dal raggio l'uno dell'altro ma entrambi nel raggio di un
+ricevitore comune possono trasmettere insieme e collidere presso quel
+ricevitore~\cite{tobagi-hidden}. Il Wi-Fi unicast mitiga questo caso con lo
+scambio RTS/CTS, non disponibile per il broadcast. I terminali nascosti sono
+quindi una fonte primaria di perdita nel beaconing broadcast e vanno modellati
+con cura (Sezione~\ref{sec:collision}).
+
+% ---------------------------------------------------------------------
+\section{Strategie di beaconing}
+\label{sec:bg-beaconing}
+
+\subsection{Beaconing statico}
+Lo schema pi\`u semplice trasmette a periodo fisso, a prescindere dalle
+condizioni. \`E banale da implementare e da analizzare, ma il suo carico di
+canale cresce in modo lineare con il numero di nodi; in scenari densi collide
+pesantemente, in scenari radi spreca energia.
+
+\subsection{Beaconing adattivo}
+Gli schemi adattivi regolano la frequenza di trasmissione in base alle condizioni
+locali. La letteratura, soprattutto dalle reti veicolari e mobili ad hoc, propone
+adattamento basato sulla densit\`a, che rallenta al crescere dei
+vicini~\cite{takai-dvcs}, adattamento basato sulla mobilit\`a, legato alla
+velocit\`a relativa~\cite{alotaibi-adaptive}, e adattamento context-aware, che
+pesa pi\`u fattori insieme~\cite{sommer-adaptive}. Le rassegne sulla
+schedulazione dei beacon per la scoperta dei dispositivi confermano che
+l'adattamento pu\`o migliorare molto l'efficienza~\cite{chen-survey}, e gli studi
+sulle VANET mostrano guadagni di affidabilit\`a dal controllo dell'intervallo
+basato su topologia e stato del canale~\cite{zhao-vanet}. La maggior parte di
+questi schemi, per\`o, assume link bidirezionali, accesso coordinato o
+instradamento a livello IP. Il contesto marittimo vieta tutti e tre: la
+comunicazione \`e broadcast unidirezionale, non c'\`e coordinamento e non c'\`e un
+livello di instradamento.
+
+\subsection{Consapevolezza oltre un hop}
+Estendere la consapevolezza oltre i vicini diretti si ottiene di solito o con il
+\emph{piggyback} di informazione condensata sui vicini, aggiunta ai normali
+beacon, oppure con il \emph{flooding}, cio\`e il rilancio dei frame ricevuti
+entro un limite di hop. Il flooding massimizza la portata ma \`e noto per il
+\emph{broadcast storm}~\cite{broadcaststorm}: in reti dense i rilanci ridondanti
+collidono e congestionano il mezzo. Il piggyback \`e pi\`u economico ma limitato
+quanto a distanza e freschezza dell'informazione che pu\`o portare. Quale dei due
+meccanismi convenga in una rete broadcast densa, non confermata e a dominio unico
+\`e una delle domande a cui questa tesi risponde in modo empirico.
+
+% ---------------------------------------------------------------------
+\section{La simulazione nella ricerca wireless}
+\label{sec:bg-sim}
+Gli esperimenti fisici con centinaia di nodi sono costosi, difficili da
+controllare e quasi impossibili da riprodurre, e i dispiegamenti al largo
+aggravano ogni difficolt\`a. La simulazione \`e l'alternativa standard. I
+simulatori generalisti come ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp} offrono
+stack protocollari ampi, ma comportano una curva di apprendimento ripida e un
+overhead notevole quando uno studio mira a un singolo meccanismo. Per domande
+mirate a livello MAC un simulatore \emph{custom} \`e spesso preferibile: contiene
+solo ci\`o che serve alla domanda di ricerca, d\`a controllo completo su ogni
+modello e produce un codice compatto e riproducibile, al prezzo di una
+validazione attenta, qui fornita calibrando il canale sul campo.
+
+% ---------------------------------------------------------------------
+\section{Lacuna nella letteratura}
+\label{sec:bg-gap}
+Il rilevamento di prossimit\`a via Wi-Fi \`e stato studiato in interni e in
+citt\`a~\cite{goel-wifi}; la comunicazione marittima si \`e concentrata sul lungo
+raggio; il beaconing adattivo \`e stato esplorato per i veicoli. Nessun lavoro
+precedente combina i vincoli specifici della rilevazione di prossimit\`a costiera
+(funzionamento senza infrastruttura, broadcast unidirezionale non confermato,
+nodi indossabili a energia limitata e necessit\`a di consapevolezza affidabile a
+corto raggio \emph{e} multihop in una popolazione mobile e variabile), n\'e
+regola insieme la frequenza di beaconing e la propagazione della consapevolezza
+sotto questi vincoli. \`E questo il trattamento congiunto che la tesi affronta.

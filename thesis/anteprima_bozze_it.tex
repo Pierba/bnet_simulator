@@ -53,10 +53,82 @@
 
 \begin{document}
 
+\input{bozza_sommario_it}
+
 \tableofcontents
 \clearpage
 
+\input{bozza_capitolo1_it}
+\input{bozza_capitolo2_it}
 \input{bozza_capitolo3_it}
 \input{bozza_capitolo4_it}
+\input{bozza_capitolo6_it}
+
+% ---------------------------------------------------------------------
+% Bibliografia: sottoinsieme delle voci di main.tex citate nel Cap. 2,
+% qui solo per risolvere i \cite in anteprima (non e' la bibliografia
+% finale della tesi).
+% ---------------------------------------------------------------------
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{Bibliografia}
+
+\bibitem{imo-ais} International Maritime Organization. \emph{AIS Transponders}.
+\url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}, accessed 2025.
+
+\bibitem{noaa-beacons} NOAA SARSAT. \emph{406\,MHz Emergency Distress Beacons}.
+\url{https://www.sarsat.noaa.gov/emergency-406-beacons/}, accessed 2025.
+
+\bibitem{ieee80211} IEEE 802.11 Working Group. \emph{The Working Group Setting
+the Standards for Wireless LANs}. \url{https://www.ieee802.org/11/}, accessed 2025.
+
+\bibitem{sharetechnote-dcf} ShareTechnote. \emph{WLAN DCF}.
+\url{https://www.sharetechnote.com/html/WLAN_DCF.html}, accessed 2025.
+
+\bibitem{csma-ca} Network Academy. \emph{Collision Avoidance (CSMA/CA)}.
+\url{https://www.networkacademy.io/ccna/wireless/collision-avoidance-csma-ca},
+accessed 2025.
+
+\bibitem{tobagi-hidden} F.~Tobagi and L.~Kleinrock. Packet switching in radio
+channels: Part II --- the hidden terminal problem in carrier sense
+multiple-access and the busy-tone solution. \emph{IEEE Transactions on
+Communications}, 23(12):1417--1433, 1975.
+
+\bibitem{ipcisco-ibss} IpCisco. \emph{Wireless Principles: BSS, ESS, IBSS}.
+\url{https://ipcisco.com/lesson/wireless-principles/}, accessed 2025.
+
+\bibitem{takai-dvcs} M.~Takai, J.~Martin, R.~Bagrodia, and A.~Ren. Directional
+virtual carrier sensing for directional antennas in mobile ad hoc networks. In
+\emph{Proc. ACM MobiHoc}, pages 183--193, 2002.
+
+\bibitem{alotaibi-adaptive} M.~M.~Alotaibi and H.~T.~Mouftah. Adaptive
+expiration time for dynamic beacon scheduling in vehicular ad-hoc networks. In
+\emph{IEEE VTC2015-Fall}, pages 1--6, 2015.
+
+\bibitem{sommer-adaptive} C.~Sommer, O.~K.~Tonguz, and F.~Dressler. Adaptive
+beaconing for delay-sensitive and congestion-aware traffic information systems.
+In \emph{IEEE Vehicular Networking Conference}, pages 1--8, 2010.
+
+\bibitem{chen-survey} L.~Chen and W.~Zhuang. Beacon scheduling for device
+discovery in wireless networks: a survey. \emph{IEEE Communications Surveys \&
+Tutorials}, 20(1):137--156, 2018.
+
+\bibitem{zhao-vanet} J.~Zhao, M.~Li, Y.~Wang, and J.~Wang. An adaptive beaconing
+strategy based on local topology and channel status in VANETs. \emph{IEEE
+Transactions on Mobile Computing}, 18(10):2354--2367, 2019.
+
+\bibitem{broadcaststorm} S.-Y.~Ni, Y.-C.~Tseng, Y.-S.~Chen, and J.-P.~Sheu. The
+broadcast storm problem in a mobile ad hoc network. In \emph{Proc. ACM
+MobiCom}, pages 151--162, 1999.
+
+\bibitem{goel-wifi} M.~Goel and S.~N.~Patel. Wi-Fi-based proximity detection in
+the wild. In \emph{Proc. ACM MobiSys}, pages 1--12, 2020.
+
+\bibitem{nsnam} nsnam.org. \emph{ns-3 Network Simulator}.
+\url{https://www.nsnam.org/}, accessed 2025.
+
+\bibitem{omnetpp} omnetpp.org. \emph{OMNeT++ Discrete Event Simulator}.
+\url{https://omnetpp.org/}, accessed 2025.
+
+\end{thebibliography}
 
 \end{document}

@@ -1,0 +1,88 @@
+% =====================================================================
+%  BOZZA - Capitolo 6 (italiano)
+%  Conclusioni e lavori futuri
+%
+%  Risultati in forma qualitativa, con rimandi a \ref{ch:risultati} e
+%  placeholder "% TODO numero" da riempire quando il Cap. 5 sara' pronto.
+%  La sezione sul gate di forwarding density-aware (lavoro futuro) e'
+%  inclusa via \input dallo snippet gia' esistente.
+%  Richiede i pacchetti gia' presenti nel preambolo di main.tex.
+% =====================================================================
+\chapter{Conclusioni e lavori futuri}
+\label{ch:conclusioni}
+
+% ---------------------------------------------------------------------
+\section{Sintesi dei contributi}
+\label{sec:concl-contributi}
+Questa tesi ha esteso un simulatore a eventi discreti per il beaconing broadcast
+Wi-Fi senza infrastruttura e lo ha usato per studiare insieme due domande: con
+quale frequenza una boa di sicurezza marittima deve trasmettere e fino a dove
+deve arrivare la consapevolezza che produce. I contributi sono uno scheduler
+context-aware (ACAB) che fonde densit\`a, recency del contatto e mobilit\`a; due
+meccanismi di propagazione della consapevolezza, append passivo e forwarded
+attivo; una suite di metriche che separa l'affidabilit\`a di link dalla
+consapevolezza di rete, dalle collisioni e dal carico di canale; e una campagna
+sperimentale su canale calibrato sul campo, con popolazione variabile e mobilit\`a
+Random Waypoint.
+
+% ---------------------------------------------------------------------
+\section{Risultati principali}
+\label{sec:concl-risultati}
+I risultati completi sono nel Capitolo~\ref{ch:risultati}. Se ne ricavano tre
+linee principali.
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{L'adattamento context-aware costa poco e rende molto.} ACAB tiene
+  il tasso di collisione basso dove il beaconing statico cresce molto con la
+  densit\`a, e trasmette molti meno beacon sia di SBP sia di ADAB, con una PDR per
+  ricevitore pari o migliore a quella delle due linee di base.
+  % TODO numero: tasso di collisione ACAB vs SBP alla densita' massima
+  % TODO numero: riduzione percentuale dei beacon trasmessi (ACAB vs SBP; ACAB vs ADAB)
+  \item \textbf{Affidabilit\`a di link e consapevolezza di rete vanno misurate
+  separatamente.} Sotto un canale con path loss realistico la PDR per ricevitore
+  \`e limitata dalla propagazione, non dalla contesa, quindi il valore
+  dell'adattamento emerge nel tasso di collisione e nel carico di canale pi\`u
+  che nella consegna grezza.
+  \item \textbf{La consapevolezza passiva batte la propagazione attiva.} La
+  modalit\`a append raggiunge una porzione di rete pari o maggiore della
+  modalit\`a forwarded, generando molto meno traffico e con una latenza di
+  reazione inferiore; il piggyback dei vicini amplifica di parecchio la
+  consapevolezza a un hop al solo costo di beacon pi\`u grandi.
+  % TODO numero: rapporto di traffico append vs forwarded; fattore di latenza
+\end{enumerate}
+Alla base delle tre linee c'\`e un principio: in una rete broadcast senza
+infrastruttura, l'informazione locale e la parsimonia nell'uso del canale sono
+sufficienti, e spesso convengono.
+
+% ---------------------------------------------------------------------
+\section{Limitazioni}
+\label{sec:concl-limiti}
+Il livello fisico \`e semplificato di proposito: probabilit\`a di ricezione
+costante a tratti, un solo tasso PHY ($1\,$Mbps), nessun capture effect e nessun
+fading esplicito. Il modello di mobilit\`a, pur migliorato a Random Waypoint, non
+cattura la deriva correlata dovuta alle correnti n\'e il raggruppamento degli
+utenti. La scala provata copre densit\`a costiere realistiche ma non
+l'affollamento estremo, e l'analisi del carico di canale considera le
+trasmissioni come proxy dell'airtime, senza un budget energetico completo. I pesi
+di ACAB $(0{,}4, 0{,}3, 0{,}3)$ sono stati fissati e non ottimizzati, e il
+confronto fra append e forwarded \`e stato fatto in un dominio ben connesso.
+
+% ---------------------------------------------------------------------
+\section{Lavori futuri}
+\label{sec:concl-futuro}
+Alcune direzioni seguono in modo naturale. Un modello di perdita dipendente dalla
+lunghezza del pacchetto permetterebbe di pesare i beacon crescenti dell'append
+contro i frame in pi\`u del forwarded sullo stesso piano, e mostrerebbe se liste
+di vicini molto grandi finiscano per danneggiare la consegna. I pesi di ACAB
+invitano a una taratura sistematica, eventualmente online. Valutare entrambe le
+modalit\`a di consapevolezza in topologie deliberatamente \emph{partizionate}
+metterebbe alla prova l'ipotesi che il forwarding ripaghi il suo costo solo
+quando il piggyback non pu\`o raggiungere fisicamente i nodi. Tracce GPS reali di
+nuotatori e piccoli mezzi affinerebbero il modello di mobilit\`a, e un budget
+energetico completo, comprensivo della catena di ricezione e dell'ascolto,
+raffinerebbe le stime sui consumi. Infine, il simulatore e i suoi risultati si
+trasferiscono oltre il caso marittimo, a qualunque problema di scoperta broadcast
+senza infrastruttura, come i beacon di sicurezza veicolari, le reti ad hoc per la
+risposta alle emergenze e l'IoT denso.
+
+% Sottosezione "Gate di forwarding density-aware" (lavoro futuro), gia' scritta.
+\input{lavori_futuri_forward_gate_it}
