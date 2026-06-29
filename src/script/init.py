@@ -119,8 +119,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--multihop-mode",
         choices=["none", "append", "forwarded"],
-        default=cfg.get('simulation', 'multihop_mode'),
-        help="Multihop mode to use for the simulation (default: from config)"
+        default=(cfg.get('simulation', 'multihop_modes') or ['none'])[0],
+        help="Multihop mode to use for the simulation (default: first of simulation.multihop_modes)"
     )
 
     # Parse the command-line arguments and return them as a namespace object
@@ -140,43 +140,43 @@ def random_velocity(default_velocity: float) -> tuple[float, float]:
         random.uniform(-1, 1) * default_velocity
     )
 
-# Main function to initialize and run the simulation
-def main():
+# Construct and run a single simulation in-process, returning (metrics, simulated_time).
+# This is the reusable core shared by the CLI entry point (main) and the test suite, so
+# tests can drive a full run and inspect the resulting Metrics without spawning a subprocess.
+def build_and_run(
+    *,
+    mode: str,
+    scenario: str,
+    duration: float,
+    seed: float,
+    world_width: float,
+    world_height: float,
+    mobile_buoy_count: int,
+    fixed_buoy_count: int,
+    density: int,
+    ideal: bool,
+    static_interval: float,
+    min_interval: float,
+    max_interval: float,
+    multihop_mode: str,
+    positions: list[tuple[float, float]] | None = None,
+) -> tuple[Metrics | None, float]:
     cfg = ConfigHandler()
-    args = parse_args()
 
-    # Unpacking args values
-    density: int           = args.density
-    duration: float        = args.duration
-    fixed_buoy_count: int  = args.fixed_buoy_count
-    ideal: bool            = args.ideal
-    max_interval: float    = args.max_interval
-    min_interval: float    = args.min_interval
-    mobile_buoy_count: int = args.mobile_buoy_count
-    mode: str              = args.mode
-    multihop_mode: str     = args.multihop_mode
-    positions_file: str    = args.positions_file
-    result_file: str       = args.result_file
-    scenario: str          = args.scenario
-    seed: float            = args.seed
-    static_interval: float = args.static_interval
-    world_height: float    = args.world_height
-    world_width: float     = args.world_width
-
-    # Inject the multihop mode parsed into the config to be accessed by other components of the simulation
+    # Inject per-run parameters that behaviour code reads from the config singleton
     cfg.set('simulation', 'multihop_mode', multihop_mode)
+    # Inject the world size so buoy mobility (RWP waypoints) honours these dimensions
+    # rather than whatever config.yaml happens to hold
+    cfg.set('world', 'width', world_width)
+    cfg.set('world', 'height', world_height)
 
     # Set the random seed for reproducibility
     random.seed(seed)
 
-    # Load buoy positions from file if provided, otherwise they will be generated randomly
-    positions: list[tuple[float, float]] = None
-    if positions_file:
-        with open(positions_file, "r") as f:
-            positions = json.load(f)
-    else:
+    # Use the provided positions, otherwise generate them randomly
+    if positions is None:
         positions = [
-            random_position(world_width, world_height) 
+            random_position(world_width, world_height)
             for _ in range(mobile_buoy_count + fixed_buoy_count)
         ]
 
@@ -203,7 +203,7 @@ def main():
     for i in range(mobile_buoy_count + fixed_buoy_count):
         # Determine if this buoy should be mobile or fixed
         mobile = i < mobile_buoy_count
-                    
+
         # Buoy initialization
         buoy = Buoy(
             position=positions[i],
@@ -236,14 +236,48 @@ def main():
     simulator = Simulator(buoys, channel, metrics, scenario, duration)
     simulated_time = simulator.start()
 
+    return metrics, simulated_time
+
+# Main function to initialize and run the simulation
+def main():
+    args = parse_args()
+
+    # Load buoy positions from file if provided; otherwise build_and_run generates them
+    positions: list[tuple[float, float]] | None = None
+    if args.positions_file:
+        with open(args.positions_file, "r") as f:
+            positions = json.load(f)
+
+    metrics, simulated_time = build_and_run(
+        mode=args.mode,
+        scenario=args.scenario,
+        duration=args.duration,
+        seed=args.seed,
+        world_width=args.world_width,
+        world_height=args.world_height,
+        mobile_buoy_count=args.mobile_buoy_count,
+        fixed_buoy_count=args.fixed_buoy_count,
+        density=args.density,
+        ideal=args.ideal,
+        static_interval=args.static_interval,
+        min_interval=args.min_interval,
+        max_interval=args.max_interval,
+        multihop_mode=args.multihop_mode,
+        positions=positions,
+    )
+
     # If metrics are enabled and there is the output file, then export metrics to a CSV file once simulation is complete
-    if metrics and result_file:
-        match scenario:
+    if metrics and args.result_file:
+        match args.scenario:
             case "ramp":
-                metrics.export_time_series(result_file)
+                metrics.export_time_series(args.result_file)
             case "random" | "static":
                 summary = metrics.summary(sim_time=simulated_time)
-                metrics.export_metrics_to_csv(summary, result_file)
+                metrics.export_metrics_to_csv(summary, args.result_file)
+                # Side-car series of how the network-discovery % grew over time, so the
+                # densest run of the sweep can be plotted as a growth curve.
+                discovery_file = args.result_file.replace(".csv", "_discovery.csv")
+                metrics.export_discovery_time_series(discovery_file)
 
 if __name__ == "__main__":
     main()

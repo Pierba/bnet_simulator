@@ -10,7 +10,7 @@ from utils.metrics import Metrics
 
 class Channel:
     # Initialization of the Channel class with configuration parameters and state variables
-    def __init__(self, metrics = None, ideal_channel = None):
+    def __init__(self, metrics: Metrics = None, ideal_channel: bool = False):
         cfg = ConfigHandler()
         
         # Channel parameters
@@ -76,7 +76,7 @@ class Channel:
         )
 
     # Broadcasts a beacon, handles collisions, schedules receptions, and updates metrics
-    def broadcast(self, beacon: Beacon, sim_time: float) -> float:
+    def broadcast(self, beacon: Beacon, sim_time: float):
         if logging.LOGGING_ENABLED:
             logging.log_info(f"Broadcasting from {str(beacon.sender_id)[:6]} at {sim_time:.2f}s")
 
@@ -123,10 +123,14 @@ class Channel:
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
+            # Collision rate counts only beacons lost to collisions (direct
+            # collisions plus poisoned earlier receptions).
             self.metrics.log_collision(collision_lost + poisoned_count)
+            # Total error counts every lost beacon: collisions, probabilistic
+            # channel loss and poisoned receptions.
             self.metrics.log_lost(total_lost + poisoned_count)
-
-        return new_end_time
+            # Sample the network-discovery growth curve (throttled inside metrics)
+            self.metrics.log_discovery_timepoint(sim_time)
 
     # Returns active buoys (excluding the sender) within communication range of the beacon
     def _receivers_in_range(self, beacon: Beacon) -> list[tuple[Buoy, float]]:
@@ -171,7 +175,8 @@ class Channel:
         comm_range_sq = self.comm_range_max_sq
 
         # Receiver coordinates resolved once instead of per (transmission x receiver) pair
-        receivers_pos = [(buoy.id, *buoy.position) for buoy, _ in receivers_data]
+        # Unpack each position once via the single-element-iterable trick (avoids a double attribute lookup)
+        receivers_pos = [(buoy.id, bx, by) for buoy, _ in receivers_data for bx, by in (buoy.position,)]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender

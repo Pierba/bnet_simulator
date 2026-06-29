@@ -1,8 +1,8 @@
 simulation:
   schedulers:
   - static
-  - dynamic_adab
-  - dynamic_acab
+  # - dynamic_adab
+  # - dynamic_acab
   min_buoys: 20
   max_buoys: 100
   step_buoys: 20
@@ -10,9 +10,9 @@ simulation:
    - 1.0   
    - 0.5
    - 0.25
-  duration: 60
+  duration: 120
   num_processes: 10
-  ideal_channel: false
+  ideal_channel: true
   # Options: static, ramp, random
   scenario: random          
   # Percentage of buoys that can change per update in random scenario 
@@ -20,21 +20,21 @@ simulation:
   enable_metrics: true
   enable_logging: false
   enable_file_logging: false
-  # Options: none, append, forwarded
-  multihop_mode: forwarded
-  # Multihop modes swept and compared per run (subset of: none, append, forwarded)
+  # Multihop modes to run; one batch per mode (subset of: none, append, forwarded)
   multihop_modes:
   # - none
   - append
   - forwarded
   # Maximum hops for forwarded mode
   multihop_limit: 1
-  # Append mode: discovered nodes farther than this many hops from the sender are
-  # not advertised in its beacons (1 = direct neighbors only, 0 = unlimited)
+  # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
+  # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2
   # Maximum number of beacons that can be stored in pending queue
-  pending_queue_limit: 20
-  # Probabilistic forwarding: queue a received beacon with p = min(1, n0/n_neighbors)
+  pending_queue_limit: 50
+  # Probabilistic forwarding baseline n0 (queue p = min(1, n0/n_neighbors)).
+  # CURRENTLY INACTIVE — the probabilistic forward gate was removed; every fresh,
+  # in-TTL, non-own beacon is queued (subject to pending_queue_limit) and relayed.
   forward_density_baseline: 5
 
 world:
@@ -70,6 +70,7 @@ scheduler:
   static_interval: 1.0
   beacon_min_interval: 1.0
   beacon_max_interval: 5.0
+  neighbor_timeout: 7.0
   # ADAB: neighbour count that maps to density factor = 1.0 (full backoff)
   adab_neighbors_threshold: 15.0
   # ACAB: neighbour count that maps density component to 1.0

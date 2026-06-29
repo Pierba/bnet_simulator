@@ -2,7 +2,11 @@ from typing import Any, Optional
 import os
 import csv
 from utils import logging
-from uuid import UUID
+
+# Minimum sim-time gap between two samples of the network-discovery growth curve.
+# Discovery only ever grows, so coarse sampling still captures the full curve while
+# keeping the series small and the per-broadcast bookkeeping cost bounded.
+DISCOVERY_SAMPLE_INTERVAL: float = 2.0
 
 # Class to track and summarize metrics for the BNet simulation
 class Metrics:
@@ -36,20 +40,27 @@ class Metrics:
         self.beacons_received: int                        = 0
         self.beacons_lost: int                            = 0
         self.beacons_collided: int                        = 0
-        self.delivered_beacons: dict[UUID, float]         = {}
-        self.discovered_pairs: dict[UUID, set[UUID]]      = {}
+        self.delivered_beacons: dict[int, float]          = {}
+        self.discovered_pairs: dict[int, set[int]]        = {}
         self.potentially_sent: int                        = 0
         self.reaction_latency_count: int                  = 0
         self.reaction_latency_sum: float                  = 0.0
         self.scheduler_latency_count: int                 = 0
         self.scheduler_latency_sum: float                 = 0.0
         self.time_series: list                            = []
+        # Growth of the average % of network discovered over sim time. Sampled on
+        # broadcast (throttled by DISCOVERY_SAMPLE_INTERVAL) so the discovery curve
+        # can be plotted for the densest run of a sweep.
+        self.discovery_time_series: list                  = []
+        self._last_discovery_sample_time: float           = -1.0
         self.total_latency: float                         = 0.0
-        self.total_successful_receivers: int              = 0
-        self.unique_nodes_per_buoy: dict[UUID, set[UUID]] = {}
-        
+        self.total_successful_receivers: int          = 0
+        # Per-buoy count of unique nodes discovered (its reachable-node count).
+        # De-duplication is done buoy-side, which reports the running size here.
+        self.unique_nodes_per_buoy: dict[int, set[int]]     = {}
+
     # Set of unique nodes discovered by each buoy
-    def set_unique_nodes_per_buoy(self, buoy_id: UUID, unique_nodes: set[UUID]):
+    def set_unique_nodes_per_buoy(self, buoy_id: int, unique_nodes: set[int]):
         nodes = self.unique_nodes_per_buoy.get(buoy_id)
         if nodes is None:
             self.unique_nodes_per_buoy[buoy_id] = set(unique_nodes)
@@ -64,7 +75,7 @@ class Metrics:
             self.beacons_forwarded += 1
 
     # Log a received beacon and tracks unique deliveries and latency
-    def log_received(self, origin_id: UUID, timestamp: float, receive_time: float, receiver_id: UUID):
+    def log_received(self, origin_id: int, timestamp: float, receive_time: float, receiver_id: int):
         # Count each reception opportunity on the same basis used by Delivery Ratio.
         self.actually_received += 1
 
@@ -93,7 +104,7 @@ class Metrics:
         self.total_latency += latency
 
 
-    # Log a lost beacon
+    # Log lost beacons (total error: collisions + probabilistic loss + poisoned receptions)
     def log_lost(self, count: int = 1):
         self.beacons_lost += count
 
@@ -134,20 +145,37 @@ class Metrics:
         originated = self.beacons_sent - self.beacons_forwarded
         return self.beacons_received / originated if originated else 0.0
 
-    # Calculate the average number of unique nodes discovered per buoy
+    # Average number of unique nodes discovered per buoy: how many other nodes
+    # the average node in the network can reach (its reachability, as a count).
     def avg_unique_nodes_discovered(self) -> float:
         if not self.unique_nodes_per_buoy:
             return 0.0
-        
+
         node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
         return sum(node_counts) / len(node_counts)
 
-    # Average percentage of the network each buoy has discovered.
-    # density - 1 excludes the buoy itself from the set of discoverable nodes.
+    # Reachability of the average node as a percentage of the whole network.
+    # density - 1 excludes the buoy itself from the set of reachable nodes.
     def avg_percentage_network_discovered(self) -> float:
         if self.density <= 1:
             return 0.0
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
+
+    # Sample the current avg % of network discovered for the growth-over-time curve.
+    # Called on every broadcast but throttled to one sample per DISCOVERY_SAMPLE_INTERVAL
+    # of sim time, so the densest run can be plotted without bloating the series.
+    def log_discovery_timepoint(self, sim_time: float):
+        if (
+            self._last_discovery_sample_time >= 0
+            and (sim_time - self._last_discovery_sample_time) < DISCOVERY_SAMPLE_INTERVAL
+        ):
+            return
+
+        self._last_discovery_sample_time = sim_time
+        self.discovery_time_series.append({
+            "time": sim_time,
+            "avg_percentage_discovered": self.avg_percentage_network_discovered(),
+        })
 
     # Log a timepoint for time-series analysis, including delivery ratio and PDR at this moment
     def log_timepoint(self, sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float] = None):
@@ -178,7 +206,7 @@ class Metrics:
         return self.avg_neighbors_sum / self.avg_neighbors_count
     
     # Generate a summary of all metrics for the simulation run
-    def summary(self, sim_time: float) -> dict[str]:
+    def summary(self, sim_time: float) -> dict[str, Any]:
         summary = {
             "Scheduler Type": self.scheduler_type,
             "Multihop Mode": self.multihop_mode,
@@ -196,6 +224,7 @@ class Metrics:
             "Delivery Ratio": self.delivery_ratio(),
             "PDR": self.packet_delivery_ratio(),
             "Collision Rate": self.beacons_collided / self.potentially_sent if self.potentially_sent else 0,
+            "Loss Rate": self.beacons_lost / self.potentially_sent if self.potentially_sent else 0,
             "Avg Reaction Latency": (
                 self.reaction_latency_sum / self.reaction_latency_count
                 if self.reaction_latency_count else 0
@@ -234,3 +263,12 @@ class Metrics:
         df = pd.DataFrame(self.time_series)
         df.to_csv(filepath, index=False)
         logging.log_info(f"Time series exported to {filepath}")
+
+    # Export the network-discovery growth series (time, avg % discovered) to CSV
+    def export_discovery_time_series(self, filepath: str):
+        import pandas as pd
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        df = pd.DataFrame(self.discovery_time_series)
+        df.to_csv(filepath, index=False)
+        logging.log_info(f"Discovery time series exported to {filepath}")
