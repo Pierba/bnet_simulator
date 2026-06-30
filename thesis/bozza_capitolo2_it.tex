@@ -13,95 +13,165 @@
 \chapter{Estensione della consapevolezza: meccanismi multihop e protocolli di beaconing}
 \label{ch:contributo}
 
-Questo capitolo descrive il contributo della tesi. Il punto di partenza \`e che un
-beacon, da solo, trasporta consapevolezza a un solo hop radio: chi lo riceve
-conosce il mittente diretto, niente di pi\`u. Il contributo centrale \`e
-l'estensione di questa conoscenza con due meccanismi multihop, \emph{append} e
-\emph{forwarded}, che diffondono nella rete ci\`o che ciascun nodo ha imparato. Si
-descrivono prima l'architettura e il modello di comunicazione del sistema ProSafe,
-poi i due meccanismi con le formule che ne governano il comportamento, quindi i tre
-protocolli che decidono \emph{quando} una boa trasmette (SBP, ADAB, ACAB) e infine
-un possibile miglioramento del forwarding.
+Questo capitolo descrive il contributo principale della tesi apportato al simulatore: le due
+modalita' di multihop \emph{append} e \emph{forwarded}, che estendono la consapevolezza dei nodi
+oltre il singolo hop.
 
-% ---------------------------------------------------------------------
-\section{Panoramica e principi di progettazione}
-\label{sec:overview}
-ProSafe (\emph{Proximity-based Safety}) \`e una rete di sicurezza basata su Wi-Fi
-in cui delle boe intelligenti trasmettono periodicamente beacon broadcast con la
-propria posizione, cos\`i che le imbarcazioni possano rilevare le persone in acqua.
-Il sistema lavora dentro un dominio ad hoc IEEE~802.11 locale: gli allarmi sono
-generati e gestiti sul posto, senza access point, router o connettivit\`a Internet.
-La progettazione segue alcuni principi: assenza di infrastruttura, comunicazione
-broadcast a livello MAC, rilevazione passiva da parte delle imbarcazioni, hardware
-a basso costo ed efficienza energetica, perch\'e le boe a batteria devono
-funzionare a lungo con energia limitata e quindi la frequenza di trasmissione va
-gestita con attenzione.
+Prima pero' si richiama il modello di comunicazione su cui poggia il simulatore, ovvero la
+struttura del beacon e i protocolli che ne regolano gli intervalli di trasmissione (SBP, ADAB,
+ACAB).
 
-L'architettura prevede due tipi di dispositivo. La \emph{smart user buoy} \`e un
-galleggiante indossato o trasportato da chi \`e in acqua, con un single-board
-computer dotato di radio Wi-Fi, modulo GPS e batteria; la sua unica radio trasmette
-i propri beacon e ascolta quelli delle altre boe, in modalit\`a ad hoc. La
-\emph{vessel safety unit}, a bordo delle imbarcazioni, lavora solo in ascolto e
-genera un allarme quando riceve un beacon abbastanza forte. Poich\'e ogni beacon
-contiene anche la lista dei nodi conosciuti dal mittente, l'imbarcazione pu\`o
-accorgersi di boe che non ha sentito direttamente: \`e questo il punto su cui
-agiscono i meccanismi multihop.
+Il capitolo si chiude con alcuni possibili miglioramenti progettati per contenere il costo delle
+due modalita' multihop, ma non ancora attivi nell'implementazione corrente.
 
 % ---------------------------------------------------------------------
 \section{Modello di comunicazione e struttura del beacon}
 \label{sec:commodel}
-ProSafe esegue la scoperta di prossimit\`a a livello MAC IEEE~802.11, senza access
-point, associazione o servizi di livello IP. I beacon sono brevi frame broadcast
-inviati all'indirizzo di broadcast. Il payload modellato nel simulatore (classe
+ProSafe esegue la scoperta di prossimit\`a a livello MAC IEEE~802.11, senza connettersi ad access
+point o utilizzare servizi di livello IP. I beacon sono brevi pacchetti inviati in broadcast.
+Il payload modellato nel simulatore (nella classe
 \texttt{Beacon}) contiene:
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item \textbf{sender id} --- identificatore del mittente ($16$ byte);
-  \item \textbf{flag di mobilit\`a} --- indica se il nodo \`e mobile ($1$ byte);
-  \item \textbf{posizione} --- coordinate correnti ($8$ byte);
-  \item \textbf{timestamp} --- istante di trasmissione ($4$ byte);
-  \item \textbf{lista dei nodi conosciuti} --- $28$ byte per voce (id, timestamp e
-  posizione); la distanza in hop di ogni voce \`e usata solo internamente e non
-  pesa sulla dimensione on-air;
-  \item \textbf{origin id} e \textbf{hop limit} --- $16+4$ byte, presenti solo in
+  \item \textbf{sender id} --- identificatore univoco della boa trasmittente ($16$ byte);
+  % \item \textbf{flag di mobilit\`a} --- indica se il nodo \`e mobile ($1$ byte);
+  \item \textbf{posizione} --- coppia di coordinate correnti relative al piano di simulazione ($8$ byte);
+  \item \textbf{timestamp} --- istante temporale di trasmissione ($4$ byte);
+  \item \textbf{lista dei nodi conosciuti} --- ciascuna voce e' costituita da id, timestamp,
+  posizione e hop del nodo vicino, le prime tre componenti hanno un peso di $28$ byte, mentre la distanza in hop \`e usata solo internamente per le operazioni del simulatore ed e' trascurata;
+  \item \textbf{origin id} e \textbf{hop limit} --- $16+4$ byte, valorizzati solamente in
   modalit\`a forwarded.
 \end{itemize}
 Detto $k$ il numero di nodi annunciati nella lista, la dimensione del frame in byte
 \`e
 \begin{equation}
-  S(k) = 33 + 28\,k + 20\,\mathbb{1}_{\text{forwarded}},
+  S(k) = 33 + 28\,k \,\,(+ 20\,_{\text{forwarded}})
   \label{eq:beacon-size}
 \end{equation}
-dove l'indicatore vale $1$ solo in modalit\`a forwarded (per i campi origin id e
-hop limit) e $0$ altrimenti. Il tempo on-air \`e $8\,S(k)/R$ con $R$ il tasso PHY.
 Il frame base \`e quindi di $33$ byte e cresce di $28$ byte per ogni nodo
-annunciato: la dimensione del beacon dipende dalla densit\`a locale, e questo lega
-direttamente la modalit\`a append (Sezione~\ref{sec:append}) al carico di canale.
+annunciato. La dimensione del beacon quindi cresce in proporzione al numero di nodi
+che la boa conosce.
 
-L'accesso al canale segue la DCF: il nodo rileva il mezzo, attende un DIFS, estrae
-un backoff dalla contention window e trasmette, senza RTS/CTS n\'e ACK. Le boe
-formano un dominio ad hoc peer-to-peer; la rete \`e dinamica, perch\'e i nodi
-entrano ed escono dal raggio per correnti, onde e mobilit\`a. Ogni nodo mantiene
-quindi una tabella dei vicini a stato leggero (\emph{soft state}), aggiornata a
-ogni ricezione ed espirata periodicamente.
+L'accesso al canale e' mediato dai principi della DCF (Distributed coordination function): il nodo rileva il mezzo, attende un DIFS, calcola il tempo di backoff e trasmette, senza ricorrere a RTS/CTS o ACK.
+La dinamicita' della rete varia a seconda dello \texttt{scenario} impostato (static, ramp, random), questo parametro va ad impattare sulla variazione del numero di nodi durante la durata della simulazione.
+Per i fini della valutazione dei risultati ci si e' concentrati sullo scenario random, nel quale il numero dei nodi sale e decresce periodicamente di un fattore percentuale stabilito dalla configurazione; allo scopo di simulare il comportamento dinamico di una rete reale, dove i nodi entrano ed escono dal raggio radio in continuazione.
+Ogni nodo mantiene in memoria una tabella dei vicini, aggiornata a ogni ricezione e svuotata dalle informazioni obsolete periodicamente.
+
+Oltre alla struttura del beacon, il modello di comunicazione comprende i protocolli che decidono
+quando una boa trasmette. Sono tre: SBP, ADAB e ACAB; agiscono solo sull'istante di
+generazione del beacon e lasciano invariato il CSMA/CA sottostante. Questi protocolli erano preesistenti nel simulatore e 
+vengono richiamati qui solo come contesto perche' ogni modalit\`a multihop introdotta pi\`u
+avanti pu\`o essere abbinata a uno qualunque di essi.
+
+\subsection{Static Beaconing Protocol (SBP)}
+\label{sec:sbp}
+Lo SBP e' il protocollo di riferimento. Ogni boa trasmette un beacon a intervallo
+fisso $BI_{\text{static}}$, indipendentemente dalle condizioni di rete, ascolta in
+continuazione e aggiorna la tabella dei vicini a ogni ricezione. \`E semplice e
+prevedibile, ma in scenari densi le collisioni riducono l'affidabilita' mentre in scenari sparsi l'intervallo fisso porta a
+trasmissioni inutilmente frequenti. Questi limiti motivano il bisogno di protocolli adattivi.
+
+\subsection{Adaptive Density-Aware Beaconing (ADAB)}
+\label{sec:adab}
+ADAB regola l'intervallo in base a una sola grandezza locale: il numero di vicini
+in tabella. A ogni decisione il nodo conta i vicini correnti $N_t$ e con essi calcola un fattore di densita' normalizzato
+\begin{equation}
+  f_t = \min\!\left(1,\; \frac{N_t}{\nthr}\right),
+  \qquad \nthr = 15,
+  \label{eq:adab-density}
+\end{equation}
+dove $\nthr$ \`e la soglia oltre la quale la congestione diventa rilevante.
+L'intervallo successivo \`e una funzione quadratica del fattore di densit\`a,
+interpolata fra un minimo e un massimo, con un piccolo jitter moltiplicativo che
+desincronizza i nodi:
+\begin{equation}
+  BI_{t+1} = \Big[\,\bimin + f_t^{\,2}\,(\bimax-\bimin)\,\Big]\,(1+\epsilon_t),
+  \qquad \epsilon_t \sim \mathcal{U}[-\eta,\eta],\;\; \eta=0.05,
+  \label{eq:adab}
+\end{equation}
+con $BI_{t+1}$ vincolato all'intervallo $[\bimin,\bimax]$. Con pochi vicini
+$f_t\approx 0$ e la boa trasmette vicino a $\bimin$, per una scoperta rapida; man
+mano che $N_t$ si avvicina a $\nthr$ il termine quadratico porta l'intervallo verso
+$\bimax$, riducendo le trasmissioni dove la contesa \`e maggiore. La forma
+quadratica tiene il nodo reattivo a bassa densit\`a e ne accelera il rallentamento
+ad alta densit\`a. I valori usati sono $\bimax = \SI{5.0}{\second}$ e $\bimin$
+configurabile (negli esperimenti $\bimin \in \{0.25, 0.5, 1.0\}\,\si{\second}$).
+
+\subsection{Adaptive Context-Aware Beaconing (ACAB)}
+\label{sec:acab}
+La densit\`a non \`e l'unico segnale locale utile a determinare se un beacon vada
+trasmesso oppure no. ACAB combina tre segnali: la densit\`a dei vicini, il tempo trascorso
+dall'ultimo contatto e la mobilit\`a del nodo.
+
+\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un conteggio
+normalizzato dei vicini, con una soglia pi\`u bassa:
+\begin{equation}
+  s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
+  \qquad \nthr^{\mathrm{ACAB}} = 10 .
+  \label{eq:acab-den}
+\end{equation}
+
+\paragraph{Componente di tempo dall'ultimo contatto.} Se la boa ha ricevuto un beacon da poco
+non ha molta fretta di pubblicizzarsi; se invece e' rimasta a lungo in silenzio, conviene che
+trasmetta. Detto $\Delta = t - t_{\text{ultimo contatto}}$ il tempo passato dall'ultimo beacon
+ricevuto e $\tau_c = \SI{20}{\second}$ la durata oltre la quale un contatto non e' piu' considerato
+recente:
+\begin{equation}
+  s_{\mathrm{con}} =
+  \begin{cases}
+    \max\!\big(0,\; 1 - \Delta/\tau_c\big) & N_t>0 \text{ e contatto registrato},\\
+    0 & \text{altrimenti.}
+  \end{cases}
+  \label{eq:acab-con}
+\end{equation}
+Un nodo contattato da poco d\`a $s_{\mathrm{con}}\to 1$ (rallenta); un nodo isolato
+o silenzioso da tempo d\`a $0$ (trasmette pi\`u spesso).
+
+\paragraph{Componente di mobilit\`a.} Un nodo veloce cambia posizione rapidamente e
+dovrebbe aggiornarla pi\`u spesso. Con velocit\`a $v=\lVert\mathbf{v}\rVert$ e una
+velocit\`a di riferimento $v_{\text{ref}}$ (la velocit\`a di default, qui
+$\SI{15}{\metre\per\second}$):
+\begin{equation}
+  s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
+  \label{eq:acab-mob}
+\end{equation}
+
+\paragraph{Combinazione e calcolo dell'intervallo.} I tre punteggi sono combinati
+con pesi $(w_d,w_c,w_m)=(0.4,0.3,0.3)$ che sommano a uno. La mobilit\`a riduce il
+backoff, da cui il termine $1-s_{\mathrm{mob}}$:
+\begin{equation}
+  s = w_d\,s_{\mathrm{den}} + w_c\,s_{\mathrm{con}} + w_m\,(1 - s_{\mathrm{mob}}).
+  \label{eq:acab-blend}
+\end{equation}
+Il punteggio $s$ viene poi usato al posto di $f_t$ nel mapping quadratico con
+jitter di ADAB (Eq.~\ref{eq:adab}). Cos\`i ACAB rallenta una boa densa, contattata
+di recente e ferma, e tiene pi\`u frequente una boa isolata, silenziosa o veloce.
+Rispetto ad ADAB, che usa la sola densit\`a, ACAB costruisce il punteggio di
+backoff da tre segnali; il costo \`e un po' di stato in pi\`u (velocit\`a e istante
+dell'ultimo contatto), trascurabile sui dispositivi considerati. Il calcolo
+dell'intervallo \`e dettagliato nel Capitolo~\ref{ch:simulatore}.
 
 % ---------------------------------------------------------------------
-\section{Estensione della conoscenza dei nodi}
+\section{Estensione della consapevolezza dei nodi}
 \label{sec:multihop}
-Un'imbarcazione che si avvicina a un gruppo di nuotatori ha interesse a conoscere
-l'intero gruppo, compresi i membri momentaneamente nascosti da un'onda o da uno
-scafo. La consapevolezza dovrebbe quindi propagarsi oltre il singolo hop radio; ma
-ogni trasmissione spesa per propagarla compete per lo stesso canale, gi\`a sotto
-pressione e privo di conferme. I due meccanismi seguenti sono due risposte opposte
-a questo compromesso. Entrambi si selezionano per esecuzione e convivono con la
-modalit\`a \emph{none}, in cui ogni beacon resta a un solo hop.
+Ad un nodo interessa conoscere la posizione e lo stato dei nodi che gli stanno attorno nella
+rete. Gia' a un solo hop un beacon non si limita ad annunciare il proprio mittente: porta con se'
+la lista dei nodi che il mittente conosce, e cosi' chi lo riceve viene a sapere anche di nodi che
+non sente in modo diretto.
+
+Il contributo di questa tesi riguarda invece l'estensione della consapevolezza oltre il singolo
+hop. Spesso a un nodo serve sapere anche dei nodi piu' lontani, o coperti da altri nodi, e
+propagare piu' in fretta le informazioni in suo possesso; ma ogni trasmissione spesa per
+propagarle compete per lo stesso canale, gia' sotto pressione e privo di conferme. I due
+meccanismi seguenti sono due risposte opposte a questo compromesso.
 
 \subsection{Append: estensione passiva}
 \label{sec:append}
-In modalit\`a append una boa include, in ogni beacon, i nodi di cui \`e a
-conoscenza: sia i vicini diretti (a distanza $1$ hop) sia i nodi scoperti
-indirettamente dalle liste annunciate dagli altri. Non si invia nessun frame in
-pi\`u: la consapevolezza viaggia sui beacon gi\`a previsti, e l'unico costo \`e
-nella dimensione del frame ($28$ byte per nodo annunciato, Eq.~\ref{eq:beacon-size}).
+In modalit\`a append una boa allega, a ogni beacon, i nodi di cui \`e a
+conoscenza: sia i vicini diretti (a $1$ hop) sia i nodi scoperti
+in modo indiretto dalle liste annunciate dagli altri. Non si manda nessun frame in
+pi\`u: la consapevolezza viaggia sui beacon che il nodo invierebbe comunque, e l'unico costo
+\`e nella dimensione del frame, che cresce di $28$ byte per ogni nodo annunciato
+(Eq.~\ref{eq:beacon-size}).
 
 Alla ricezione di un beacon, la boa aggiorna prima i vicini diretti con il
 mittente, poi integra la lista annunciata in una tabella di \emph{nodi scoperti}.
@@ -123,12 +193,6 @@ pi\`u fresca, cio\`e se
 dove $t_j^{\text{mem}}$ \`e il timestamp dell'ultima informazione memorizzata su
 $j$ (oppure $-\infty$ se $j$ \`e nuovo). Cos\`i ogni nodo tende a conservare la
 posizione pi\`u recente nota di ciascun nodo raggiungibile.
-
-Nell'implementazione attuale un eventuale limite di hop per l'append
-(\texttt{append\_hop\_limit}) \`e caricato dalla configurazione ma \emph{non}
-applicato: una boa annuncia tutti i nodi scoperti, a prescindere dalla distanza in
-hop. La distanza $h_j'$ resta comunque registrata e potrebbe servire in futuro a
-limitare la propagazione.
 
 \subsection{Forwarded: estensione attiva}
 \label{sec:forwarded}
@@ -179,111 +243,31 @@ I due meccanismi sono scelte opposte. L'append \`e economico, perch\'e non aggiu
 nessun frame, ma \`e limitato dalla freschezza dell'informazione e dalla dimensione
 crescente del beacon (Eq.~\ref{eq:beacon-size}): pi\`u nodi conosce una boa,
 pi\`u grande, e pi\`u costoso in airtime, diventa ogni suo beacon. Il forwarded
-estende la portata fisica della consapevolezza, perch\'e un beacon pu\`o
+estende la portata della consapevolezza, perch\'e un beacon pu\`o
 raggiungere nodi fuori dal range del mittente originale, ma aumenta il traffico, le
 collisioni e la latenza. Quale dei due convenga in una rete broadcast densa, a
 dominio unico e senza conferme \`e valutato nel capitolo dedicato ai risultati.
 
 % ---------------------------------------------------------------------
-\section{Protocolli di beaconing}
-\label{sec:protocols}
-I meccanismi multihop decidono \emph{cosa} e \emph{fino a dove} propagare; i
-protocolli di questa sezione decidono \emph{quando} una boa trasmette. Tutti e tre
-agiscono solo sull'istante di generazione del beacon e lasciano invariato il
-CSMA/CA sottostante. Sono presentati qui come contesto del contributo, perch\'e
-ogni modalit\`a multihop pu\`o essere abbinata a uno qualunque di essi.
+\section{Possibili miglioramenti}
+\label{sec:improvements}
+Oltre ai due meccanismi multihop appena descritti, durante lo sviluppo sono stati progettati due
+accorgimenti per contenerne il costo: un limite di hop per l'append e un gate di forwarding
+density-aware. Entrambi sono presenti nel codice ma non attivi negli esperimenti di questa tesi,
+e la loro valutazione \`e lasciata ai lavori futuri.
 
-\subsection{Static Beaconing Protocol (SBP)}
-\label{sec:sbp}
-L'SBP \`e il protocollo di riferimento. Ogni boa trasmette un beacon a intervallo
-fisso $BI_{\text{static}}$, indipendentemente dalle condizioni di rete, ascolta in
-continuazione e aggiorna la tabella dei vicini a ogni ricezione. \`E semplice e
-prevedibile, ma il carico di canale cresce con il numero di nodi: in scenari densi
-le collisioni riducono l'affidabilit\`a, in scenari radi l'intervallo fisso porta a
-trasmissioni inutilmente frequenti. Questi limiti motivano gli schemi adattivi.
+\subsection{Limite di hop per l'append}
+\label{sec:append-hoplimit}
+In modalit\`a append (Sezione~\ref{sec:append}) una boa annuncia tutti i nodi scoperti, a
+prescindere da quanto sono lontani in hop; in reti dense questo allunga la lista annunciata e
+quindi la dimensione del beacon (Eq.~\ref{eq:beacon-size}). Un eventuale limite di hop per
+l'append (\texttt{append\_hop\_limit}) \`e gi\`a caricato dalla configurazione ma \emph{non}
+applicato. La distanza $h_j'$ di ogni voce (Eq.~\ref{eq:append-hop}) resta comunque registrata, e
+basterebbe usarla per non annunciare i nodi oltre una certa distanza in hop, tenendo cos\`i sotto
+controllo la crescita del beacon. La taratura del limite e l'effetto su copertura e airtime sono
+lasciati ai lavori futuri.
 
-\subsection{Adaptive Density-Aware Beaconing (ADAB)}
-\label{sec:adab}
-ADAB regola l'intervallo in base a una sola grandezza locale: il numero di vicini
-in tabella. A ogni decisione il nodo conta i vicini correnti $N_t$ (dopo aver
-espirato le voci obsolete) e li mappa su un fattore di densit\`a normalizzato
-\begin{equation}
-  f_t = \min\!\left(1,\; \frac{N_t}{\nthr}\right),
-  \qquad \nthr = 15,
-  \label{eq:adab-density}
-\end{equation}
-dove $\nthr$ \`e la soglia oltre la quale la congestione diventa rilevante.
-L'intervallo successivo \`e una funzione quadratica del fattore di densit\`a,
-interpolata fra un minimo e un massimo, con un piccolo jitter moltiplicativo che
-desincronizza i nodi:
-\begin{equation}
-  BI_{t+1} = \Big[\,\bimin + f_t^{\,2}\,(\bimax-\bimin)\,\Big]\,(1+\epsilon_t),
-  \qquad \epsilon_t \sim \mathcal{U}[-\eta,\eta],\;\; \eta=0.05,
-  \label{eq:adab}
-\end{equation}
-con $BI_{t+1}$ vincolato all'intervallo $[\bimin,\bimax]$. Con pochi vicini
-$f_t\approx 0$ e la boa trasmette vicino a $\bimin$, per una scoperta rapida; man
-mano che $N_t$ si avvicina a $\nthr$ il termine quadratico porta l'intervallo verso
-$\bimax$, riducendo le trasmissioni dove la contesa \`e maggiore. La forma
-quadratica tiene il nodo reattivo a bassa densit\`a e ne accelera il rallentamento
-ad alta densit\`a. I valori usati sono $\bimax = \SI{5.0}{\second}$ e $\bimin$
-configurabile (negli esperimenti $\bimin \in \{0.25, 0.5, 1.0\}\,\si{\second}$).
-
-\subsection{Adaptive Context-Aware Beaconing (ACAB)}
-\label{sec:acab}
-La densit\`a non \`e l'unico segnale locale utile a decidere se un beacon vada
-trasmesso. ACAB combina tre segnali: la densit\`a dei vicini, il tempo trascorso
-dall'ultimo contatto e la mobilit\`a del nodo.
-
-\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un conteggio
-normalizzato dei vicini, con una soglia pi\`u bassa:
-\begin{equation}
-  s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
-  \qquad \nthr^{\mathrm{ACAB}} = 10 .
-  \label{eq:acab-den}
-\end{equation}
-
-\paragraph{Componente di contact-recency.} Se la boa ha ricevuto un beacon di
-recente \`e meno urgente che si annunci; se \`e rimasta a lungo in silenzio,
-conviene che trasmetta. Con $\Delta = t - t_{\text{ultimo contatto}}$ e un orizzonte
-di recency $\tau_c = \SI{20}{\second}$:
-\begin{equation}
-  s_{\mathrm{con}} =
-  \begin{cases}
-    \max\!\big(0,\; 1 - \Delta/\tau_c\big) & N_t>0 \text{ e contatto registrato},\\
-    0 & \text{altrimenti.}
-  \end{cases}
-  \label{eq:acab-con}
-\end{equation}
-Un nodo contattato da poco d\`a $s_{\mathrm{con}}\to 1$ (rallenta); un nodo isolato
-o silenzioso da tempo d\`a $0$ (trasmette pi\`u spesso).
-
-\paragraph{Componente di mobilit\`a.} Un nodo veloce cambia posizione rapidamente e
-dovrebbe aggiornarla pi\`u spesso. Con velocit\`a $v=\lVert\mathbf{v}\rVert$ e una
-velocit\`a di riferimento $v_{\text{ref}}$ (la velocit\`a di default, qui
-$\SI{15}{\metre\per\second}$):
-\begin{equation}
-  s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
-  \label{eq:acab-mob}
-\end{equation}
-
-\paragraph{Combinazione e calcolo dell'intervallo.} I tre punteggi sono combinati
-con pesi $(w_d,w_c,w_m)=(0.4,0.3,0.3)$ che sommano a uno. La mobilit\`a riduce il
-backoff, da cui il termine $1-s_{\mathrm{mob}}$:
-\begin{equation}
-  s = w_d\,s_{\mathrm{den}} + w_c\,s_{\mathrm{con}} + w_m\,(1 - s_{\mathrm{mob}}).
-  \label{eq:acab-blend}
-\end{equation}
-Il punteggio $s$ viene poi usato al posto di $f_t$ nel mapping quadratico con
-jitter di ADAB (Eq.~\ref{eq:adab}). Cos\`i ACAB rallenta una boa densa, contattata
-di recente e ferma, e tiene pi\`u frequente una boa isolata, silenziosa o veloce.
-Rispetto ad ADAB, che usa la sola densit\`a, ACAB costruisce il punteggio di
-backoff da tre segnali; il costo \`e un po' di stato in pi\`u (velocit\`a e istante
-dell'ultimo contatto), trascurabile sui dispositivi considerati. Il calcolo
-dell'intervallo \`e dettagliato nel Capitolo~\ref{ch:simulatore}.
-
-% ---------------------------------------------------------------------
-\section{Un possibile miglioramento: gate di forwarding density-aware}
+\subsection{Gate di forwarding density-aware}
 \label{sec:fwdgate}
 La modalit\`a forwarded della Sezione~\ref{sec:forwarded} rilancia ogni beacon
 fresco, entro TTL e non proprio, con il solo limite della coda. In reti dense
@@ -322,8 +306,9 @@ estendono la conoscenza dei nodi in modo opposto: l'append (passivo) aggiunge ai
 beacon la lista dei nodi conosciuti senza traffico extra, incrementando la distanza
 in hop e tenendo l'informazione pi\`u fresca; il forwarded (attivo) rilancia i
 beacon entro un TTL, con deduplicazione per origine e coda limitata a contenere il
-broadcast storm. I tre protocolli di beaconing (SBP, ADAB, ACAB) decidono quando
-trasmettere e si possono combinare con entrambe le modalit\`a. Infine si \`e
-descritto un gate di forwarding density-aware come miglioramento progettato ma non
-ancora attivo. Il prossimo capitolo descrive come tutto questo \`e realizzato nel
-simulatore.
+broadcast storm. I tre protocolli di beaconing (SBP, ADAB, ACAB), gi\`a presenti nel
+simulatore e parte del modello di comunicazione, decidono quando
+trasmettere e si possono combinare con entrambe le modalit\`a. Infine si sono
+descritti due possibili miglioramenti, un limite di hop per l'append e un gate di
+forwarding density-aware, progettati ma non ancora attivi. Il prossimo capitolo
+descrive come tutto questo \`e realizzato nel simulatore.
