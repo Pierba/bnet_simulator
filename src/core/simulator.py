@@ -11,12 +11,16 @@ from config.config_handler import ConfigHandler
 from utils import logging
 from scipy.spatial import cKDTree
 
+# Minimum percentage of buoys that must remain active in the random scenario
+MIN_BUOYS_NUM: int = 3
+PERCENTAGE_MIN_BUOYS: float = 0.2
+
 # Sim-time delay before the first buoy-array update in the ramp/random scenarios
 FIRST_ARRAY_UPDATE_DELAY: float = 30.0
 
 # Constants for metrics sampling intervals based on the scenario type
 SAMPLE_INTERVAL_RAMP: float = 5.0
-SAMPLE_INTERVAL_OTHER: float = 16.0
+SAMPLE_INTERVAL_OTHER: float = 8.0
 
 # Constants for random buoy array update intervals in the random scenario
 MIN_INTERVAL_RANDOM: float = 15.0
@@ -58,7 +62,7 @@ class Simulator:
         self.random_variability: float = cfg.get('simulation', 'random_variability')
         total_buoys: int               = len(self.buoys)
         self.rnd_max_change: int       = max(1, int(total_buoys * self.random_variability))
-        self.rnd_min_buoys: int        = max(3, int(total_buoys * 0.2))
+        self.rnd_min_buoys: int        = max(MIN_BUOYS_NUM, int(total_buoys * PERCENTAGE_MIN_BUOYS))
 
         # Channel settings
         self.channel.set_buoys(self.buoys)
@@ -119,10 +123,7 @@ class Simulator:
 
             self._schedule_buoy_events(buoy)
 
-        # Periodic metrics sampling runs in every scenario: SAMPLE_INTERVAL_RAMP (5s) for
-        # ramp (timepoint logs), SAMPLE_INTERVAL_OTHER (16s) otherwise. Mobile buoys move
-        # even in the static scenario, so the average-neighbor count must be resampled
-        # there too (not just once at t=0).
+        # Schedule the first average neighbors calculation event if metrics are enabled
         if self.metrics:
             sample_interval = SAMPLE_INTERVAL_RAMP if self.scenario == "ramp" else SAMPLE_INTERVAL_OTHER
             self.schedule_event(sample_interval, EventType.AVG_NEIGHBORS_CALCULATION, self)
@@ -190,7 +191,7 @@ class Simulator:
     # Starts the simulation loop, processing events until the simulation duration ends or gets interrupted
     def start(self) -> float:
         # Simulation state variables
-        last_time_log: float    = None
+        last_time_log: int      = 0
         real_time_start: float  = time.time()
         running: bool           = True
         simulated_time: float   = 0.0
@@ -218,9 +219,9 @@ class Simulator:
                         logging.log_info(f"Processing {event.event_type.name} event")
 
                     time_log = int(simulated_time)
-                    if last_time_log != time_log and time_log > 0 and time_log % 10 == 0:
+                    if time_log >= last_time_log + 10:
                         logging.log_info(f"Time: {simulated_time:.2f}s, Event queue size: {len(self.event_queue)}")
-                        last_time_log = time_log
+                        last_time_log = time_log - (time_log % 10)  # Snap it to the clean decimal
 
                 # Handle the event and catch any exceptions to prevent the simulation from crashing
                 try:

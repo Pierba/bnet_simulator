@@ -1,10 +1,10 @@
 simulation:
   schedulers:
   - static
-  # - dynamic_adab
-  # - dynamic_acab
+  - dynamic_adab
+  - dynamic_acab
   min_buoys: 20
-  max_buoys: 100
+  max_buoys: 200
   step_buoys: 20
   intervals:
    - 1.0   
@@ -12,7 +12,7 @@ simulation:
    - 0.25
   duration: 120
   num_processes: 10
-  ideal_channel: true
+  ideal_channel: false
   # Options: static, ramp, random
   scenario: random          
   # Percentage of buoys that can change per update in random scenario 
@@ -22,11 +22,11 @@ simulation:
   enable_file_logging: false
   # Multihop modes to run; one batch per mode (subset of: none, append, forwarded)
   multihop_modes:
-  # - none
+  - none
   - append
   - forwarded
   # Maximum hops for forwarded mode
-  multihop_limit: 1
+  multihop_limit: 2
   # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
   # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2

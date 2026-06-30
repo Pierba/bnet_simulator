@@ -176,7 +176,11 @@ class Channel:
 
         # Receiver coordinates resolved once instead of per (transmission x receiver) pair
         # Unpack each position once via the single-element-iterable trick (avoids a double attribute lookup)
-        receivers_pos = [(buoy.id, bx, by) for buoy, _ in receivers_data for bx, by in (buoy.position,)]
+        receivers_pos = [
+            (buoy.id, bx, by) 
+            for buoy, _ in receivers_data 
+            for bx, by in (buoy.position,)
+        ]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender

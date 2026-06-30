@@ -140,11 +140,8 @@ def random_velocity(default_velocity: float) -> tuple[float, float]:
         random.uniform(-1, 1) * default_velocity
     )
 
-# Construct and run a single simulation in-process, returning (metrics, simulated_time).
-# This is the reusable core shared by the CLI entry point (main) and the test suite, so
-# tests can drive a full run and inspect the resulting Metrics without spawning a subprocess.
+# Construct and run a single simulation in-process, returning (metrics, simulated_time)
 def build_and_run(
-    *,
     mode: str,
     scenario: str,
     duration: float,
@@ -163,10 +160,8 @@ def build_and_run(
 ) -> tuple[Metrics | None, float]:
     cfg = ConfigHandler()
 
-    # Inject per-run parameters that behaviour code reads from the config singleton
+    # Injecting cli parameters into the config for simulator components
     cfg.set('simulation', 'multihop_mode', multihop_mode)
-    # Inject the world size so buoy mobility (RWP waypoints) honours these dimensions
-    # rather than whatever config.yaml happens to hold
     cfg.set('world', 'width', world_width)
     cfg.set('world', 'height', world_height)
 
@@ -248,6 +243,7 @@ def main():
         with open(args.positions_file, "r") as f:
             positions = json.load(f)
 
+    # Run the simulation with the given arguments and retrieve metrics and simulated time
     metrics, simulated_time = build_and_run(
         mode=args.mode,
         scenario=args.scenario,
@@ -274,8 +270,8 @@ def main():
             case "random" | "static":
                 summary = metrics.summary(sim_time=simulated_time)
                 metrics.export_metrics_to_csv(summary, args.result_file)
-                # Side-car series of how the network-discovery % grew over time, so the
-                # densest run of the sweep can be plotted as a growth curve.
+
+                # Export the discovery time series to a separate CSV file for later analysis
                 discovery_file = args.result_file.replace(".csv", "_discovery.csv")
                 metrics.export_discovery_time_series(discovery_file)
 
