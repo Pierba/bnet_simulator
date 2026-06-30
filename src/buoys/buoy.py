@@ -92,7 +92,7 @@ class Buoy:
         # Forwarded mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
         # Append mode hop limit (0 = unlimited, 1 = only direct neighbors, etc.).
-        # NOTE: currently inactive — append stores/advertises all discovered nodes
+        # CURRENLTY INACTIVE — append stores/advertises all discovered nodes
         # regardless of hop distance; this value is loaded but not enforced anywhere.
         self.append_hop_limit: int = cfg.get('simulation', 'append_hop_limit')
 
@@ -118,11 +118,13 @@ class Buoy:
             EventType.BUOY_MOVEMENT:                self._handle_buoy_movement
         }
 
+    # Activate the buoy, resetting its state and clearing any leftover CSMA pipeline state
     def activate(self):
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
         self.want_to_send = False
 
+    # Deactivate the buoy, invalidating any scheduled events and clearing pending/forwarded beacons
     def deactivate(self):
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
@@ -131,11 +133,11 @@ class Buoy:
         self.pending_forward_beacons.clear()
         self.forwarded_beacons.clear()
 
-    # Schedules a generation-gated event targeting this buoy: events scheduled before a
-    # deactivation are lazily discarded by handle_event once the buoy is reactivated
+    # Schedule event wrapper that includes the current generation for lazy cancellation of stale events
     def _schedule_event(self, time: float, event_type: EventType):
         self.schedule_callback(time, event_type, self, {'_gen': self._generation})
 
+    # Event handler dispatcher: routes events to the appropriate handler based on event type
     def handle_event(self, event: Event, sim_time: float):
         # Lazy cancellation: discard stale events for inactive buoys
         if not self.active:
@@ -158,8 +160,9 @@ class Buoy:
     # Scheduler check handler: asks the scheduler if we should send a beacon and schedules next check
     def _handle_scheduler_check(self, event: Event, sim_time: float):
         # If the scheduler decides to send, set want_to_send and start a CSMA pipeline if one isn't already running
-        if not self.want_to_send and self.scheduler.should_send(
-            self.velocity, len(self.neighbors), self.last_contact_ts, sim_time
+        if (
+            not self.want_to_send 
+            and self.scheduler.should_send(self.velocity, len(self.neighbors), self.last_contact_ts, sim_time)
         ):
             self.want_to_send = True
             self.scheduler_decision_time = sim_time

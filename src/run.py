@@ -52,7 +52,7 @@ def run_simulation(
     fixed_count = total_buoys - mobile_count
 
     # Set scheduler intervals
-    min_interval: float = interval
+    min_interval: float = cfg.get('scheduler', 'beacon_min_interval')
     max_interval: float = cfg.get('scheduler', 'beacon_max_interval')
 
     # Build the command to run the simulation script with the appropriate arguments based on the configuration and parameters
@@ -161,32 +161,30 @@ def main():
     #======================
     # PROTOCOLS 
     #======================
-    schedulers: list[str] = cfg.get('simulation', 'schedulers')     # List of protocols to simulate
+    schedulers: list[str]     = cfg.get('simulation', 'schedulers')     # List of protocols to simulate
+    multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes') # List of multihop modes (none, append, forwarded)
 
     #======================
     # BUOYS DISTRIBUTION 
     #======================
     min_buoys: int  = cfg.get('simulation', 'min_buoys')             # Minimum number of buoys to simulate
     max_buoys: int  = cfg.get('simulation', 'max_buoys')             # Maximum number of buoys to simulate
-    step_buoys: int = cfg.get('simulation', 'step_buoys')           # Step size for buoy density
+    step_buoys: int = cfg.get('simulation', 'step_buoys')            # Step size for buoy density
 
     #=======================
     # SIMULATION PARAMETERS
     #=======================
-    intervals: list[float] = cfg.get('simulation', 'intervals')     # List of beacon intervals to simulate
+    intervals: list[float] = cfg.get('simulation', 'intervals')     # Intervals used for transmitting beacons (1.0, 0.5, 0.25)
     num_processes: int     = cfg.get('simulation', 'num_processes') # Number of parallel processes to use for parallel simulations
     ideal: bool            = cfg.get('simulation', 'ideal_channel') # Whether to simulate with an ideal channel (no collisions)
     scenario: str          = cfg.get('simulation', 'scenario')      # Scenario to run (static, ramp, random)
     world_width: float     = cfg.get('world', 'width')              # Width of the simulation world
     world_height: float    = cfg.get('world', 'height')             # Height of the simulation world
     
-    # Multihop modes are swept like intervals and schedulers: one batch per mode.
-    # When more than one is listed the cross-mode comparison plots are produced too.
-    multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes')
-    print(f"Sweeping multihop modes: {multihop_modes}")
-
     # Determine whether to produce cross-mode comparison plots
-    compare_mode = scenario in ('random', 'static') and len(mode_results_dirs) > 1
+    compare_mode = scenario in ('random', 'static') and len(multihop_modes) > 1
+    
+    print(f"Sweeping multihop modes: {multihop_modes}")
     
     try:
         # Suffixes shared by every output dir (only the interval part changes per loop)
@@ -240,7 +238,16 @@ def main():
                 match scenario:
                     case 'ramp':
                         for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
-                            run_simulation(mode, interval, max_buoys, ramp_positions, results_dir, cfg, multihop_mode, random.randrange(2**32))
+                            run_simulation(
+                                mode, 
+                                interval, 
+                                max_buoys,
+                                ramp_positions, 
+                                results_dir, 
+                                cfg, 
+                                multihop_mode, 
+                                random.randrange(2**32)
+                            )
 
                     case 'random' | 'static':
                         tasks: list[tuple] = []
@@ -249,7 +256,16 @@ def main():
                             for mode in schedulers: # ['static', 'dynamic_adab', 'dynamic_acab']
                                 # Each task is a tuple of arguments for the simulation_worker
                                 # function, with its own distinct reproducible seed
-                                tasks.append((mode, interval, density, positions, results_dir, cfg, multihop_mode, random.randrange(2**32)))
+                                tasks.append((
+                                    mode, 
+                                    interval, 
+                                    density, 
+                                    positions, 
+                                    results_dir, 
+                                    cfg, 
+                                    multihop_mode, 
+                                    random.randrange(2**32)
+                                ))
 
                         print(f"Running {len(tasks)} simulations in parallel using {num_processes} processes")
                         run_simulations_parallel(tasks, num_processes)
