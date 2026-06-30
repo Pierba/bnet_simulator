@@ -1,9 +1,10 @@
 % =====================================================================
 %  BOZZA - Capitolo 1 (italiano)
-%  Introduzione
+%  Introduzione e accenno allo stato dell'arte
 %
-%  Richiede i pacchetti gia' presenti nel preambolo di main.tex:
-%  enumitem, amsmath.
+%  Richiede i pacchetti gia' presenti nel preambolo del wrapper:
+%  enumitem, amsmath. Usa \cite con le chiavi della thebibliography del
+%  wrapper anteprima_bozze_it.tex.
 % =====================================================================
 \chapter{Introduzione}
 \label{ch:introduzione}
@@ -11,20 +12,18 @@
 % ---------------------------------------------------------------------
 \section{Contesto e motivazione}
 \label{sec:intro-contesto}
-Le acque costiere mettono a contatto due popolazioni difficili da rendere
-visibili l'una all'altra. Da un lato ci sono i mezzi grandi, come motoscafi,
-traghetti e pescherecci, dotati di radar e del sistema di identificazione
-automatica (AIS). Dall'altro ci sono le persone in acqua e i piccoli mezzi
-attorno a loro: nuotatori, snorkeler, sub, pagaiatori e kayaker. Gli strumenti
-che proteggono la prima popolazione non sono stati pensati per rilevare la
-seconda. I transponder AIS sono costosi, assorbono molta energia e non sono
-obbligatori per i piccoli mezzi. I beacon satellitari di emergenza, come EPIRB e
-PLB, servono per le emergenze e non per la consapevolezza continua, secondo per
-secondo, che serve a evitare le collisioni. Il tracciamento via smartphone
-dipende dalla copertura cellulare, che a poche centinaia di metri dalla costa \`e
-gi\`a inaffidabile. Resta quindi un divario di rilevazione di prossimit\`a: gli
-utenti marittimi pi\`u vulnerabili restano invisibili ai mezzi che pi\`u
-facilmente possono ferirli.
+Le acque costiere mettono a contatto due popolazioni difficili da rendere visibili
+l'una all'altra. Da un lato ci sono i mezzi grandi, come motoscafi, traghetti e
+pescherecci, dotati di radar e del sistema di identificazione automatica (AIS).
+Dall'altro ci sono le persone in acqua e i piccoli mezzi attorno a loro:
+nuotatori, snorkeler, sub, pagaiatori e kayaker. Gli strumenti che proteggono la
+prima popolazione non sono stati pensati per rilevare la seconda. I transponder
+AIS sono costosi, assorbono molta energia e non sono obbligatori per i piccoli
+mezzi. I beacon satellitari di emergenza servono per le emergenze, non per la
+consapevolezza continua che serve a evitare le collisioni. Il tracciamento via
+smartphone dipende dalla copertura cellulare, che a poche centinaia di metri dalla
+costa \`e gi\`a inaffidabile. Resta quindi un divario: gli utenti marittimi
+pi\`u vulnerabili restano invisibili ai mezzi che pi\`u facilmente possono ferirli.
 
 Colmare questo divario richiede una tecnologia al tempo stesso economica, a basso
 consumo, a corto raggio e priva di infrastruttura fissa. Il Wi-Fi (IEEE~802.11)
@@ -33,11 +32,11 @@ costruita attorno a un chipset Wi-Fi di largo consumo pu\`o trasmettere un breve
 frame che annuncia la propria posizione senza associarsi ad alcun access point,
 senza connessione a Internet e senza un coordinatore centrale. A un'imbarcazione
 basta restare in ascolto. L'hardware costa poche decine di euro, il raggio in
-acqua aperta \`e dell'ordine di un centinaio di metri e il sistema degrada in
-modo graduale, perch\'e non c'\`e nulla di centralizzato che possa guastarsi.
+acqua aperta \`e dell'ordine di un centinaio di metri e il sistema degrada in modo
+graduale, perch\'e non c'\`e nulla di centralizzato che possa guastarsi.
 
 % ---------------------------------------------------------------------
-\section{Il problema della scalabilit\`a e della consapevolezza}
+\section{Il problema: scalabilit\`a del broadcast e consapevolezza oltre un hop}
 \label{sec:intro-problema}
 Il Wi-Fi, per\`o, non \`e stato progettato per il broadcast in contesti critici
 per la sicurezza. La sua Distributed Coordination Function (DCF) arbitra il mezzo
@@ -49,71 +48,115 @@ boe nel raggio radio cresce la probabilit\`a che due trasmettano insieme, e i
 beacon vanno persi in silenzio. Per un sistema di sicurezza questo \`e il modo di
 fallire peggiore, perch\'e un beacon perso \`e una persona non rilevata.
 
-C'\`e un secondo problema, meno discusso. Un singolo beacon informa solo sul
-proprio mittente diretto. Un'imbarcazione che si avvicina a un gruppo di
-nuotatori, per\`o, ha interesse a conoscere l'intero gruppo, compresi i membri
-momentaneamente nascosti da un'onda o da uno scafo. La consapevolezza dovrebbe
-quindi propagarsi oltre il singolo hop radio. Ma ogni trasmissione spesa per
-propagarla compete per lo stesso canale, gi\`a scarso e privo di conferme, che il
-problema di scalabilit\`a sta gi\`a mettendo sotto pressione. La frequenza di
-beaconing (quanto spesso trasmettere) e la propagazione della consapevolezza
-(fino a dove diffondere ci\`o che si ascolta) non sono quindi parametri
-indipendenti: attingono allo stesso budget e vanno progettati insieme.
+C'\`e un secondo problema. Un singolo beacon informa solo sul proprio mittente
+diretto. Un'imbarcazione che si avvicina a un gruppo di nuotatori, per\`o, ha
+interesse a conoscere l'intero gruppo, compresi i membri momentaneamente nascosti
+da un'onda o da uno scafo. La consapevolezza dovrebbe quindi propagarsi oltre il
+singolo hop radio. Ma ogni trasmissione spesa per propagarla compete per lo stesso
+canale, gi\`a scarso e privo di conferme, che il problema di scalabilit\`a sta
+gi\`a mettendo sotto pressione. La frequenza di beaconing (quanto spesso
+trasmettere) e la propagazione della consapevolezza (fino a dove diffondere ci\`o
+che si ascolta) non sono quindi parametri indipendenti: attingono allo stesso
+budget di canale e vanno progettati insieme.
 
 % ---------------------------------------------------------------------
-\section{Contributi}
+\section{Accenno allo stato dell'arte}
+\label{sec:intro-sota}
+Questa sezione richiama brevemente il contesto tecnologico, senza pretesa di
+completezza, per inquadrare le scelte dei capitoli successivi.
+
+\paragraph{Tecnologie di sicurezza marittima.}
+L'AIS \`e un sistema di transponder VHF imposto per le navi di grande
+stazza~\cite{imo-ais}: ottimo per la consapevolezza fra navi in mare aperto, ma
+costoso, energivoro e non pensato per gli utenti ricreativi. I beacon di emergenza
+EPIRB e PLB~\cite{noaa-beacons} trasmettono verso la costellazione satellitare
+Cospas--Sarsat solo quando attivati, con ritardi di minuti e segnalazione verso i
+centri di soccorso anzich\'e verso i mezzi vicini. Le applicazioni per smartphone
+dipendono dalla copertura cellulare al largo e da un'infrastruttura. Ognuna di
+queste tecnologie \`e troppo costosa, legata a un'infrastruttura o pensata per un
+problema diverso dalla rilevazione continua a corto raggio.
+
+\paragraph{MAC IEEE~802.11 e broadcast.}
+La DCF \`e costruita sul Carrier-Sense Multiple Access with Collision Avoidance
+(CSMA/CA)~\cite{sharetechnote-dcf,csma-ca}: il nodo rileva il canale, attende un
+DCF Interframe Space (DIFS), estrae un backoff casuale e trasmette. Per l'unicast
+un ACK mancante viene letto come collisione e raddoppia la contention window
+(backoff esponenziale binario). Il traffico broadcast non ha ACK: il mittente non
+ha riscontro, la contention window non pu\`o crescere e le collisioni diventano
+perdite silenziose. A questo si aggiunge il problema del terminale
+nascosto~\cite{tobagi-hidden}: due mittenti fuori dal raggio l'uno dell'altro ma
+nel raggio di un ricevitore comune collidono presso quel ricevitore, senza che lo
+scambio RTS/CTS (non disponibile per il broadcast) possa evitarlo. Le boe formano
+un dominio ad hoc peer-to-peer in stile IBSS~\cite{ipcisco-ibss}, senza access
+point n\'e associazioni persistenti.
+
+\paragraph{Strategie di beaconing.}
+Lo schema pi\`u semplice trasmette a periodo fisso: banale da analizzare, ma con
+un carico di canale che cresce con il numero di nodi. Gli schemi adattivi regolano
+la frequenza in base alle condizioni locali. La letteratura, soprattutto dalle
+reti veicolari e mobili ad hoc, propone adattamento basato sulla
+densit\`a~\cite{takai-dvcs}, sulla mobilit\`a~\cite{alotaibi-adaptive} e
+context-aware, che pesa pi\`u fattori insieme~\cite{sommer-adaptive}; le rassegne
+sulla scoperta dei dispositivi confermano i guadagni di
+efficienza~\cite{chen-survey}, e gli studi sulle VANET quelli di
+affidabilit\`a~\cite{zhao-vanet}. La maggior parte di questi schemi assume per\`o
+link bidirezionali, accesso coordinato o instradamento a livello IP, condizioni
+che il contesto marittimo non offre.
+
+\paragraph{Consapevolezza oltre un hop.}
+Estendere la consapevolezza oltre i vicini diretti si ottiene di solito o con il
+\emph{piggyback} di informazione condensata sui vicini, aggiunta ai normali
+beacon, oppure con il \emph{flooding}, cio\`e il rilancio dei frame ricevuti entro
+un limite di hop. Il flooding massimizza la portata ma \`e noto per il
+\emph{broadcast storm}~\cite{broadcaststorm}: in reti dense i rilanci ridondanti
+collidono e congestionano il mezzo. Il piggyback \`e pi\`u economico ma limitato
+quanto a distanza e freschezza dell'informazione che pu\`o portare.
+
+\paragraph{Il ruolo della simulazione.}
+Gli esperimenti fisici con molti nodi sono costosi e difficili da riprodurre, e i
+dispiegamenti al largo aggravano ogni difficolt\`a. I simulatori generalisti come
+ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp} offrono stack ampi ma un overhead
+notevole quando lo studio mira a un singolo meccanismo. Per domande mirate a
+livello MAC un simulatore dedicato \`e spesso preferibile, al prezzo di una
+validazione attenta, qui fornita calibrando il canale sul campo.
+
+% ---------------------------------------------------------------------
+\section{Contributi della tesi}
 \label{sec:intro-contributi}
-Questa tesi affronta i due problemi insieme. Partendo da un simulatore a eventi
-discreti per il beaconing Wi-Fi senza infrastruttura, d\`a i contributi seguenti.
+Questa tesi lavora su un simulatore a eventi discreti per il beaconing Wi-Fi senza
+infrastruttura e d\`a i contributi seguenti.
 
-\begin{enumerate}[leftmargin=1.4em]
-  \item \textbf{Uno scheduler adattivo context-aware (ACAB).} Si progetta e si
-  implementa uno scheduler di beaconing che fonde tre segnali locali (densit\`a
-  dei vicini, tempo trascorso dall'ultimo beacon ricevuto e velocit\`a del nodo)
-  in un unico intervallo di beaconing adattivo, e lo si confronta con una linea
-  di base a intervallo fisso (SBP) e con uno schema adattivo basato sulla sola
-  densit\`a (ADAB).
-  \item \textbf{Due meccanismi di consapevolezza multihop.} Si implementano la
-  modalit\`a \emph{append} (piggyback passivo della lista dei nodi conosciuti su
-  ogni beacon) e la modalit\`a \emph{forwarded} (rilancio attivo dei beacon
-  ricevuti entro un limite di hop), e le si confrontano sullo stesso scenario.
-  \item \textbf{Una suite di metriche disaccoppiata.} Si separa la \emph{PDR per
-  ricevitore} dal \emph{delivery ratio di rete}, si aggiungono la
-  \emph{percentuale di rete scoperta} e la \emph{latenza di reazione}, e le si
-  usa per mostrare che il beneficio dell'adattamento sta nel carico di canale e
-  nelle collisioni pi\`u che nella consegna grezza di link sotto un canale con
-  path loss.
-  \item \textbf{Uno studio sperimentale calibrato.} Con un canale calibrato su
-  misure in mare, mobilit\`a Random Waypoint e una popolazione che varia nel
-  tempo, si esegue un'ampia campagna mediata su pi\`u ripetizioni e se ne
-  riportano i risultati nel Capitolo~\ref{ch:risultati}.
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{Due meccanismi di consapevolezza multihop} (contributo centrale).
+  Si implementano e si confrontano la modalit\`a \emph{append}, che aggiunge a
+  ogni beacon la lista dei nodi conosciuti senza inviare frame in pi\`u, e la
+  modalit\`a \emph{forwarded}, che rilancia attivamente i beacon ricevuti entro un
+  limite di hop. I due meccanismi estendono la conoscenza che ogni nodo ha della
+  rete e rappresentano due scelte opposte nel compromesso fra copertura e costo di
+  canale.
+  \item \textbf{Tre protocolli di beaconing.} Si descrivono il protocollo statico
+  di riferimento (SBP), l'adattamento basato sulla sola densit\`a (ADAB) e lo
+  scheduler context-aware ACAB, che fonde densit\`a dei vicini, tempo dall'ultimo
+  contatto e mobilit\`a del nodo in un'unica decisione sull'intervallo.
+  \item \textbf{Una suite di metriche disaccoppiata.} Si separa la PDR per
+  ricevitore dal delivery ratio di rete, e si aggiungono la percentuale di rete
+  scoperta e la latenza di reazione, cos\`i da distinguere l'affidabilit\`a di link
+  dalla consapevolezza di rete.
+  \item \textbf{Un simulatore calibrato.} Il canale \`e calibrato su misure in
+  mare, la mobilit\`a segue il modello Random Waypoint e la popolazione di boe
+  varia nel tempo, per valutare i protocolli in condizioni controllate e
+  riproducibili.
 \end{enumerate}
-
-% ---------------------------------------------------------------------
-\section{Domande di ricerca}
-\label{sec:intro-rq}
-Il lavoro \`e organizzato attorno a quattro domande.
-\begin{description}[leftmargin=2em,style=nextline]
-  \item[RQ1] Come influisce la densit\`a dei nodi sull'affidabilit\`a e sul costo
-  di canale del beaconing broadcast in una rete senza infrastruttura?
-  \item[RQ2] Uno scheduler context-aware che usa solo informazione locale pu\`o
-  ridurre il carico di canale e le collisioni senza sacrificare l'affidabilit\`a?
-  E come si confronta con uno schema basato sulla sola densit\`a?
-  \item[RQ3] Qual \`e il modo giusto di propagare la consapevolezza oltre un hop,
-  il piggyback passivo o il rilancio attivo, e a quale costo?
-  \item[RQ4] Quali metriche di prestazione espongono davvero il valore
-  dell'adattamento una volta introdotto un canale con path loss realistico?
-\end{description}
 
 % ---------------------------------------------------------------------
 \section{Struttura della tesi}
 \label{sec:intro-struttura}
-Il Capitolo~\ref{ch:background} ripercorre le tecnologie di sicurezza marittima,
-i meccanismi del MAC 802.11 rilevanti per il broadcast, le strategie di beaconing
-e il ruolo della simulazione custom. Il Capitolo~\ref{ch:sistema} descrive il
-sistema ProSafe e specifica i tre scheduler (SBP, ADAB, ACAB) e i due meccanismi
-di consapevolezza. Il Capitolo~\ref{ch:simulatore} dettaglia il simulatore: il
-motore a eventi discreti, la macchina a stati della boa, il modello di mobilit\`a
-Random Waypoint, il canale calibrato, la pipeline di trasmissione e la suite di
-metriche. Il Capitolo~\ref{ch:risultati} presenta e discute i risultati
-sperimentali. Il Capitolo~\ref{ch:conclusioni} conclude e indica i lavori futuri.
+Il Capitolo~\ref{ch:contributo} presenta il contributo: l'estensione della
+conoscenza dei nodi tramite i due meccanismi multihop, con le formule che ne
+governano il comportamento, i tre protocolli di beaconing che decidono quando
+trasmettere e un possibile miglioramento del forwarding. Il
+Capitolo~\ref{ch:simulatore} descrive l'implementazione: il motore a eventi
+discreti, la macchina a stati della boa, l'implementazione delle modalit\`a
+multihop, il modello di canale calibrato, le metriche e il modello di mobilit\`a.
+Il capitolo dedicato ai risultati riporta la valutazione sperimentale, e quello
+conclusivo riassume il lavoro e indica gli sviluppi futuri.

@@ -1,45 +1,38 @@
 % =====================================================================
 %  BOZZA - Sommario (italiano)
 %
-%  Versione italiana qualitativa dell'abstract. Niente numeri specifici:
-%  i risultati quantitativi sono nel Capitolo dei risultati (Cap. 5).
-%  Richiede i pacchetti gia' presenti nel preambolo di main.tex.
+%  Versione italiana qualitativa dell'abstract, allineata alla nuova
+%  struttura a tre capitoli scritti (Introduzione, Contributo,
+%  Implementazione). Niente numeri specifici: i risultati quantitativi
+%  arriveranno nel capitolo dedicato.
 % =====================================================================
 \chapter*{Sommario}
 \addcontentsline{toc}{chapter}{Sommario}
 
 Nuotatori, snorkeler, sub e kayaker sono poco visibili alle imbarcazioni che
 condividono le acque costiere. Le tecnologie di sicurezza pensate per le grandi
-navi (AIS, beacon satellitari di emergenza, tracciamento cellulare) sono troppo
-costose, troppo lente o legate a un'infrastruttura che al largo non esiste.
-Un'alternativa praticabile \`e usare la radio Wi-Fi gi\`a presente in molti
-dispositivi come beacon di prossimit\`a senza infrastruttura: delle boe
+navi, come l'AIS, i beacon satellitari di emergenza e il tracciamento cellulare,
+sono troppo costose, troppo lente o legate a un'infrastruttura che al largo non
+esiste. Un'alternativa praticabile \`e usare la radio Wi-Fi gi\`a presente in
+molti dispositivi come beacon di prossimit\`a senza infrastruttura: delle boe
 intelligenti trasmettono periodicamente brevi frame broadcast con la propria
 posizione, che le imbarcazioni vicine ascoltano.
 
-Questa tesi estende un simulatore a eventi discreti per il beaconing broadcast
-IEEE~802.11 e lo usa per studiare due aspetti del progetto: con quale frequenza
-una boa deve trasmettere e fino a dove deve propagarsi la consapevolezza che
-produce. Sul primo aspetto si introduce ACAB (\emph{Adaptive Context-Aware
-Beaconing}), uno scheduler che combina tre segnali locali (densit\`a dei vicini,
-tempo trascorso dall'ultimo contatto e mobilit\`a del nodo) in un'unica decisione
-sull'intervallo di beaconing, confrontato con il beaconing statico a intervallo
-fisso (SBP) e con l'adattamento basato sulla sola densit\`a (ADAB). Sul secondo
-aspetto si implementano e si confrontano due meccanismi di propagazione della
-consapevolezza: la modalit\`a \emph{append}, che aggiunge a ogni beacon la lista
-dei nodi conosciuti, e la modalit\`a \emph{forwarded}, che rilancia attivamente i
-beacon ricevuti entro un limite di hop. Il modello di canale \`e calibrato su
-misure in mare aperto, la mobilit\`a segue il modello Random Waypoint e la
-popolazione varia nel tempo per imitare gli utenti che entrano ed escono
-dall'acqua.
+Questa tesi lavora su un simulatore a eventi discreti per il beaconing broadcast
+IEEE~802.11 e si concentra sulla propagazione della consapevolezza oltre il
+singolo hop radio. Il contributo principale \`e l'implementazione e il confronto
+di due meccanismi che estendono la conoscenza che ogni nodo ha della rete: la
+modalit\`a \emph{append}, che aggiunge a ogni beacon la lista dei nodi gi\`a
+conosciuti senza inviare frame in pi\`u, e la modalit\`a \emph{forwarded}, che
+rilancia attivamente i beacon ricevuti entro un limite di hop. Accanto a questi
+meccanismi si descrivono i protocolli che decidono \emph{quando} una boa
+trasmette: il beaconing statico a intervallo fisso (SBP), l'adattamento basato
+sulla densit\`a (ADAB) e lo scheduler context-aware ACAB, che combina densit\`a
+dei vicini, tempo dall'ultimo contatto e mobilit\`a del nodo.
 
-I risultati, ottenuti mediando pi\`u esecuzioni su diverse densit\`a e
-configurazioni, sono presentati nel Capitolo~\ref{ch:risultati} e indicano tre
-linee principali. L'adattamento context-aware riduce il carico di canale e le
-collisioni senza perdere affidabilit\`a di consegna per ricevitore. L'affidabilit\`a
-di link e la consapevolezza di rete vanno misurate separatamente, perch\'e sotto
-un canale con path loss realistico la consegna per ricevitore \`e limitata dalla
-propagazione e il vantaggio dell'adattamento emerge nel tasso di collisione e
-nell'airtime. La consapevolezza passiva (append) raggiunge una porzione di rete
-pari o maggiore della propagazione attiva (forwarded), generando molto meno
-traffico e con una latenza di scoperta inferiore.
+Il modello di canale \`e calibrato su misure in mare aperto, la mobilit\`a segue
+il modello Random Waypoint e la popolazione di boe varia nel tempo per imitare gli
+utenti che entrano ed escono dall'acqua. I capitoli che seguono presentano la
+motivazione del lavoro, il progetto dei due meccanismi multihop con le formule che
+ne governano il comportamento, e l'implementazione nel simulatore. La valutazione
+sperimentale e le conclusioni sono lasciate ai capitoli successivi.

@@ -1,12 +1,17 @@
 % =====================================================================
-%  Documento "wrapper" per l'ANTEPRIMA delle bozze italiane dei
-%  Capitoli 3 e 4. NON e' la tesi finale: serve solo a compilare in PDF
-%  i frammenti di capitolo (che da soli non hanno un preambolo).
+%  Documento "wrapper" per l'ANTEPRIMA delle bozze italiane.
+%  Include il sommario e i Capitoli 1-3 (Introduzione, Contributo
+%  multihop, Implementazione). NON e' la tesi finale: serve solo a
+%  compilare in PDF i frammenti di capitolo, che da soli non hanno un
+%  preambolo.
 %
 %  Compilazione:
 %     pdflatex anteprima_bozze_it.tex      (due volte, per ToC e riferimenti)
 %  oppure:
 %     latexmk -pdf anteprima_bozze_it.tex
+%
+%  I rimandi ai capitoli ancora da scrivere (risultati, conclusioni)
+%  restano "??" in anteprima: e' atteso.
 % =====================================================================
 \documentclass[12pt,a4paper,oneside]{report}
 
@@ -21,8 +26,6 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{listings}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
 \usepackage{enumitem}
 \usepackage{tabularx}
 \usepackage{siunitx}
@@ -47,10 +50,6 @@
 \newcommand{\nthr}{N_{\mathrm{thr}}}
 \renewcommand{\arraystretch}{1.15}
 
-% Placeholder per il riferimento al Capitolo dei risultati (non ancora scritto),
-% cosi' \ref{ch:risultati} non resta "??" in anteprima.
-\newcommand{\chrisultati}{5}
-
 \begin{document}
 
 \input{bozza_sommario_it}
@@ -61,13 +60,11 @@
 \input{bozza_capitolo1_it}
 \input{bozza_capitolo2_it}
 \input{bozza_capitolo3_it}
-\input{bozza_capitolo4_it}
-\input{bozza_capitolo6_it}
 
 % ---------------------------------------------------------------------
-% Bibliografia: sottoinsieme delle voci di main.tex citate nel Cap. 2,
-% qui solo per risolvere i \cite in anteprima (non e' la bibliografia
-% finale della tesi).
+% Bibliografia: sottoinsieme delle voci citate nell'accenno allo stato
+% dell'arte del Cap. 1, qui solo per risolvere i \cite in anteprima.
+% Non e' la bibliografia finale della tesi.
 % ---------------------------------------------------------------------
 \begin{thebibliography}{99}
 \addcontentsline{toc}{chapter}{Bibliografia}
@@ -77,9 +74,6 @@
 
 \bibitem{noaa-beacons} NOAA SARSAT. \emph{406\,MHz Emergency Distress Beacons}.
 \url{https://www.sarsat.noaa.gov/emergency-406-beacons/}, accessed 2025.
-
-\bibitem{ieee80211} IEEE 802.11 Working Group. \emph{The Working Group Setting
-the Standards for Wireless LANs}. \url{https://www.ieee802.org/11/}, accessed 2025.
 
 \bibitem{sharetechnote-dcf} ShareTechnote. \emph{WLAN DCF}.
 \url{https://www.sharetechnote.com/html/WLAN_DCF.html}, accessed 2025.
