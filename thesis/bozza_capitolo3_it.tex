@@ -5,33 +5,36 @@
 %  Richiede i pacchetti gia' presenti nel preambolo del wrapper:
 %  amsmath, amssymb, siunitx, enumitem, listings, booktabs.
 % =====================================================================
-\chapter{Parte implementativa: il simulatore}
+\chapter{Implementazione del simulatore e delle sue componenti}
 \label{ch:simulatore}
-
-Questo capitolo descrive il simulatore con cui i protocolli del
-Capitolo~\ref{ch:contributo} sono valutati in modo controllato e riproducibile. Si
-presentano la struttura del simulatore e il motore a eventi discreti, la macchina a
-stati della boa, l'implementazione delle modalit\`a multihop, il modello di canale
-calibrato sul campo, il modello di mobilit\`a Random Waypoint, la raccolta delle
-metriche, la gestione della popolazione dinamica e della configurazione, e infine
-le limitazioni del modello.
+Questo capitolo descrive la struttura del simulatore e di tutte le sue componenti 
+dal punto di vista funzionale e implementativo.
+Inizia con la premessa delle motivazioni alla base della creazione di questo simulatore.
+Di seguito vengono mostrate le realazioni tra le classi per mezzo di un diagramma UML.
+Si presentano poi ciascuno dei suoi attributi: 
+\begin{itemize}[leftmargin=1.4em,nosep]
+ \item \textbf{struttura del simulatore}
+ \item \textbf{struttura della boa}
+ \item \textbf{struttura del canale}
+ \item \textbf{pipeline di trasmissione della boa}
+ \item \textbf{modello di mobilit\`a basasto su RWP}
+ \item \textbf{attivazione/disattivazione dinamica dei nodi}
+ \item \textbf{modalit\`a di raccolta metriche}
+ \item \textbf{file di configurazione dei parametri di simulazione}
+\end{itemize}
+Alla fine del capitolo vengono discusse le limitazioni che affliggono il modello
+e le migliorie apportate nella versione corrente del simulatore.
 
 % ---------------------------------------------------------------------
-\section{Motivazione e struttura del simulatore}
+\section{Motivazione alla base della creazione del simulatore}
 \label{sec:why}
-I simulatori generalisti come ns-3 e OMNeT++ offrono stack protocollari ampi, ma
-per uno studio focalizzato su un singolo meccanismo MAC richiedono di gestire
-complessit\`a e overhead non necessari. Un simulatore custom a eventi discreti
-contiene solo ci\`o che serve (comportamento delle boe, canale, logica di beaconing
-e metriche), \`e abbastanza piccolo da poter essere letto per intero, \`e facile da
-estendere con un nuovo scheduler o una nuova modalit\`a, ed \`e riproducibile
-perch\'e ogni parametro \`e nella configurazione. Il simulatore \`e scritto in
-Python ed \`e diviso in moduli con responsabilit\`a singola: \texttt{simulator.py}
-(motore e coda eventi), \texttt{events.py} (tipi di evento), \texttt{channel.py}
-(canale, collisioni, propagazione), \texttt{buoy.py} (comportamento del nodo,
-macchina a stati, vicini), \texttt{scheduler.py} (protocolli di beaconing),
-\texttt{beacon.py} (struttura del frame), \texttt{metrics.py} (misurazione) e
-\texttt{config\_handler.py} (accesso ai parametri).
+I simulatori open-source popolari come ns-3 e OMNeT++ offrono funzionalit\`a molto avanzate, ma
+richiedono di gestire complessit\`a e overhead superflui ai fini dei nostri esperimenti. 
+Un simulatore custom a eventi discreti contiene solo ci\`o che serve: comportamento delle boe, funzionamento del canale, 
+logica di beaconing e metriche. Presenta una codebase dalle dimensioni modeste ed \`e facile da modificare.
+Inoltre per la riprodicibilit\`a dei test occorre semplicemente configurare i parametri, divisi per categoria di competenza 
+delle componenti, presenti nell'apposito file in formato YAML. Questo simulatore \'e interamente scritto in linguaggio Python
+per via della sua semplicit\`a nella sintassi e popolarit\`a negli ambiti di ricearca.
 
 % ---------------------------------------------------------------------
 \section{Architettura a eventi discreti}
