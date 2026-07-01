@@ -1,0 +1,220 @@
+@startuml classes_BNet_Simulator
+set namespaceSeparator none
+class "Beacon" as beacon.Beacon <<dataclass>> {
+  hop_limit : int
+  mobile : bool
+  neighbors : List[Tuple[int, float, Tuple[float, float], int]]
+  origin_id : Optional[int]
+  position : Tuple[float, float]
+  scheduled_receivers : Set[int]
+  sender_id : int
+  timestamp : float
+  size_bits() -> int
+}
+class "BeaconScheduler" as scheduler.BeaconScheduler {
+  acab_contact_threshold : float
+  acab_neighbors_threshold : float
+  acab_weights : tuple[float, float, float]
+  adab_neighbors_threshold : float
+  default_velocity : float
+  interval_range : float
+  last_dynamic_send_time : float
+  last_fq : float
+  last_static_send_time : float
+  max_interval : float
+  min_interval : float
+  next_dynamic_interval : float
+  scheduler_type : str
+  static_interval : float
+  compute_interval(velocity: tuple[float, float], n_neighbors: int, last_contact_ts: float, current_time: float) -> float
+  get_next_check_interval() -> float
+  should_send(velocity: tuple[float, float], n_neighbors: int, last_contact_ts: float, current_time: float) -> bool
+  should_send_dynamic(velocity: tuple[float, float], n_neighbors: int, last_contact_ts: float, current_time: float) -> bool
+  should_send_static(current_time: float) -> bool
+}
+class "Buoy" as buoy.Buoy {
+  active : bool
+  append_hop_limit : int
+  channel_broadcast : Optional[callable]
+  channel_is_busy : Optional[callable]
+  cw : int
+  difs_time : float
+  discovered_nodes : dict[int, tuple[float, tuple[float, float], int]]
+  forwarded_beacons : dict[int, float]
+  id : int
+  is_mobile : bool
+  last_contact_ts : Optional[float]
+  log_received_callback : Optional[callable]
+  metrics : bool
+  multihop_limit : int
+  multihop_mode : str
+  neighbor_timeout : float
+  neighbors : dict[int, tuple[float, tuple[float, float]]]
+  pending_forward_beacons : dict[int, Beacon]
+  pending_queue_limit : int
+  position : tuple[float, float]
+  processing : bool
+  record_scheduler_latency_callback : Optional[callable]
+  rwp_dt : float
+  rwp_pause_max : float
+  rwp_pause_min : float
+  rwp_pause_until : float
+  rwp_speed : float
+  rwp_speed_max : float
+  rwp_speed_min : float
+  rwp_waypoint : tuple[float, float]
+  schedule_callback : Optional[callable]
+  scheduler
+  scheduler_decision_time : float
+  set_unique_nodes_per_buoy_callback : Optional[callable]
+  slot_time : float
+  state : BACKOFF, RECEIVING, WAITING_DIFS
+  velocity : tuple[float, float]
+  want_to_send : bool
+  world_height : float
+  world_width : float
+  activate()
+  create_beacon(sim_time: float) -> Beacon
+  deactivate()
+  forward_beacon(original_beacon: Beacon, sim_time: float) -> Beacon
+  handle_event(event: Event, sim_time: float)
+}
+class "BuoyState" as buoy.BuoyState {
+  name
+}
+class "Channel" as channel.Channel {
+  active_transmissions : list[tuple[Beacon, float, float]]
+  bit_rate : int
+  buoys : list[Buoy]
+  comm_range_high_prob_sq : float
+  comm_range_max_sq : float
+  delivery_prob_high : float
+  delivery_prob_low : float
+  grace_period
+  ideal_channel : bool
+  metrics : Optional[Metrics]
+  schedule_callback : Optional[callable]
+  speed_of_light : float
+  broadcast(beacon: Beacon, sim_time: float)
+  handle_event(event, sim_time: float)
+  is_busy(position: tuple[float, float], sim_time: float) -> tuple[bool, float]
+  set_buoys(buoys: list[Buoy])
+  update(sim_time: float)
+}
+class "ConfigHandler" as config_handler.ConfigHandler <<singleton>> {
+  DEFAULT_CONFIG : dict
+  get(section: str, key: str) -> Any
+  set(section: str, key: str, value: Any) -> None
+}
+class "Event" as events.Event {
+  data : dict
+  event_type
+  target_obj : Any
+  time : float
+}
+class "EventType" as events.EventType {
+  name
+}
+class "Metrics" as metrics.Metrics {
+  actually_received : int
+  avg_neighbors_count : int
+  avg_neighbors_sum : float
+  beacons_collided : int
+  beacons_forwarded : int
+  beacons_lost : int
+  beacons_received : int
+  beacons_sent : int
+  delivered_beacons : dict[int, float]
+  density : float
+  discovered_pairs : dict[int, set[int]]
+  discovery_time_series : list
+  fixed_buoy_count : int
+  mobile_buoy_count : int
+  multihop_mode : str
+  potentially_sent : int
+  reaction_latency_count : int
+  reaction_latency_sum : float
+  scheduler_latency_count : int
+  scheduler_latency_sum : float
+  scheduler_type : str
+  simulation_duration : float
+  time_series : list
+  total_latency : float
+  total_successful_receivers : int
+  unique_nodes_per_buoy : dict[int, set[int]]
+  world_height : float
+  world_width : float
+  avg_percentage_network_discovered() -> float
+  avg_scheduler_latency() -> float
+  avg_unique_nodes_discovered() -> float
+  delivery_ratio() -> float
+  export_discovery_time_series(filepath: str)
+  export_metrics_to_csv(summary, filepath: str)
+  export_time_series(filepath: str)
+  get_final_avg_neighbors() -> float
+  log_collision(count: int)
+  log_discovery_timepoint(sim_time: float)
+  log_lost(count: int)
+  log_potentially_sent(n_receivers: int)
+  log_received(origin_id: int, timestamp: float, receive_time: float, receiver_id: int)
+  log_sent(is_forward: bool)
+  log_successful_receivers(count: int)
+  log_timepoint(sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float])
+  packet_delivery_ratio() -> float
+  record_avg_neighbors_sample(avg_neighbors_value: float)
+  record_scheduler_latency(latency: float)
+  set_unique_nodes_per_buoy(buoy_id: int, unique_nodes: set[int])
+  summary(sim_time: float) -> dict[str, Any]
+}
+class "Simulator" as simulator.Simulator {
+  buoys : list[Buoy]
+  channel
+  comm_range_max : float
+  duration : float
+  event_counter : int
+  event_queue : list
+  metrics
+  neighbor_timeout : float
+  ramp_add_interval : float
+  random_variability : float
+  rnd_max_change : int
+  rnd_min_buoys : int
+  scenario : str
+  calculate_avg_neighbors() -> float
+  handle_event(event: Event, sim_time: float)
+  schedule_event(time: float, event_type: EventType, target_obj: Buoy | Channel, data: Optional[dict])
+  start() -> float
+  update_buoy_array(sim_time: float)
+}
+' ---- Relationships ----
+
+' Simulator orchestrates the whole simulation
+simulator.Simulator "1" o-- "*" buoy.Buoy : manages
+simulator.Simulator --> channel.Channel : uses
+simulator.Simulator --> metrics.Metrics : tracks
+simulator.Simulator ..> events.Event : creates
+simulator.Simulator ..> events.EventType : uses
+simulator.Simulator ..> config_handler.ConfigHandler : reads config
+
+' Buoy behaviour and collaborators
+buoy.Buoy --> buoy.BuoyState : has state
+buoy.Buoy --> scheduler.BeaconScheduler : schedules with
+buoy.Buoy ..> beacon.Beacon : creates
+buoy.Buoy ..> channel.Channel : broadcasts to
+buoy.Buoy ..> metrics.Metrics : reports to
+buoy.Buoy ..> events.EventType : uses
+buoy.Buoy ..> config_handler.ConfigHandler : reads config
+
+' Channel transports beacons between buoys
+channel.Channel o-- "*" buoy.Buoy : tracks
+channel.Channel ..> beacon.Beacon : transmits
+channel.Channel --> metrics.Metrics : reports to
+channel.Channel ..> events.EventType : uses
+channel.Channel ..> config_handler.ConfigHandler : reads config
+
+' Scheduler decides when a buoy sends
+scheduler.BeaconScheduler ..> config_handler.ConfigHandler : reads config
+
+' Event structure
+events.EventType --o events.Event : event_type
+@enduml

@@ -1,0 +1,32 @@
+@startuml packages_BNet_Simulator
+set namespaceSeparator none
+package "avg_metrics" as avg_metrics {
+}
+package "beacon" as beacon {
+}
+package "buoy" as buoy {
+}
+package "channel" as channel {
+}
+package "config_handler" as config_handler {
+}
+package "events" as events {
+}
+package "init" as init {
+}
+package "logging" as logging {
+}
+package "metrics" as metrics {
+}
+package "plot_initial_positions" as plot_initial_positions {
+}
+package "plot_metrics" as plot_metrics {
+}
+package "plot_mode_comparison" as plot_mode_comparison {
+}
+package "scheduler" as scheduler {
+}
+package "simulator" as simulator {
+}
+avg_metrics --> plot_mode_comparison
+@enduml
