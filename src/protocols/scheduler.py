@@ -124,7 +124,7 @@ class BeaconScheduler:
                 raise ValueError(f"Unknown scheduler type: {self.scheduler_type}")
 
         fq = combined * combined
-        self.last_fq = fq
+        # self.last_fq = fq
         bi = self.min_interval + fq * self.interval_range
 
         jittered = bi * (1.0 + random.uniform(-JITTER_FRACTION, JITTER_FRACTION))
