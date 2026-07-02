@@ -12,9 +12,9 @@
 \label{ch:simulatore}
 Questo capitolo descrive la struttura del simulatore e di tutte le sue componenti
 dal punto di vista funzionale e implementativo.
-Inizia con la premessa delle motivazioni alla base della creazione di questo simulatore.
-Di seguito vengono mostrate le relazioni tra le classi per mezzo di un diagramma UML.
-Si presentano poi ciascuna delle sue componenti nelle seguenti sezioni:
+Si apre con le motivazioni alla base della scelta di sviluppare un simulatore
+personalizzato; vengono poi mostrate le relazioni tra le classi per mezzo di un
+diagramma UML. Si presentano quindi le singole componenti nelle sezioni seguenti:
 \begin{itemize}[leftmargin=1.4em,nosep]
  \item \hyperref[sec:simulatore]{\textbf{Architettura del simulatore}}
  \item \hyperref[sec:buoy]{\textbf{Modellazione della boa}}
@@ -31,9 +31,10 @@ I simulatori open-source popolari come ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp
 richiedono di gestire complessit\`a e overhead superflui ai fini dei nostri esperimenti.
 Un simulatore custom a eventi discreti contiene solo ci\`o che serve: comportamento delle boe, funzionamento del canale,
 logica di beaconing e metriche. Presenta una codebase dalle dimensioni modeste ed \`e facile da modificare.
-Inoltre per la riproducibilit\`a dei test occorre semplicemente configurare i parametri, divisi per categoria di competenza
-delle componenti, presenti nell'apposito file in formato YAML. Questo simulatore \`e interamente scritto in linguaggio Python
-per via della sua semplicit\`a nella sintassi e popolarit\`a negli ambiti di ricerca.
+Inoltre, per la riproducibilit\`a dei test, occorre semplicemente configurare i parametri
+--- divisi per categoria di competenza delle componenti --- presenti nell'apposito file in
+formato YAML (Sezione~\ref{sec:config}). Il simulatore \`e interamente scritto in Python,
+per la semplicit\`a della sua sintassi e per la sua popolarit\`a negli ambienti di ricerca.
 
 % ---------------------------------------------------------------------
 \section{Schema UML delle classi}
@@ -66,13 +67,13 @@ Non ci sono dipendenze circolari strette: le interazioni inverse (ad esempio la 
 trasmette sul canale, o che schedula eventi presso il simulatore) avvengono tramite
 callback iniettate all'avvio, come descritto nella Sezione~\ref{sec:files}.
 
-\begin{figure}[p]
+\begin{figure}[htbp]
   \centering
   \IfFileExists{figures/classes_uml.pdf}{%
     \includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{figures/classes_uml}%
   }{%
-    \fbox{\parbox[c][0.5\textheight][c]{0.9\textwidth}{\centering
-      \emph{Segnaposto: renderizzare} \texttt{src/classes\_BNet\_Simulator.plantuml}\\
+    \fbox{\parbox[c][4.5em][c]{0.8\textwidth}{\centering\small
+      \emph{Segnaposto: renderizzare} \texttt{src/classes\_BNet\_Simulator.plantuml}
       \emph{in} \texttt{thesis/figures/classes\_uml.pdf}}}%
   }
   \caption[Diagramma UML delle classi del simulatore]{%
@@ -120,7 +121,7 @@ Il codice sorgente \`e organizzato in moduli con responsabilit\`a separate:
   \item \texttt{run.py} e \texttt{script/init.py} --- rispettivamente il lanciatore dei
   batch di esperimenti e il costruttore della singola simulazione (Sezione~\ref{sec:config}).
 \end{itemize}
-Le componenti non si referenziano direttamente l'una con l'altra pi\`u dello stretto
+Le componenti si referenziano direttamente l'una con l'altra solo per lo stretto
 necessario: la comunicazione ``verso l'alto'' avviene tramite \emph{callback} assegnate in fase di
 inizializzazione. Ogni boa riceve dal simulatore la funzione \texttt{schedule\_callback}
 con cui accodare i propri eventi futuri, e dal canale le funzioni \texttt{channel\_is\_busy}
@@ -318,16 +319,63 @@ nodi scoperti, dalla coda di inoltro e dalla memoria di deduplicazione.
 \label{sec:rwp}
 Una frazione configurabile delle boe (\texttt{mobile\_percentage}, il $40\%$ negli
 esperimenti) \`e mobile e si muove secondo il modello \emph{Random Waypoint} (RWP),
-implementato nell'handler dell'evento periodico \texttt{BUOY\_MOVEMENT}. Ogni boa mobile
-sceglie un punto di destinazione (\emph{waypoint}) uniformemente distribuito nel piano di
-simulazione e una velocit\`a di tratta $v \sim \mathcal{U}[5, 20]\,\si{\metre\per\second}$,
-quindi si muove in linea retta verso la destinazione aggiornando posizione e vettore
-velocit\`a a passi di \SI{0.5}{\second} di tempo simulato. Raggiunto il waypoint, la boa
-sosta per una pausa casuale $\mathcal{U}[0, 10]\,\si{\second}$ (durante la quale la sua
-velocit\`a \`e nulla, il che rilassa la componente di mobilit\`a di ACAB,
-Eq.~\ref{eq:acab-mob}), poi estrae nuovo waypoint e nuova velocit\`a e riparte. Il moto
-cos\`i generato alterna spostamenti rettilinei e soste, e mantiene le boe entro i confini
-del mondo simulato senza bisogno di gestione dei bordi.
+implementato nell'handler dell'evento \texttt{BUOY\_MOVEMENT}. Il modello genera
+traiettorie che alternano tratte rettilinee e soste, e ogni boa si muove in modo
+indipendente dalle altre, senza correlazioni di gruppo: \`e una buona approssimazione
+di nuotatori e piccoli mezzi che si spostano ognuno per conto proprio.
+
+All'inizio di ogni tratta la boa estrae la propria destinazione (\emph{waypoint}) $W$,
+uniformemente distribuita nel piano di simulazione, e la velocit\`a di crociera $v$,
+uniforme nell'intervallo configurato:
+\begin{equation}
+  W \sim \mathcal{U}\big([0, L_x] \times [0, L_y]\big),
+  \qquad
+  v \sim \mathcal{U}[v_{\min},\, v_{\max}],
+  \label{eq:rwp-draw}
+\end{equation}
+con $L_x = L_y = \SI{500}{\metre}$ le dimensioni del mondo e
+$[v_{\min}, v_{\max}] = [5, 20]\,\si{\metre\per\second}$; la prima estrazione avviene
+alla creazione della boa. Il moto verso il waypoint \`e campionato a passi discreti di
+durata $\Delta t = \SI{0.5}{\second}$ di tempo simulato: detta $\mathbf{p}_t$ la
+posizione corrente, a ogni passo si ricalcolano il versore di direzione, il vettore
+velocit\`a e la nuova posizione
+\begin{equation}
+  \hat{\mathbf{u}}_t = \frac{W - \mathbf{p}_t}{\lVert W - \mathbf{p}_t \rVert},
+  \qquad
+  \mathbf{v}_t = v\,\hat{\mathbf{u}}_t,
+  \qquad
+  \mathbf{p}_{t+\Delta t} = \mathbf{p}_t + \mathbf{v}_t\,\Delta t .
+  \label{eq:rwp-step}
+\end{equation}
+Il modulo della velocit\`a resta costante lungo tutta la tratta, e il vettore
+$\mathbf{v}_t$ non serve solo al movimento: \`e lo stesso che alimenta la componente di
+mobilit\`a di ACAB (Eq.~\ref{eq:acab-mob}). Quando la distanza residua \`e coperta da un
+solo passo, cio\`e $\lVert W - \mathbf{p}_t \rVert \le v\,\Delta t$, la boa si aggancia
+esattamente al waypoint e azzera la velocit\`a; qui estrae subito il prossimo waypoint e
+la prossima velocit\`a (Eq.~\ref{eq:rwp-draw}) e sosta per una pausa casuale
+\begin{equation}
+  \tau \sim \mathcal{U}[\tau_{\min},\, \tau_{\max}],
+  \qquad
+  [\tau_{\min}, \tau_{\max}] = [0, 10]\,\si{\second},
+  \label{eq:rwp-pause}
+\end{equation}
+scaduta la quale inizia la tratta successiva. La pausa si sposa bene con
+l'architettura a eventi: anzich\'e schedulare passi ``a vuoto'' durante la sosta, il
+prossimo \texttt{BUOY\_MOVEMENT} viene fissato direttamente all'istante in cui la pausa
+scade. Durante la sosta la velocit\`a nulla rilassa la componente di mobilit\`a di
+ACAB, che percepisce il nodo come fermo e ne dirada i beacon.
+
+Due propriet\`a del modello sono rilevanti per la lettura degli esperimenti. La prima
+\`e geometrica: poich\'e il piano \`e convesso e i waypoint sono punti interni, ogni
+tratta rettilinea resta per costruzione dentro i confini, senza bisogno di alcuna
+gestione dei bordi; in compenso le tratte attraversano pi\`u spesso la zona centrale
+del piano, per cui a regime la densit\`a delle boe mobili tende ad addensarsi verso il
+centro --- un comportamento caratteristico dell'RWP. La seconda riguarda la
+velocit\`a: il tempo di percorrenza di una tratta di lunghezza $d$ vale $d/v$, quindi
+velocit\`a minime prossime allo zero produrrebbero tratte lunghissime, destinate a
+dominare il tempo di simulazione abbassando progressivamente la velocit\`a media della
+rete; il limite inferiore $v_{\min} = \SI{5}{\metre\per\second}$ evita questo degrado e
+mantiene la mobilit\`a media stazionaria.
 
 % ---------------------------------------------------------------------
 \section{Funzionamento del canale}
