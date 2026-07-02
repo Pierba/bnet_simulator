@@ -1,16 +1,9 @@
 % =====================================================================
 %  BOZZA - Capitolo 2 (italiano)
 %  Contributo: consapevolezza multihop e protocolli di beaconing
-%
-%  Richiede i pacchetti gi\`a presenti nel preambolo del wrapper:
-%  amsmath, amssymb, siunitx, enumitem, booktabs.
-%  Le macro seguenti sono ridefinite con \providecommand per sicurezza.
 % =====================================================================
-\providecommand{\bimin}{BI_{\min}}
-\providecommand{\bimax}{BI_{\max}}
-\providecommand{\nthr}{N_{\mathrm{thr}}}
 
-\chapter{Estensione della consapevolezza: meccanismi multihop e protocolli di beaconing}
+\chapter{Protocolli di beaconing multi-hop}
 \label{ch:contributo}
 
 Questo capitolo si apre con la definizione del modello di comunicazione su cui poggia il simulatore, ovvero la
@@ -157,14 +150,14 @@ Il contributo di questa tesi riguarda l'estensione di questa consapevolezza dei 
 hop. Per i propositi di questo sistema, \`e molto utile per un nodo venire a conoscenza anche dei nodi pi\`u lontani, o coperti da altri nodi, 
 e propagare in maniera pi\`u efficente le informazioni in suo possesso; ma ogni trasmissione spesa per
 propagarle compete per lo stesso canale, gi\`a sotto pressione e privo di conferme. Le due nuove modalit\`a di comunicazione, spiegate nelle sezioni successive, 
-propongono due approcci risolutivi opposti a questo compromesso.
+propongono due approcci risolutivi a questo compromesso.
 
-\subsection{Append: estensione passiva}
+\subsection{Append multihop mode}
 \label{sec:append}
 In modalit\`a append una boa allega, a ogni beacon, tutti i nodi di cui \`e attualmente a
 conoscenza: sia i suoi vicini diretti (a $1$ hop), sia i \emph{nodi scoperti}
-in modo indiretto dalle liste annunciate dagli altri. Non si manda nessun frame in
-pi\`u: la consapevolezza viaggia sui beacon che il nodo invierebbe comunque e l'unico costo risiede 
+in modo indiretto dalle liste annunciate dagli altri. Non si mandano in rete ulteriori frame: 
+la consapevolezza viaggia sui beacon che il nodo invierebbe da s\`e e l'unico costo risiede 
 nella dimensione del frame, che cresce di $28$ byte per ogni nodo annunciato. 
 (Eq.~\ref{eq:beacon-size}).
 
@@ -189,7 +182,7 @@ dove $t_j^{\text{mem}}$ \`e il timestamp dell'ultima informazione memorizzata su
 $j$ (oppure $-\infty$ nel caso in cui $j$ è nuovo, in questo modo la condizione per aggiungerlo alla lista dei nodi scoperti verr\`a per forza soddisfatta).
 Cos\`i ogni nodo tende a conservare la posizione pi\`u recente nota di ciascun nodo raggiungibile.
 
-\subsection{Forwarded: estensione attiva}
+\subsection{Forwarded multihop mode}
 \label{sec:forwarded}
 In modalit\`a forwarded una boa ritrasmette i beacon che riceve. Ogni beacon porta con s\'e
 un \emph{origin id} (il mittente originale) e un \emph{hop limit} $\ell$, un
@@ -236,21 +229,22 @@ non proprio e con TTL positivo, rispettando il limite della coda.
 
 \subsection{Copertura e costo di canale}
 \label{sec:tradeoff}
-I due meccanismi sono scelte opposte. L'append \`e economico, perch\'e non aggiunge
-nessun frame, ma \`e limitato dalla freschezza dell'informazione e dalla dimensione
-crescente del beacon (Eq.~\ref{eq:beacon-size}): pi\`u nodi conosce una boa,
-pi\`u grande e pi\`u costoso in airtime, diventa ogni suo beacon. Il forwarded
-estende la portata della consapevolezza, perch\'e un beacon pu\`o
-raggiungere nodi fuori dal range del mittente originale, ma aumenta il traffico,
-le possibili collisioni e la latenza. Quale dei due convenga applicare nella rete presa in esame, con aggiornamenti locali e senza conferme, 
+I due meccanismi presentano entrambi vantaggi e svanataggi. 
+L'append non aggiunge nessun frame in pi\`u da spedire; aggrega tutte le informazioni della boa in un unico pacchetto, 
+ma \`e fortemente limitato dalla dimensione crescente di quest'ultimo (Eq.~\ref{eq:beacon-size}): pi\`u nodi 
+conosce una boa, pi\`u grande e pi\`u costoso in airtime, diventa ogni suo beacon. 
+Il forwarded estende la portata della consapevolezza dei nodi, perch\'e un beacon pu\`o
+raggiungere nodi fuori dal range del mittente originale, ma aumenta il traffico, portando con s\`e anche
+le possibili collisioni e la maggiore latenza. 
+Quale dei due convenga applicare nella rete presa in esame - con aggiornamenti locali dei nodi e senza conferme di ricezione - 
 \`e valutato nel capitolo dedicato ai risultati.
 
 % ---------------------------------------------------------------------
 \section{Possibili miglioramenti}
 \label{sec:improvements}
-Oltre ai due meccanismi multihop appena descritti, durante lo sviluppo sono stati progettati due
-accorgimenti per contenerne il costo: un limite di hop per l'append e un \emph{gate di forwarding}
-density-aware. Entrambi sono presenti nel codice ma non attivi negli esperimenti di questa tesi,
+In merito alle due modalit\`a di multihop appena descritte, durante lo sviluppo sono stati progettati due
+accorgimenti per contenere il costo di entrambe: un \hyperref[sec:append-hoplimit]{\emph{limite di hop}} per l'append e un \hyperref[sec:fwdgate]{\emph{gate di forwarding}} per il forward. 
+Entrambi sono presenti nel codice, ma non sono stati utilizzati negli esperimenti di questa tesi
 e la loro valutazione \`e lasciata ai lavori futuri.
 
 \subsection{Limite di hop per l'append}
@@ -263,7 +257,7 @@ applicato. La distanza $h_j'$ di ogni voce (Eq.~\ref{eq:append-hop}) resta comun
 basterebbe sfruttarla per non annunciare i nodi che oltrepassano una certa distanza in hop, contenendo cos\`i la crescita del beacon. 
 La taratura del limite e l'effetto su copertura e collisioni sono lasciati ai lavori futuri.
 
-\subsection{Gate di forwarding density-aware}
+\subsection{Gate di forwarding density-aware per il forward}
 \label{sec:fwdgate}
 La modalit\`a forwarded della Sezione~\ref{sec:forwarded} rilancia ogni beacon
 fresco, entro TTL e non proprio, con il solo limite della coda. In reti dense
@@ -286,7 +280,7 @@ atteso di inoltranti per cascata ($\texttt{forward\_density\_baseline}=5$) e $f_
 Il fattore $n_0/N$ dirada gli inoltri nelle zone dense, cosicch\'e in media solo
 $\approx n_0$ degli $N$ candidati inoltrino. Il fattore $\max(0.3,\,1-f_q)$ riusa
 lo stesso segnale di congestione locale utilittazo per il calcolo dell'intervallo per la 
-frequenza dei beacon propri: una boa che sta gi\`a sta attenuando le trasmissioni dei beacon propri, riduce anche la percentuale di inoltri, fino a un
+frequenza dei beacon propri: una boa che sta gi\`a sta attenuando le trasmissioni dei beacon propri, riduce anche la percentuale di inoltri; fino a un
 minimo di $30\%$.
 
 Nel codice il gate \`e presente (\texttt{should\_forward}) ma non viene utilizzato, e il
@@ -298,13 +292,14 @@ lasciata ai lavori futuri.
 % ---------------------------------------------------------------------
 \section*{Sintesi del capitolo}
 Questo capitolo ha presentato il contributo della tesi. I due meccanismi multihop
-estendono la conoscenza dei nodi in modo opposto: l'append (passivo) aggiunge ai
+estendono la conoscenza dei nodi in modi diversi: l'append aggiunge ai
 beacon la lista dei nodi conosciuti senza traffico extra, incrementando la distanza
-in hop e tenendo l'informazione pi\`u fresca; il forwarded (attivo) rilancia i
-beacon entro un TTL, con deduplicazione per origine e coda limitata atti a contenere il
-broadcast storm. I tre protocolli di beaconing (SBP, ADAB, ACAB), gi\`a presenti nel
+in hop e tenendo l'informazione pi\`u fresca; 
+il forward rilancia i beacon entro un TTL, con deduplicazione per origine e coda limitata atti 
+a contenere il broadcast storm. 
+I tre protocolli di beaconing (SBP, ADAB, ACAB), gi\`a presenti nel
 simulatore e parte del modello di comunicazione, decidono quando
-trasmettere e si possono combinare con entrambe le modalit\`a. Infine si sono
-descritti due possibili miglioramenti: un limite di hop per l'append e un gate di
+trasmettere e si possono combinare con entrambe le modalit\`a. 
+Infine si sono descritti due possibili miglioramenti: un limite di hop per l'append e un gate di
 forwarding density-aware; progettati ma non ancora attivi. Il prossimo capitolo
 descrive come tutto questo \`e realizzato nel simulatore.
