@@ -1,35 +1,63 @@
 % =====================================================================
-%  Documento "wrapper" per l'ANTEPRIMA delle bozze italiane.
-%  Include il sommario e i Capitoli 1-3 (Introduzione, Contributo
-%  multihop, Implementazione). NON e' la tesi finale: serve solo a
-%  compilare in PDF i frammenti di capitolo, che da soli non hanno un
-%  preambolo.
+%  Documento "wrapper" della tesi, ora basato sulla classe sapthesis
+%  (impaginazione conforme alle linee guida Sapienza:
+%  https://www.uniroma1.it/it/pagina/impaginazione-della-tesi-e-logo).
+%  Include frontespizio, sommario e i Capitoli 1-3 (Introduzione,
+%  Contributo multihop, Implementazione).
 %
-%  Compilazione:
+%  Richiede nella stessa cartella: sapthesis.cls e sapienzalogo.pdf
+%  (copiati da thesis/sapthesis/, vedi README della classe).
+%
+%  Compilazione (su Overleaf: compilatore pdfLaTeX):
 %     pdflatex anteprima_bozze_it.tex      (due volte, per ToC e riferimenti)
-%  oppure:
-%     latexmk -pdf anteprima_bozze_it.tex
 %
 %  I rimandi ai capitoli ancora da scrivere (risultati, conclusioni)
 %  restano "??" in anteprima: e' atteso.
 % =====================================================================
-\documentclass[12pt,a4paper,oneside]{report}
+% !TeX encoding = UTF-8
+% !TeX program = pdflatex
+% !TeX spellcheck = it_IT
+\documentclass[binding=0.6cm,oneside]{sapthesis}
 
+% NB: sapthesis (basata su book, corpo 11pt su A4) carica gia' geometry
+% (margini conformi), fontenc T1, lmodern, graphicx, caption, booktabs,
+% amsmath e fancyhdr: non vanno ricaricati per evitare conflitti.
 \usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[a4paper,margin=2.7cm]{geometry}
-\usepackage{graphicx}
-\usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{array}
+\usepackage[italian]{babel}
+\usepackage{microtype}
+\usepackage{amssymb}
 \usepackage{xcolor}
-\usepackage{caption}
 \usepackage{subcaption}
 \usepackage{listings}
 \usepackage{enumitem}
+\usepackage{array}
 \usepackage{tabularx}
 \usepackage{siunitx}
 \usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdftitle={Context-Aware Adaptive Beaconing and Multi-Hop Awareness
+            for Infrastructure-Free Maritime Proximity Detection},
+  pdfauthor={Nome Cognome},
+}
+
+% ---------------------------------------------------------------------
+% Frontespizio (dati richiesti dalla classe sapthesis).
+% TODO: sostituire i segnaposto: nome, matricola, corso di laurea,
+%       facolta', relatore, email.
+% ---------------------------------------------------------------------
+\title{Context-Aware Adaptive Beaconing and Multi-Hop Awareness\\
+       for Infrastructure-Free Maritime Proximity Detection}
+\author{Nome Cognome}                       % TODO: nome e cognome del candidato
+\IDnumber{1234567}                          % TODO: matricola
+\course{Corso di Laurea in Informatica}     % TODO: denominazione esatta del corso
+\courseorganizer{Facolt\`a di Ingegneria dell'Informazione,
+                 Informatica e Statistica}  % TODO: verificare la facolta'
+\AcademicYear{2025/2026}
+\advisor{Prof. Nome Cognome}                % TODO: relatore
+% \coadvisor{Dr. Nome Cognome}              % correlatore, se presente
+\authoremail{nome.cognome@studenti.uniroma1.it} % TODO: email istituzionale
+\copyyear{2026}
+\thesistype{Tesi di Laurea}
 
 \definecolor{codebg}{rgb}{0.97,0.97,0.97}
 \definecolor{codekw}{rgb}{0.10,0.30,0.65}
@@ -52,11 +80,15 @@
 
 \begin{document}
 
+\frontmatter
+\maketitle
+
 \input{bozza_sommario_it}
 
 \tableofcontents
 \clearpage
 
+\mainmatter
 \input{bozza_capitolo1_it}
 \input{bozza_capitolo2_it}
 \input{bozza_capitolo3_it}
@@ -66,8 +98,11 @@
 % dell'arte del Cap. 1, qui solo per risolvere i \cite in anteprima.
 % Non e' la bibliografia finale della tesi.
 % ---------------------------------------------------------------------
+\backmatter
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{\bibname}
 \begin{thebibliography}{99}
-\addcontentsline{toc}{chapter}{Bibliografia}
 
 \bibitem{imo-ais} International Maritime Organization. \emph{AIS Transponders}.
 \url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}, accessed 2025.
