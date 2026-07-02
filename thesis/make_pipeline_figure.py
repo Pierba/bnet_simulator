@@ -4,12 +4,15 @@ Run from the repository root:
 
     .venv/Scripts/python.exe thesis/make_pipeline_figure.py
 
-Writes thesis/figures/tx_pipeline.pdf (vector) and .png. The diagram is a
-single-column flow of the CSMA/CA transmission pipeline implemented in
-src/buoys/buoy.py: the scheduler trigger, carrier sensing, DIFS, backoff, the
-own-vs-forward priority at transmission, and the re-contention loop that drains
-the forward queue one frame per contention win. Colours match the house style
-of the hand-drawn SVGs (blue = event/handler, gray = decision, coral = action).
+Writes thesis/figures/tx_pipeline.pdf (vector) and .png. The diagram mirrors
+the CSMA/CA transmission pipeline implemented in src/buoys/buoy.py: the two
+triggers that can arm it (the periodic scheduler deciding to send an own
+beacon, and the reception of a forwardable beacon that is queued with a random
+jitter), the single-pipeline `processing` lock that serialises them, the
+carrier-sense / DIFS / backoff chain, the own-vs-forward priority at
+transmission, and the re-contention loop that drains the forward queue one
+frame per contention win. Colours match the house style of the hand-drawn SVGs
+(blue = event/handler, gray = decision, coral = action).
 
 Layout note: every feedback edge is routed on a dedicated right-hand "bus"
 lane (or a short left lane) that never crosses a box or another lane, so the
@@ -33,9 +36,11 @@ SUB = "#555555"
 
 PITCH = 1.55          # vertical distance between consecutive rows
 H = 0.82              # box height
-W = 3.5               # default box width (fits the longest single-line title)
-BUS_X = 4.4           # right-hand feedback lane (returns to CHANNEL_SENSE)
-LEFT_X = -3.0         # short left lane (should_send? -> back to check)
+W = 3.7               # default box width (fits the longest single-line title)
+EW = 3.6              # entry-column box width
+CX_L, CX_R = -2.6, 2.6  # centres of the two trigger columns
+BUS_X = 4.7           # right-hand feedback lane (returns to CHANNEL_SENSE)
+LEFT_X = -4.9         # short left lane (should_send? -> back to check)
 
 boxes = {}            # name -> (cx, cy, w, h)
 
@@ -88,58 +93,94 @@ def label(x, y, text, fs=9, color=SUB, rot=0):
             zorder=4)
 
 
-fig, ax = plt.subplots(figsize=(4.9, 11.2))
+fig, ax = plt.subplots(figsize=(5.7, 12.0))
 
-# --------------------------------------------------------------------- nodes
-add_box("sched", 0, 0, "SCHEDULER_CHECK", "verifica periodica", BLUE)
-add_box("should", 0, 1, "should_send() ?", "densita, mobilita", GRAY)
-add_box("arm", 0, 2, "want_to_send = true", "avvia la pipeline", BLUE)
-add_box("sense", 0, 3, "CHANNEL_SENSE", "rileva il canale", BLUE)
-add_box("d1", 0, 4, "canale libero ?", "channel_is_busy()", GRAY)
-add_box("difs", 0, 5, "attesa DIFS", "WAITING_DIFS", BLUE)
-add_box("d2", 0, 6, "canale libero ?", "DIFS_COMPLETION", GRAY)
-add_box("backoff", 0, 7, "backoff casuale", "b slot in [0, cw-1]", BLUE)
-add_box("d3", 0, 8, "canale libero ?", "BACKOFF_COMPLETION", GRAY)
-add_box("tx", 0, 9, "TRANSMISSION_START", None, CORAL)
-add_box("dtx", 0, 10, "beacon proprio ?", "want_to_send", GRAY)
-add_box("txown", -1.9, 11, "trasmetti", "beacon proprio", CORAL, w=2.9)
-add_box("txfwd", 1.9, 11, "inoltra", "hop_limit - 1", CORAL, w=2.9)
-add_box("dpend", 0, 12, "altri inoltri ?", "coda di forward", GRAY)
-add_box("done", 0, 13, "processing = false", "torna a RECEIVING", BLUE)
+# ------------------------------------------- trigger 1: own beacon (left col)
+add_box("sched", CX_L, 0, "SCHEDULER_CHECK", "verifica periodica", BLUE, w=EW)
+add_box("should", CX_L, 1, "should_send() ?", "densita · mobilita · contatto", GRAY, w=EW)
+add_box("arm", CX_L, 2, "want_to_send = true", "beacon proprio", BLUE, w=EW)
 
-# --------------------------------------------------------- main downward flow
+# --------------------------------------- trigger 2: forwarding (right column)
+add_box("recv", CX_R, 0, "RECEPTION", "beacon ricevuto (forwarded)", BLUE, w=EW)
+add_box("fwdok", CX_R, 1, "inoltrabile ?", "hop_limit > 0 · piu fresco", GRAY, w=EW)
+add_box("queue", CX_R, 2, "accoda il beacon", "in coda · jitter casuale", BLUE, w=EW)
+add_box("drop", 5.75, 1, "scarta", None, GRAY, w=1.5)
+
+# ------------------------------------------------- single-pipeline lock (row 3)
+add_box("lock", 0, 3, "pipeline attiva ?", "processing", GRAY, w=3.3)
+add_box("wait", 3.85, 3, "resta in coda", "la pipeline attiva la invia", BLUE, w=3.3)
+
+# ------------------------------------------------------------ CSMA/CA chain
+add_box("sense", 0, 4, "CHANNEL_SENSE", "processing = true", BLUE)
+add_box("d1", 0, 5, "canale libero ?", "channel_is_busy()", GRAY)
+add_box("difs", 0, 6, "attesa DIFS", "WAITING_DIFS", BLUE)
+add_box("d2", 0, 7, "canale libero ?", "DIFS_COMPLETION", GRAY)
+add_box("backoff", 0, 8, "backoff casuale", "b slot in [0, cw-1]", BLUE)
+add_box("d3", 0, 9, "canale libero ?", "BACKOFF_COMPLETION", GRAY)
+add_box("tx", 0, 9, "TRANSMISSION_START", "un beacon per contesa vinta", CORAL)
+add_box("dtx", 0, 11, "beacon proprio ?", "want_to_send", GRAY)
+add_box("txown", -2.05, 12, "trasmetti", "beacon proprio", CORAL, w=3.2)
+add_box("txfwd", 2.05, 12, "inoltra", "dalla coda, hop_limit - 1", CORAL, w=3.2)
+add_box("dpend", 0, 13, "altri inoltri ?", "coda di forward", GRAY)
+add_box("done", 0, 14, "processing = false", "torna a RECEIVING", BLUE)
+
+# ------------------------------------------------------ left trigger column
 arrow(edge("sched", "bottom"), edge("should", "top"))
 arrow(edge("should", "bottom"), edge("arm", "top"))
-label(0.34, (row_y(1) + row_y(2)) / 2, "si", color=SUB)
-arrow(edge("arm", "bottom"), edge("sense", "top"))
-arrow(edge("sense", "bottom"), edge("d1", "top"))
-arrow(edge("d1", "bottom"), edge("difs", "top"))
-label(0.32, (row_y(4) + row_y(5)) / 2, "libero")
-arrow(edge("difs", "bottom"), edge("d2", "top"))
-arrow(edge("d2", "bottom"), edge("backoff", "top"))
-label(0.32, (row_y(6) + row_y(7)) / 2, "libero")
-arrow(edge("backoff", "bottom"), edge("d3", "top"))
-arrow(edge("d3", "bottom"), edge("tx", "top"))
-label(0.32, (row_y(8) + row_y(9)) / 2, "libero")
-arrow(edge("tx", "bottom"), edge("dtx", "top"))
+label(CX_L + 0.32, (row_y(1) + row_y(2)) / 2, "si")
 
-# own vs forward split and merge
-arrow(edge("dtx", "bottom"), edge("txown", "top"))
-arrow(edge("dtx", "bottom"), edge("txfwd", "top"))
-label(-1.15, row_y(10) - 0.62, "si")
-label(1.15, row_y(10) - 0.62, "no")
-arrow(edge("txown", "bottom"), edge("dpend", "top"))
-arrow(edge("txfwd", "bottom"), edge("dpend", "top"))
-arrow(edge("dpend", "bottom"), edge("done", "top"))
-label(0.32, (row_y(12) + row_y(13)) / 2, "no")
-
-# ------------------------------------------------ left lane: should_send = no
+# left lane: should_send = no -> back to the periodic check
 lx, ly0 = edge("should", "left")
 sx, sy0 = edge("sched", "left")
 arrow((lx, ly0), (LEFT_X, ly0), head=False)
 arrow((LEFT_X, ly0), (LEFT_X, sy0), head=False)
 arrow((LEFT_X, sy0), (sx, sy0))
 label((lx + LEFT_X) / 2, ly0 - 0.24, "no")
+
+# ----------------------------------------------------- right trigger column
+arrow(edge("recv", "bottom"), edge("fwdok", "top"))
+arrow(edge("fwdok", "bottom"), edge("queue", "top"))
+label(CX_R + 0.32, (row_y(1) + row_y(2)) / 2, "si")
+
+# not forwardable (duplicate, TTL exhausted, queue full) -> dropped
+fx, fy = edge("fwdok", "right")
+dx0, dy0 = edge("drop", "left")
+arrow((fx, fy), (dx0, dy0))
+label((fx + dx0) / 2, fy + 0.22, "no")
+
+# ------------------------- both triggers merge into the single-pipeline lock
+arrow(edge("arm", "bottom"), edge("lock", "top"))
+arrow(edge("queue", "bottom"), edge("lock", "top"))
+
+# lock branches: start a fresh pipeline, or let the in-flight one drain it
+arrow(edge("lock", "bottom"), edge("sense", "top"))
+label(0.55, (row_y(3) + row_y(4)) / 2, "no, avvia")
+lkx, lky = edge("lock", "right")
+wx0, wy0 = edge("wait", "left")
+arrow((lkx, lky), (wx0, wy0))
+label((lkx + wx0) / 2, lky + 0.24, "si")
+
+# --------------------------------------------------------- main downward flow
+arrow(edge("sense", "bottom"), edge("d1", "top"))
+arrow(edge("d1", "bottom"), edge("difs", "top"))
+label(0.32, (row_y(5) + row_y(6)) / 2, "libero")
+arrow(edge("difs", "bottom"), edge("d2", "top"))
+arrow(edge("d2", "bottom"), edge("backoff", "top"))
+label(0.32, (row_y(7) + row_y(8)) / 2, "libero")
+arrow(edge("backoff", "bottom"), edge("d3", "top"))
+arrow(edge("d3", "bottom"), edge("tx", "top"))
+label(0.32, (row_y(9) + row_y(10)) / 2, "libero")
+arrow(edge("tx", "bottom"), edge("dtx", "top"))
+
+# own vs forward split and merge
+arrow(edge("dtx", "bottom"), edge("txown", "top"))
+arrow(edge("dtx", "bottom"), edge("txfwd", "top"))
+label(-1.15, row_y(11) - 0.62, "si")
+label(1.15, row_y(11) - 0.62, "no")
+arrow(edge("txown", "bottom"), edge("dpend", "top"))
+arrow(edge("txfwd", "bottom"), edge("dpend", "top"))
+arrow(edge("dpend", "bottom"), edge("done", "top"))
+label(0.32, (row_y(13) + row_y(14)) / 2, "no")
 
 # -------------------------------- right feedback bus: busy / more pending ->
 # returns from d1, d2, d3 (canale occupato) and dpend (altri inoltri) all
@@ -158,9 +199,15 @@ for nm, txt in (("d1", "occupato"), ("d2", "occupato"),
     arrow((ex, ey), (BUS_X, ey), head=False)
     label((ex + BUS_X) / 2, ey + 0.22, txt)
 
+# ---------------------------------------------- guard note (every stage)
+ax.text(0.6, row_y(14) - 1.05,
+        "Guardia a ogni stadio: senza beacon proprio o inoltri in coda,\n"
+        "processing = false e ritorno immediato a RECEIVING.",
+        ha="center", va="top", fontsize=8, style="italic", color=SUB)
+
 # --------------------------------------------------------------------- frame
-ax.set_xlim(-3.7, 5.3)
-ax.set_ylim(row_y(13) - 0.9, 0.9)
+ax.set_xlim(-5.5, 6.75)
+ax.set_ylim(row_y(14) - 1.9, 0.9)
 ax.set_aspect("equal")
 ax.axis("off")
 fig.tight_layout(pad=0.3)
