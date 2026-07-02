@@ -4,9 +4,9 @@
 %
 %  Richiede i pacchetti gia' presenti nel preambolo del wrapper:
 %  amsmath, amssymb, siunitx, enumitem, listings, booktabs.
-%  Include la figura della pipeline (fig_tx_pipeline_it.tex) e la figura
-%  UML (thesis/figures/classes_uml.pdf, da renderizzare a partire da
-%  src/classes_BNet_Simulator.plantuml).
+%  Include la figura della pipeline (thesis/tx_pipeline.pdf, esportata
+%  in PDF da draw.io) e la figura UML (thesis/figures/classes_uml.pdf,
+%  da renderizzare a partire da src/classes_BNet_Simulator.plantuml).
 % =====================================================================
 \chapter{Implementazione del simulatore e delle sue componenti}
 \label{ch:simulatore}
@@ -283,7 +283,25 @@ sul posto. Ai fini delle metriche, la boa registra anche la \emph{latenza di sch
 il tempo trascorso tra la decisione di trasmettere e l'effettivo inizio della
 trasmissione, cio\`e il costo della contesa CSMA.
 
-% \input{fig_tx_pipeline_it}
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight,keepaspectratio]{tx_pipeline}
+  \caption[Pipeline di trasmissione della boa]{%
+    Pipeline di trasmissione di una boa (CSMA/CA), come implementata in
+    \texttt{buoy.py}. La pipeline ha due punti d'ingresso: la decisione
+    periodica dello scheduler (\texttt{SCHEDULER\_CHECK}) e l'accodamento di
+    un beacon inoltrabile alla ricezione (\texttt{RECEPTION}); in entrambi i
+    casi la contesa parte solo se non ce n'\`e gi\`a una in volo (lock
+    \texttt{processing}). Il canale viene rilevato prima del DIFS, dopo il
+    DIFS e al termine del backoff (Eq.~\ref{eq:backoff}): se risulta occupato
+    in una qualunque delle tre verifiche, si rientra dal \texttt{CHANNEL\_SENSE}.
+    Vinta la contesa, la boa invia un solo frame -- con precedenza al beacon
+    proprio, altrimenti un inoltro dalla coda con il TTL decrementato
+    (Eq.~\ref{eq:ttl}) -- e, se restano inoltri in sospeso, rientra subito in
+    contesa. Per leggibilit\`a non \`e mostrato il controllo, ripetuto a ogni
+    stadio, che rilascia il lock se non resta nulla da inviare.}
+  \label{fig:tx-pipeline}
+\end{figure}
 
 % ---------------------------------------------------------------------
 \subsection{Ricezione di un beacon}
