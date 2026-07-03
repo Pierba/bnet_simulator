@@ -24,7 +24,7 @@ simulation:
   multihop_modes:
   # - none
   - append
-  # - forwarded
+  - forwarded
   # Maximum hops for forwarded mode
   multihop_limit: 1
   # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
