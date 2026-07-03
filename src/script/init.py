@@ -118,7 +118,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--multihop-mode",
-        choices=["none", "append", "forwarded"],
+        choices=["none", "append", "forward"],
         default=(cfg.get('simulation', 'multihop_modes') or ['none'])[0],
         help="Multihop mode to use for the simulation (default: first of simulation.multihop_modes)"
     )
@@ -174,7 +174,7 @@ def build_and_run(
             mobile_count=mobile_buoy_count,
             fixed_count=fixed_buoy_count,
             duration=duration,
-            multihop_mode=multihop_mode  # [none, append, forwarded]
+            multihop_mode=multihop_mode  # [none, append, forward]
         )
 
     # Setting up the communication channel for the simulation

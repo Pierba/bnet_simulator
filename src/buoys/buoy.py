@@ -39,8 +39,6 @@ class Buoy:
         self.scheduler: BeaconScheduler    = scheduler
         self.position: tuple[float, float] = position
         self.is_mobile: bool               = is_mobile
-        # Instantaneous velocity vector, owned by the RWP model: stationary until
-        # the first BUOY_MOVEMENT event, recomputed each movement update
         self.velocity: tuple[float, float] = (0.0, 0.0)
         self.metrics: bool                 = metrics
 
@@ -91,9 +89,9 @@ class Buoy:
         self.want_to_send: bool             = False
         self.scheduler_decision_time: float = 0.0
 
-        # Multihop mode configuration ('none' | 'append' | 'forwarded')
+        # Multihop mode configuration ('none' | 'append' | 'forward')
         self.multihop_mode: str = multihop_mode
-        # Forwarded mode: multihop limit sets TTL for fowarded beacons
+        # Forward mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
         # Append mode hop limit (0 = unlimited, 1 = only direct neighbors, etc.).
         # CURRENLTY INACTIVE — append stores/advertises all discovered nodes
@@ -104,7 +102,7 @@ class Buoy:
         # (last-contact ts, position, hop distance from this buoy)
         self.discovered_nodes: dict[int, tuple[float, tuple[float, float], int]] = {}
 
-        # Multihop forwarded mode: pending forwards are paced through the CSMA pipeline one at a time
+        # Multihop forward mode: pending forwards are paced through the CSMA pipeline one at a time
         self.pending_queue_limit: int                           = cfg.get('simulation', 'pending_queue_limit')
         self.pending_forward_beacons: dict[int, Beacon]         = {}
         # forwarded_beacons records the latest timestamp decided per origin so duplicates aren't re-evaluated
@@ -316,9 +314,9 @@ class Buoy:
                     if neighbor_ts > self.discovered_nodes.get(neighbor_id, (-1, None, 0))[0]:
                         self.discovered_nodes[neighbor_id] = (neighbor_ts, neighbor_pos, hops)
 
-            # Multihop forwarded mode: queue beacon WITHOUT modification if beacon.origin_id != self.id and beacon.hop_limit > 0:
+            # Multihop forward mode: queue beacon WITHOUT modification if beacon.origin_id != self.id and beacon.hop_limit > 0:
             # Never re-forward a beacon this buoy originated (echo received via a neighbor)
-            case 'forwarded' if beacon.origin_id != self.id and beacon.hop_limit > 0:
+            case 'forward' if beacon.origin_id != self.id and beacon.hop_limit > 0:
                 # Only queue the beacon if it is fresher than the last one we forwarded from the same origin
                 if beacon.timestamp > self.forwarded_beacons.get(beacon.origin_id, -1):
                     # Update/Insert the beacon in the pending queue if it's already there or there's room for it
@@ -349,7 +347,7 @@ class Buoy:
             discovered_nodes = {b[0] for b in beacon.neighbors}
             discovered_nodes.add(beacon.sender_id)
 
-            if self.multihop_mode == 'forwarded' and beacon.origin_id is not None:
+            if self.multihop_mode == 'forward' and beacon.origin_id is not None:
                 discovered_nodes.add(beacon.origin_id)
 
             discovered_nodes.discard(self.id)  # Don't count self as discovered
@@ -357,7 +355,7 @@ class Buoy:
             # Track all unique nodes discovered from this beacon
             self.set_unique_nodes_per_buoy_callback(self.id, discovered_nodes)
 
-            # Log the reception of this beacon, attributed to its origin: in forwarded
+            # Log the reception of this beacon, attributed to its origin: in forward
             # mode the sender is just the relay, while timestamp belongs to the origin
             self.log_received_callback(
                 origin_id=beacon.origin_id or beacon.sender_id,
@@ -383,8 +381,8 @@ class Buoy:
                     if sim_time - data[0] <= self.neighbor_timeout
                 }
 
-            # In forwarded mode => cleanup the pending queue and the stale dedup memory
-            case 'forwarded':
+            # In forward mode => cleanup the pending queue and the stale dedup memory
+            case 'forward':
                 self.forwarded_beacons = {
                     nid: ts
                     for nid, ts in self.forwarded_beacons.items()
@@ -473,7 +471,7 @@ class Buoy:
                 )
             
             # Set origin and hop limit
-            case 'forwarded':
+            case 'forward':
                 origin_id = self.id
                 hop_limit = self.multihop_limit
             

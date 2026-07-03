@@ -126,7 +126,7 @@ def plot_block_by_density(results_dir, plot_dir, interval=None, schedulers=None)
                 mode_str = "Single-Hop"
             elif mode == "append":
                 mode_str = "Append Mode"
-            elif mode == "forwarded":
+            elif mode == "forward":
                 mode_str = "Forward Mode"
             else:
                 mode_str = mode.capitalize()
@@ -440,7 +440,7 @@ def plot_ramp_grouped_by_buoy_count(results_dir, plot_file, schedulers=None):
             title += ", Single-Hop)"
         elif multihop_mode == "append":
             title += ", Append Mode)"
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title += ", Forward Mode)"
         else:
             title += f", {multihop_mode.capitalize()})"
@@ -571,7 +571,7 @@ def plot_delivery_ratio_vs_time(results_dir, plot_file, interval=None, scheduler
             title_parts.append(", Single-Hop")
         elif multihop_mode == "append":
             title_parts.append(", Append Mode")
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title_parts.append(", Forward Mode")
         else:
             title_parts.append(f", {multihop_mode.capitalize()}")
@@ -764,7 +764,7 @@ def plot_neighbor_ratio_by_density(results_dir, plot_dir, interval=None, schedul
                 mode_str = "Single-Hop"
             elif mode == "append":
                 mode_str = "Append Mode"
-            elif mode == "forwarded":
+            elif mode == "forward":
                 mode_str = "Forward Mode"
             else:
                 mode_str = mode.capitalize()
@@ -903,7 +903,7 @@ def plot_neighbor_delta_by_density(results_dir, plot_dir, interval=None, schedul
                 mode_str = "Single-Hop"
             elif mode == "append":
                 mode_str = "Append Mode"
-            elif mode == "forwarded":
+            elif mode == "forward":
                 mode_str = "Forward Mode"
             else:
                 mode_str = mode.capitalize()
@@ -1032,7 +1032,7 @@ def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None, schedulers=
             title_parts.append(", Single-Hop")
         elif multihop_mode == "append":
             title_parts.append(", Append Mode")
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title_parts.append(", Forward Mode")
         else:
             title_parts.append(f", {multihop_mode.capitalize()}")
@@ -1119,7 +1119,7 @@ def plot_network_discovery_growth(results_dir, plot_file, interval=None, schedul
             title_parts.append(", Single-Hop")
         elif multihop_mode == "append":
             title_parts.append(", Append Mode")
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title_parts.append(", Forward Mode")
         else:
             title_parts.append(f", {multihop_mode.capitalize()}")

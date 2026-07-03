@@ -9,7 +9,7 @@ from collections import defaultdict
 from plot_mode_comparison import generate_comparison_plots
 
 # Multihop modes that may appear as the trailing token of a results-dir name
-MULTIHOP_MODES = ("none", "append", "forwarded")
+MULTIHOP_MODES = ("none", "append", "forward")
 
 def average_metrics(input_dirs, output_dir):
     # Identify subdirectories in each input directory
@@ -28,7 +28,7 @@ def average_metrics(input_dirs, output_dir):
     for subdir in sorted(all_subdirs):
         # Mirror the input naming for the averaged outputs (strip the leading
         # "results_") so downstream tools recognise them identically, e.g.
-        # results_interval-1.0_random_forwarded.
+        # results_interval-1.0_random_forward.
         suffix = subdir[len("results_"):] if subdir.startswith("results_") else subdir
 
         # Create results and plots directories directly in output_dir
@@ -406,7 +406,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
             mode_str = "Single-Hop"
         elif mode == "append":
             mode_str = "Append Mode"
-        elif mode == "forwarded":
+        elif mode == "forward":
             mode_str = "Forward Mode"
         else:
             mode_str = mode.capitalize()
@@ -657,7 +657,7 @@ def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
             mode_str = "Single-Hop"
         elif mode == "append":
             mode_str = "Append Mode"
-        elif mode == "forwarded":
+        elif mode == "forward":
             mode_str = "Forward Mode"
         else:
             mode_str = mode.capitalize()
@@ -752,7 +752,7 @@ def plot_neighbor_ratio_by_density_with_errors(data_dir, plot_dir, interval=None
             mode_str = "Single-Hop"
         elif mode == "append":
             mode_str = "Append Mode"
-        elif mode == "forwarded":
+        elif mode == "forward":
             mode_str = "Forward Mode"
         else:
             mode_str = mode.capitalize()
@@ -887,7 +887,7 @@ def plot_neighbor_delta_by_density_with_errors(data_dir, plot_dir, interval=None
             mode_str = "Single-Hop"
         elif mode == "append":
             mode_str = "Append Mode"
-        elif mode == "forwarded":
+        elif mode == "forward":
             mode_str = "Forward Mode"
         else:
             mode_str = mode.capitalize()
@@ -1077,7 +1077,7 @@ def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
             title += ", Single-Hop)"
         elif multihop_mode == "append":
             title += ", Append Mode)"
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title += ", Forward Mode)"
         else:
             title += f", {multihop_mode.capitalize()})"
@@ -1188,7 +1188,7 @@ def plot_timeseries_with_errors(data_dir, plot_dir, interval=None):
             title_parts.append(", Single-Hop")
         elif multihop_mode == "append":
             title_parts.append(", Append Mode")
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title_parts.append(", Forward Mode")
         else:
             title_parts.append(f", {multihop_mode.capitalize()}")
@@ -1276,7 +1276,7 @@ def plot_unique_nodes_vs_time_with_errors(data_dir, plot_dir, interval=None):
             title_parts.append(", Single-Hop")
         elif multihop_mode == "append":
             title_parts.append(", Append Mode")
-        elif multihop_mode == "forwarded":
+        elif multihop_mode == "forward":
             title_parts.append(", Forward Mode")
         else:
             title_parts.append(f", {multihop_mode.capitalize()}")

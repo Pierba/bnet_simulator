@@ -162,7 +162,7 @@ def main():
     # PROTOCOLS 
     #======================
     schedulers: list[str]     = cfg.get('simulation', 'schedulers')     # List of protocols to simulate
-    multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes') # List of multihop modes (none, append, forwarded)
+    multihop_modes: list[str] = cfg.get('simulation', 'multihop_modes') # List of multihop modes (none, append, forward)
 
     #======================
     # BUOYS DISTRIBUTION 
@@ -223,7 +223,7 @@ def main():
             # Track each mode's results directory to feed the comparison plotter
             mode_results_dirs: dict[str, str] = {}
 
-            for multihop_mode in multihop_modes: # ['none', 'append', 'forwarded']
+            for multihop_mode in multihop_modes: # ['none', 'append', 'forward']
                 multihop_suffix = f"_{multihop_mode}"
 
                 results_dir = os.path.join(output_root, f"results_interval-{interval_str}{ideal_suffix}{scenario_suffix}{multihop_suffix}")

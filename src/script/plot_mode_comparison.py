@@ -12,9 +12,9 @@ DEFAULT_SCHEDULERS = ["static", "dynamic_acab", "dynamic_adab"]
 SCHEDULER_LABELS = {"static": "SBP", "dynamic_acab": "ACAB", "dynamic_adab": "ADAB"}
 
 # Multihop mode order, labels and colors used across every comparison figure
-MODE_ORDER = ["none", "append", "forwarded"]
-MODE_LABELS = {"none": "Single-Hop", "append": "Append", "forwarded": "Forward"}
-MODE_COLORS = {"none": "tab:blue", "append": "tab:orange", "forwarded": "tab:green"}
+MODE_ORDER = ["none", "append", "forward"]
+MODE_LABELS = {"none": "Single-Hop", "append": "Append", "forward": "Forward"}
+MODE_COLORS = {"none": "tab:blue", "append": "tab:orange", "forward": "tab:green"}
 
 
 def scheduler_from(df, filename):
