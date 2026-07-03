@@ -34,7 +34,7 @@ def load_mode_data(mode_dirs):
     """Load every density summary CSV across all modes into a single long DataFrame.
 
     Returns columns: Density, Scheduler, Mode, PDR, CollisionRate, LossRate,
-    PercentageDiscovered, NeighborReceiverRatio.
+    PercentageDiscovered, NeighborReceiverRatio, NeighborReceiverDelta.
     """
     rows = []
     for mode, results_dir in mode_dirs.items():
@@ -59,6 +59,8 @@ def load_mode_data(mode_dirs):
             loss = float(df.loc["Loss Rate", "Value"]) if "Loss Rate" in df.index else np.nan
             ratio = (float(df.loc["Avg Neighbors to Receivers Ratio", "Value"])
                      if "Avg Neighbors to Receivers Ratio" in df.index else np.nan)
+            delta = (float(df.loc["Avg Neighbors to Receivers Delta", "Value"])
+                     if "Avg Neighbors to Receivers Delta" in df.index else np.nan)
 
             # Prefer the directly-exported percentage; otherwise derive it
             if "Avg % Network Discovered" in df.index:
@@ -77,6 +79,7 @@ def load_mode_data(mode_dirs):
                 "LossRate": loss,
                 "PercentageDiscovered": pct,
                 "NeighborReceiverRatio": ratio,
+                "NeighborReceiverDelta": delta,
             })
 
     return pd.DataFrame(rows)
@@ -137,6 +140,84 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
     if interval:
         suptitle += f" (Static Interval: {interval}s)"
     # wrap so the title still fits when only one scheduler subplot is drawn
+    fig.suptitle(suptitle, fontsize=14, fontweight="bold", wrap=True)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=200)
+    plt.close()
+    print(f"  [OK]Saved {os.path.basename(output_path)}")
+
+
+def plot_delta_comparison(df, output_path, interval, schedulers):
+    """Render the cross-mode neighbors-receivers delta comparison as annotated lines.
+
+    One subplot per scheduler; within each, one line per multihop mode over density.
+    Every point is labelled with its signed value (+X.X / -X.X), and a dashed
+    break-even line marks delta = 0.
+    """
+    modes_present = [m for m in MODE_ORDER if m in df["Mode"].unique()]
+    if not modes_present:
+        print("  [!]No modes available for NeighborReceiverDelta")
+        return
+
+    metric_df = df[df["NeighborReceiverDelta"].notna()]
+    if metric_df.empty:
+        print("  [!]No NeighborReceiverDelta data found")
+        return
+
+    schedulers_present = [s for s in schedulers if s in set(metric_df["Scheduler"].unique())]
+    if not schedulers_present:
+        print("  [!]No scheduler data found for NeighborReceiverDelta")
+        return
+
+    densities = sorted(metric_df["Density"].unique())
+    x = np.arange(len(densities))
+
+    fig, axes = plt.subplots(1, len(schedulers_present), figsize=(6 * len(schedulers_present), 6), squeeze=False)
+    axes = axes[0]
+
+    # Shared y-limits (0 always in view) so the subplots stay visually comparable
+    lower = min(0.0, metric_df["NeighborReceiverDelta"].min())
+    upper = max(0.0, metric_df["NeighborReceiverDelta"].max())
+    pad = 0.15 * max(upper - lower, 1.0)
+
+    for ax, sched in zip(axes, schedulers_present):
+        for mode in modes_present:
+            values = []
+            for d in densities:
+                rows = metric_df[(metric_df["Density"] == d) &
+                                 (metric_df["Scheduler"] == sched) &
+                                 (metric_df["Mode"] == mode)]
+                # NaN breaks the line instead of faking a zero for a missing density
+                values.append(rows["NeighborReceiverDelta"].mean() if not rows.empty else np.nan)
+
+            values_arr = np.array(values, dtype=float)
+            if np.isnan(values_arr).all():
+                continue
+
+            color = MODE_COLORS.get(mode)
+            ax.plot(x, values_arr, marker="o", linestyle="-", linewidth=1,
+                    label=MODE_LABELS.get(mode, mode), color=color)
+
+            for x_pos, value in zip(x, values_arr):
+                if np.isnan(value):
+                    continue
+                ax.text(x_pos, value, f"{value:+.1f}", color=color,
+                        ha="center", va="bottom" if value >= 0 else "top", fontsize=8)
+
+        ax.axhline(0.0, color="gray", linestyle="--", linewidth=1)
+        ax.set_xlabel("Total Buoys", fontsize=11)
+        ax.set_ylabel("Avg Neighbors - Receivers in Range", fontsize=11)
+        ax.set_title(SCHEDULER_LABELS.get(sched, sched), fontsize=12, fontweight="bold")
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(int(d)) for d in densities])
+        ax.set_ylim(lower - pad, upper + pad)
+        ax.legend(loc="upper left", fontsize=10)
+        ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    suptitle = "Neighbors-Receivers Delta Comparison: Multihop Modes by Protocol"
+    if interval:
+        suptitle += f" (Static Interval: {interval}s)"
     fig.suptitle(suptitle, fontsize=14, fontweight="bold", wrap=True)
 
     plt.tight_layout()
@@ -290,6 +371,11 @@ def generate_comparison_plots(mode_dirs, output_dir, interval=None, schedulers=N
         "Neighbors-to-Receivers Ratio Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_neighbor_receiver_ratio_interval-{tag}.png"),
         interval, schedulers, ylim=ratio_ylim, legend_loc="upper left", refline=1.0,
+    )
+    plot_delta_comparison(
+        df,
+        os.path.join(output_dir, f"mode_comparison_neighbor_receiver_delta_interval-{tag}.png"),
+        interval, schedulers,
     )
     plot_discovery_over_time(
         mode_dirs,

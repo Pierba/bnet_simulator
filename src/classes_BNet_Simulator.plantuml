@@ -204,6 +204,8 @@ class "Metrics" as metrics.Metrics {
   avg_neighbors_count : int
   neighbor_ratio_sum : float
   neighbor_ratio_count : int
+  neighbor_delta_sum : float
+  neighbor_delta_count : int
   delivered_beacons : dict[int, float]
   discovered_pairs : dict[int, set[int]]
   unique_nodes_per_buoy : dict[int, set[int]]
@@ -218,6 +220,8 @@ class "Metrics" as metrics.Metrics {
   record_scheduler_latency(latency: float)
   log_neighbor_ratio(n_neighbors: int, n_receivers: int)
   avg_neighbor_ratio() -> float
+  log_neighbor_delta(n_neighbors: int, n_receivers: int)
+  avg_neighbor_delta() -> float
   delivery_ratio() -> float
   packet_delivery_ratio() -> float
   avg_percentage_network_discovered() -> float
