@@ -30,7 +30,6 @@ class Buoy:
         multihop_mode: str,
         position: tuple[float, float] = (0.0, 0.0),
         is_mobile: bool = False,
-        velocity: tuple[float, float] = (0.0, 0.0),
         metrics: bool = False,
     ):
         cfg = ConfigHandler()
@@ -40,7 +39,9 @@ class Buoy:
         self.scheduler: BeaconScheduler    = scheduler
         self.position: tuple[float, float] = position
         self.is_mobile: bool               = is_mobile
-        self.velocity: tuple[float, float] = velocity
+        # Instantaneous velocity vector, owned by the RWP model: stationary until
+        # the first BUOY_MOVEMENT event, recomputed each movement update
+        self.velocity: tuple[float, float] = (0.0, 0.0)
         self.metrics: bool                 = metrics
 
         # Network state
@@ -123,12 +124,14 @@ class Buoy:
 
     # Activate the buoy, resetting its state and clearing any leftover CSMA pipeline state
     def activate(self):
+        self.state = BuoyState.RECEIVING
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
         self.want_to_send = False
 
     # Deactivate the buoy, invalidating any scheduled events and clearing pending/forwarded beacons
     def deactivate(self):
+        self.state = BuoyState.SLEEPING
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 

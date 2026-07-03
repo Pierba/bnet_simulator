@@ -133,13 +133,6 @@ def random_position(world_width: float, world_height: float) -> tuple[float, flo
         random.uniform(10, world_height - 10)
     )
 
-# Get random velocity vector for mobile buoys based on a default velocity
-def random_velocity(default_velocity: float) -> tuple[float, float]:
-    return (
-        random.uniform(-1, 1) * default_velocity,
-        random.uniform(-1, 1) * default_velocity
-    )
-
 # Construct and run a single simulation in-process, returning (metrics, simulated_time)
 def build_and_run(
     mode: str,
@@ -208,7 +201,6 @@ def build_and_run(
                 max_interval=max_interval,
                 default_velocity=default_velocity
             ),
-            velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
             metrics=metrics is not None
         )
 

@@ -122,7 +122,7 @@ class "Buoy" as buoy.Buoy {
   pending_forward_beacons : dict[int, Beacon]
   forwarded_beacons : dict[int, float]
   --
-  __init__(scheduler: BeaconScheduler, position: tuple[float, float], is_mobile: bool, velocity: tuple[float, float], metrics: bool)
+  __init__(scheduler: BeaconScheduler, world_width: float, world_height: float, multihop_mode: str, position: tuple[float, float], is_mobile: bool, metrics: bool)
   activate()
   deactivate()
   handle_event(event: Event, sim_time: float)
