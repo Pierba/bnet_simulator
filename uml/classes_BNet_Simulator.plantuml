@@ -213,20 +213,31 @@ class "Metrics" as metrics.Metrics {
   discovery_time_series : list
   --
   __init__(density: float, scheduler_type: str, world_width: float, world_height: float, mobile_count: int, fixed_count: int, duration: float, multihop_mode: str)
+  set_unique_nodes_per_buoy(buoy_id: int, unique_nodes: set[int])
   log_sent(is_forward: bool)
   log_received(origin_id: int, timestamp: float, receive_time: float, receiver_id: int)
   log_lost(count: int)
   log_collision(count: int)
   record_scheduler_latency(latency: float)
+  avg_scheduler_latency() -> float
+  log_potentially_sent(n_receivers: int)
+  log_successful_receivers(count: int)
   log_neighbor_ratio(n_neighbors: int, n_receivers: int)
   avg_neighbor_ratio() -> float
   log_neighbor_delta(n_neighbors: int, n_receivers: int)
   avg_neighbor_delta() -> float
   delivery_ratio() -> float
   packet_delivery_ratio() -> float
+  avg_unique_nodes_discovered() -> float
   avg_percentage_network_discovered() -> float
+  log_discovery_timepoint(sim_time: float)
+  log_timepoint(sim_time: float, n_buoys: int, avg_neighbors_sample: Optional[float])
+  record_avg_neighbors_sample(avg_neighbors_value: float)
+  get_final_avg_neighbors() -> float
   summary(sim_time: float) -> dict[str, Any]
   export_metrics_to_csv(summary, filepath: str)
+  export_time_series(filepath: str)
+  export_discovery_time_series(filepath: str)
 }
 
 class "ConfigHandler" as config_handler.ConfigHandler <<singleton>> {
