@@ -721,6 +721,37 @@ dove il denominatore $N-1$ esclude la boa stessa dall'insieme dei nodi scopribil
 $D_{\%}$ \`e la metrica di consapevolezza: quanta parte della rete il nodo medio
 conosce.
 
+\paragraph{Amplificazione informativa: rapporto e delta vicini--destinatari.}
+$D_{\%}$ misura quanta rete i nodi arrivano a conoscere; per quantificare
+l'efficacia delle modalit\`a multihop serve anche misurare quanta informazione il
+singolo beacon trasporta \emph{oltre} la portata fisica del mittente. A ogni
+trasmissione $t$ il canale confronta perci\`o il numero di nodi annunciati nella
+lista del beacon, $A_t$, con il numero di destinatari effettivamente in portata
+nell'istante della trasmissione, $R_t$. Ne derivano due indicatori aggregati, un
+rapporto e una differenza con segno:
+\begin{equation}
+  \overline{\rho} \;=\; \frac{1}{\lvert T^{+} \rvert} \sum_{t \in T^{+}} \frac{A_t}{R_t},
+  \qquad
+  T^{+} = \{\, t : R_t > 0 \,\},
+  \label{eq:nbr-ratio}
+\end{equation}
+\begin{equation}
+  \overline{\Delta} \;=\; \frac{1}{\lvert T \rvert} \sum_{t \in T} \big( A_t - R_t \big),
+  \label{eq:nbr-delta}
+\end{equation}
+dove $T$ \`e l'insieme di tutte le trasmissioni del run. Il rapporto
+$\overline{\rho}$ esclude le trasmissioni senza destinatari in portata, per le quali
+non \`e definito; il delta $\overline{\Delta}$, ben definito anche con $R_t = 0$, le
+include tutte (un beacon trasmesso senza nessuno in ascolto annuncia comunque $A_t$
+nodi a vuoto). In modalit\`a single-hop la lista annunciata coincide con la tabella
+dei vicini diretti, quindi $\overline{\rho} \approx 1$ e $\overline{\Delta} \approx 0$,
+a meno dello sfasamento tra la tabella (soggetta a \texttt{neighbor\_timeout}) e il
+vicinato geometrico istantaneo. Valori $\overline{\rho} > 1$ e $\overline{\Delta} > 0$
+indicano invece che il beacon medio annuncia pi\`u nodi di quanti il mittente possa
+raggiungere fisicamente in quel momento: \`e l'amplificazione informativa che le
+modalit\`a multihop dovrebbero produrre, misurata per\`o sul frame in transito
+anzich\'e sulle tabelle dei riceventi come fa $D_{\%}$ (Eq.~\ref{eq:netdisc}).
+
 \paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Misura l'affidabilit\`a del
 singolo link radio. Per ogni trasmissione, il canale conta i destinatari in portata
 (opportunit\`a di ricezione) e le boe contano le ricezioni andate a buon fine:
@@ -781,7 +812,9 @@ nella stessa contesa CSMA dei beacon propri; il modello di canale calibrato
 sul campo, con propagazione, collisioni dirette e da terminale nascosto e perdita
 probabilistica; il modello di mobilit\`a Random Waypoint; la gestione della popolazione
 dinamica con cancellazione pigra degli eventi; la configurazione centralizzata nel
-singleton YAML e le metriche, dalla percentuale di rete scoperta ai due livelli di PDR.
+singleton YAML e le metriche, dalla percentuale di rete scoperta ai due livelli di PDR,
+fino agli indicatori di amplificazione informativa dei beacon (rapporto e delta
+vicini--destinatari).
 Il simulatore offre una piattaforma controllata e riproducibile per valutare i
 protocolli di broadcast. Il prossimo capitolo presenta la metodologia sperimentale e i
 risultati.
