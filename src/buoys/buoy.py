@@ -25,6 +25,9 @@ class Buoy:
     def __init__(
         self,
         scheduler: BeaconScheduler,
+        world_width: float,
+        world_height: float,
+        multihop_mode: str,
         position: tuple[float, float] = (0.0, 0.0),
         is_mobile: bool = False,
         velocity: tuple[float, float] = (0.0, 0.0),
@@ -62,8 +65,8 @@ class Buoy:
 
         # Network parameters for distance calculations
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
-        self.world_width: float      = cfg.get('world', 'width')
-        self.world_height: float     = cfg.get('world', 'height')
+        self.world_width: float      = world_width
+        self.world_height: float     = world_height
 
         # Random Waypoint mobility model state
         # Speed is drawn uniformly from [rwp_speed_min, rwp_speed_max] per leg
@@ -88,7 +91,7 @@ class Buoy:
         self.scheduler_decision_time: float = 0.0
 
         # Multihop mode configuration ('none' | 'append' | 'forwarded')
-        self.multihop_mode: str = cfg.get('simulation', 'multihop_mode')
+        self.multihop_mode: str = multihop_mode
         # Forwarded mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
         # Append mode hop limit (0 = unlimited, 1 = only direct neighbors, etc.).

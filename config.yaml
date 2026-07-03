@@ -68,7 +68,7 @@ csma:
 
 scheduler:
   static_interval: 1.0
-  beacon_min_interval: 1.0
+  beacon_min_interval: 0.25
   beacon_max_interval: 5.0
   neighbor_timeout: 7.0
   # ADAB: neighbour count that maps to density factor = 1.0 (full backoff)

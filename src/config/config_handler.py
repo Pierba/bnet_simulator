@@ -90,9 +90,3 @@ class ConfigHandler:
     # Getter of configuration values
     def get(self, section: str, key: str) -> Any:
         return self._config.get(section, {}).get(key)
-
-    # Setter to override a configuration value at runtime (in-process only).
-    # Used to inject per-simulation parameters (e.g. multihop_mode) that must be
-    # honored by behavior code reading directly from the config singleton.
-    def set(self, section: str, key: str, value: Any) -> None:
-        self._config.setdefault(section, {})[key] = value

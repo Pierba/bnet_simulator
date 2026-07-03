@@ -160,11 +160,6 @@ def build_and_run(
 ) -> tuple[Metrics | None, float]:
     cfg = ConfigHandler()
 
-    # Injecting cli parameters into the config for simulator components
-    cfg.set('simulation', 'multihop_mode', multihop_mode)
-    cfg.set('world', 'width', world_width)
-    cfg.set('world', 'height', world_height)
-
     # Set the random seed for reproducibility
     random.seed(seed)
 
@@ -203,6 +198,9 @@ def build_and_run(
         buoy = Buoy(
             position=positions[i],
             is_mobile=mobile,
+            world_width=world_width,
+            world_height=world_height,
+            multihop_mode=multihop_mode,
             scheduler=BeaconScheduler(
                 scheduler_type=mode,
                 static_interval=static_interval,
