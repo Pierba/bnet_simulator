@@ -122,6 +122,8 @@ class Channel:
             is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
+            # Advertised-neighbors vs in-range-receivers ratio (multihop amplification)
+            self.metrics.log_neighbor_ratio(len(beacon.neighbors), n_receivers)
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
             # Collision rate counts only beacons lost to collisions (direct
             # collisions plus poisoned earlier receptions).

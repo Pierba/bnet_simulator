@@ -33,7 +33,8 @@ def scheduler_from(df, filename):
 def load_mode_data(mode_dirs):
     """Load every density summary CSV across all modes into a single long DataFrame.
 
-    Returns columns: Density, Scheduler, Mode, PDR, CollisionRate, LossRate, PercentageDiscovered.
+    Returns columns: Density, Scheduler, Mode, PDR, CollisionRate, LossRate,
+    PercentageDiscovered, NeighborReceiverRatio.
     """
     rows = []
     for mode, results_dir in mode_dirs.items():
@@ -56,6 +57,8 @@ def load_mode_data(mode_dirs):
             pdr = float(df.loc["PDR", "Value"]) if "PDR" in df.index else np.nan
             collision = float(df.loc["Collision Rate", "Value"]) if "Collision Rate" in df.index else np.nan
             loss = float(df.loc["Loss Rate", "Value"]) if "Loss Rate" in df.index else np.nan
+            ratio = (float(df.loc["Avg Neighbors to Receivers Ratio", "Value"])
+                     if "Avg Neighbors to Receivers Ratio" in df.index else np.nan)
 
             # Prefer the directly-exported percentage; otherwise derive it
             if "Avg % Network Discovered" in df.index:
@@ -73,12 +76,13 @@ def load_mode_data(mode_dirs):
                 "CollisionRate": collision,
                 "LossRate": loss,
                 "PercentageDiscovered": pct,
+                "NeighborReceiverRatio": ratio,
             })
 
     return pd.DataFrame(rows)
 
 
-def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers, ylim=None, legend_loc="best"):
+def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers, ylim=None, legend_loc="best", refline=None):
     """Render one figure: a subplot per scheduler with mode-grouped bars over density."""
     modes_present = [m for m in MODE_ORDER if m in df["Mode"].unique()]
     if not modes_present:
@@ -115,6 +119,9 @@ def plot_metric(df, value_col, ylabel, title, output_path, interval, schedulers,
                 values.append(rows[value_col].mean() if not rows.empty else 0)
             ax.bar(x + offset + i * bar_width, values, bar_width,
                    label=MODE_LABELS.get(mode, mode), color=MODE_COLORS.get(mode))
+
+        if refline is not None:
+            ax.axhline(refline, color="gray", linestyle="--", linewidth=1)
 
         ax.set_xlabel("Total Buoys", fontsize=11)
         ax.set_ylabel(ylabel, fontsize=11)
@@ -273,6 +280,16 @@ def generate_comparison_plots(mode_dirs, output_dir, interval=None, schedulers=N
         "Network Discovery Comparison: Multihop Modes by Protocol",
         os.path.join(output_dir, f"mode_comparison_avg_percentage_network_discovered_interval-{tag}.png"),
         interval, schedulers, ylim=(0, 100), legend_loc="upper left",
+    )
+    # Neighbors-to-receivers ratio is unbounded: 0-based axis with headroom above the
+    # data, never below the parity refline at 1 so modes stay visually comparable.
+    ratio_values = df["NeighborReceiverRatio"].dropna()
+    ratio_ylim = (0, max(2.0, ratio_values.max() * 1.2)) if not ratio_values.empty else (0, 2.0)
+    plot_metric(
+        df, "NeighborReceiverRatio", "Avg Neighbors / Receivers in Range",
+        "Neighbors-to-Receivers Ratio Comparison: Multihop Modes by Protocol",
+        os.path.join(output_dir, f"mode_comparison_neighbor_receiver_ratio_interval-{tag}.png"),
+        interval, schedulers, ylim=ratio_ylim, legend_loc="upper left", refline=1.0,
     )
     plot_discovery_over_time(
         mode_dirs,

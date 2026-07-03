@@ -713,6 +713,111 @@ def plot_unique_nodes_by_density(results_dir, plot_dir, interval=None, scheduler
         plt.savefig(os.path.join(plot_dir, "avg_percentage_network_discovered_by_density.png"))  # UPDATED
     plt.close()
 
+def plot_neighbor_ratio_by_density(results_dir, plot_dir, interval=None, schedulers=None):
+    """Plot the avg neighbors-to-receivers ratio vs density.
+
+    The ratio compares the neighbors advertised in each beacon with the receivers
+    actually in range at transmission time: above 1 the beacon carries information
+    about more nodes than the sender can physically reach (multihop amplification).
+    """
+    schedulers = schedulers or DEFAULT_SCHEDULERS
+    files = [f for f in os.listdir(results_dir) if f.endswith(".csv")]
+    data = []
+    multihop_modes = set()
+
+    for f in files:
+        df = pd.read_csv(os.path.join(results_dir, f), index_col=0)
+        if "Density" in df.index and "Avg Neighbors to Receivers Ratio" in df.index:
+            density = float(df.loc["Density", "Value"])
+            ratio = float(df.loc["Avg Neighbors to Receivers Ratio", "Value"])
+
+            if "Multihop Mode" in df.index:
+                multihop_modes.add(str(df.loc["Multihop Mode", "Value"]).lower())
+
+            if "Scheduler Type" in df.index:
+                sched_type = str(df.loc["Scheduler Type", "Value"]).lower()
+            elif f.startswith("static_"):
+                sched_type = "static"
+            elif f.startswith("dynamic_acab_"):
+                sched_type = "dynamic_acab"
+            elif f.startswith("dynamic_adab_"):
+                sched_type = "dynamic_adab"
+            elif f.startswith("dynamic_"):
+                sched_type = "dynamic_adab"
+            else:
+                sched_type = "unknown"
+
+            data.append((density, ratio, sched_type))
+
+    if not data:
+        print("No neighbors-to-receivers ratio data with density found.")
+        return
+
+    # Determine mode string for title
+    mode_str = ""
+    if multihop_modes:
+        if len(multihop_modes) == 1:
+            mode = list(multihop_modes)[0]
+            if mode == "none":
+                mode_str = "Single-Hop"
+            elif mode == "append":
+                mode_str = "Append Mode"
+            elif mode == "forwarded":
+                mode_str = "Forward Mode"
+            else:
+                mode_str = mode.capitalize()
+        else:
+            mode_str = "Mixed Modes"
+
+    df = pd.DataFrame(data, columns=["Density", "NeighborReceiverRatio", "Scheduler"])
+    grouped = df.groupby(["Density", "Scheduler"], observed=False).mean().reset_index()
+    densities = sorted(df["Density"].unique())
+    bar_width = 0.8 / max(1, len(schedulers))
+    x = np.arange(len(densities))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    offset = -(len(schedulers) - 1) * bar_width / 2
+    for i, sched in enumerate(schedulers):
+        values = []
+        for d in densities:
+            row = grouped[(grouped["Density"] == d) & (grouped["Scheduler"] == sched)]
+            values.append(row["NeighborReceiverRatio"].values[0] if not row.empty else 0)
+        ax.bar(x + offset + i * bar_width, values, bar_width,
+               label=SCHEDULER_LABELS[sched], color=SCHEDULER_COLORS[sched])
+
+    # Parity line: below 1 a beacon advertises fewer nodes than it can reach directly
+    ax.axhline(1.0, color="gray", linestyle="--", linewidth=1, label="Parity (ratio = 1)")
+
+    ax.set_xlabel("Total Buoys")
+    ax.set_ylabel("Avg Neighbors / Receivers in Range")
+    # Unbounded ratio: keep 0-based axis with headroom, but never below the parity line
+    ax.set_ylim(0, max(2.0, df["NeighborReceiverRatio"].max() * 1.2))
+
+    # Update title to include mode
+    title_parts = ["Neighbors-to-Receivers Ratio vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(int(d)) for d in densities])
+    ax.legend(loc='upper left')
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    plt.tight_layout()
+
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"neighbor_receiver_ratio_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "neighbor_receiver_ratio_by_density.png"))
+    plt.close()
+
 def plot_unique_nodes_vs_time(results_dir, plot_file, interval=None, schedulers=None):
     """Plot average unique nodes discovered vs time for ramp scenarios"""
     schedulers = schedulers or DEFAULT_SCHEDULERS
@@ -909,6 +1014,9 @@ def main():
 
     print("Plotting unique nodes by density...")
     plot_unique_nodes_by_density(results_dir, plot_dir, interval=interval, schedulers=schedulers)
+
+    print("Plotting neighbors-to-receivers ratio by density...")
+    plot_neighbor_ratio_by_density(results_dir, plot_dir, interval=interval, schedulers=schedulers)
 
     print("Plotting PDR vs time for ramp scenarios...")
     plot_file = os.path.join(plot_dir, "b_pdr_vs_time_ramp.png")

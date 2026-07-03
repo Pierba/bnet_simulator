@@ -260,7 +260,10 @@ def plot_averaged_metrics(data_dir, plot_dir, interval=None):
     
     # Plot unique nodes by density with error bars
     plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval)
-    
+
+    # Plot neighbors-to-receivers ratio by density with error bars
+    plot_neighbor_ratio_by_density_with_errors(data_dir, plot_dir, interval)
+
     # Plot timeseries with error bands
     plot_timeseries_with_errors(data_dir, plot_dir, interval)
     
@@ -277,6 +280,7 @@ def get_density_dataframes(data_dir):
     collision_data = []
     loss_data = []
     unique_nodes_data = []
+    neighbor_ratio_data = []
     
     # Extract data from CSV files
     for f in files:
@@ -351,18 +355,27 @@ def get_density_dataframes(data_dir):
             avg_unique_std = float(df.loc["Avg Unique Nodes Discovered", "StdDev"])
             
             unique_nodes_data.append((density, avg_unique, avg_unique_std, sched_type, multihop_mode))
-    
+
+        # Extract neighbors-to-receivers ratio data
+        if "Density" in df.index and "Avg Neighbors to Receivers Ratio" in df.index:
+            density = float(df.loc["Density", "Value"])
+            ratio = float(df.loc["Avg Neighbors to Receivers Ratio", "Value"])
+            ratio_std = float(df.loc["Avg Neighbors to Receivers Ratio", "StdDev"])
+
+            neighbor_ratio_data.append((density, ratio, ratio_std, sched_type, multihop_mode))
+
     # Create dataframes
     pdr_df = pd.DataFrame(pdr_data, columns=["Density", "PDR", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
     coll_df = pd.DataFrame(collision_data, columns=["Density", "CollisionRate", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
     loss_df = pd.DataFrame(loss_data, columns=["Density", "LossRate", "StdDev", "Scheduler", "AvgNeighbors", "MultihopMode"])
     unique_df = pd.DataFrame(unique_nodes_data, columns=["Density", "AvgUniqueNodes", "StdDev", "Scheduler", "MultihopMode"])
+    ratio_df = pd.DataFrame(neighbor_ratio_data, columns=["Density", "NeighborReceiverRatio", "StdDev", "Scheduler", "MultihopMode"])
 
-    return pdr_df, coll_df, loss_df, unique_df
+    return pdr_df, coll_df, loss_df, unique_df, ratio_df
 
 def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
     try:
-        pdr_df, coll_df, loss_df, _ = get_density_dataframes(data_dir)
+        pdr_df, coll_df, loss_df, _, _ = get_density_dataframes(data_dir)
     except Exception as e:
         print(f"Error getting density data: {e}")
         return
@@ -609,7 +622,7 @@ def plot_block_by_density_with_errors(data_dir, plot_dir, interval=None):
 def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
     """Plot average unique nodes discovered (as percentage) vs density with error bars"""
     try:
-        _, _, _, unique_df = get_density_dataframes(data_dir)
+        _, _, _, unique_df, _ = get_density_dataframes(data_dir)
     except Exception as e:
         print(f"Error getting unique nodes data: {e}")
         return
@@ -698,6 +711,105 @@ def plot_unique_nodes_by_density_with_errors(data_dir, plot_dir, interval=None):
         plt.savefig(os.path.join(plot_dir, f"avg_percentage_network_discovered_interval{int(interval*10)}.png"))
     else:
         plt.savefig(os.path.join(plot_dir, "avg_percentage_network_discovered_by_density.png"))
+    plt.close()
+
+def plot_neighbor_ratio_by_density_with_errors(data_dir, plot_dir, interval=None):
+    """Plot avg neighbors-to-receivers ratio vs density with error bars.
+
+    The ratio compares the neighbors advertised in each beacon with the receivers
+    actually in range at transmission time: above 1 the beacon carries information
+    about more nodes than the sender can physically reach (multihop amplification).
+    """
+    try:
+        _, _, _, _, ratio_df = get_density_dataframes(data_dir)
+    except Exception as e:
+        print(f"Error getting neighbors-to-receivers ratio data: {e}")
+        return
+
+    if ratio_df.empty:
+        print("No neighbors-to-receivers ratio data with density found.")
+        return
+
+    # Get multihop mode for title
+    multihop_modes = set(ratio_df["MultihopMode"].unique())
+    mode_str = ""
+    if len(multihop_modes) == 1:
+        mode = list(multihop_modes)[0]
+        if mode == "none":
+            mode_str = "Single-Hop"
+        elif mode == "append":
+            mode_str = "Append Mode"
+        elif mode == "forwarded":
+            mode_str = "Forward Mode"
+        else:
+            mode_str = mode.capitalize()
+    elif len(multihop_modes) > 1:
+        mode_str = "Mixed Modes"
+
+    densities = sorted(ratio_df["Density"].unique())
+    schedulers = ["dynamic_acab", "dynamic_adab", "static"]
+    scheduler_labels = {"static": "SBP", "dynamic_adab": "ADAB", "dynamic_acab": "ACAB"}
+    color_map = {"static": "tab:blue", "dynamic_adab": "tab:orange", "dynamic_acab": "tab:green"}
+    bar_width = 0.25
+    x = np.arange(len(densities))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    offset = -(len(schedulers) - 1) * bar_width / 2
+    for i, sched in enumerate(schedulers):
+        values = []
+        errors = []
+        for d in densities:
+            rows = ratio_df[(ratio_df["Density"] == d) & (ratio_df["Scheduler"] == sched)]
+            if not rows.empty:
+                values.append(rows["NeighborReceiverRatio"].mean())
+                errors.append(rows["StdDev"].mean())
+            else:
+                values.append(0)
+                errors.append(0)
+
+        values_arr = np.array(values)
+        errors_arr = np.array(errors)
+        lower_errors = np.minimum(errors_arr, values_arr)
+        upper_errors = errors_arr
+
+        ax.bar(x + offset + i * bar_width, values_arr, bar_width,
+               label=scheduler_labels[sched], color=color_map[sched])
+        ax.errorbar(x + offset + i * bar_width, values_arr,
+                   yerr=[lower_errors, upper_errors], fmt='none',
+                   ecolor='black', capsize=5, alpha=0.7)
+
+    # Parity line: below 1 a beacon advertises fewer nodes than it can reach directly
+    ax.axhline(1.0, color="gray", linestyle="--", linewidth=1, label="Parity (ratio = 1)")
+
+    ax.set_xlabel("Total Buoys")
+    ax.set_ylabel("Avg Neighbors / Receivers in Range")
+    # Unbounded ratio: keep 0-based axis with headroom, but never below the parity line
+    ax.set_ylim(0, max(2.0, (ratio_df["NeighborReceiverRatio"] + ratio_df["StdDev"]).max() * 1.2))
+
+    # Update title to include mode
+    title_parts = ["Neighbors-to-Receivers Ratio vs Buoy Count"]
+    if mode_str:
+        title_parts.append(f"({mode_str}")
+        if interval:
+            title_parts.append(f", Static Interval: {interval}s)")
+        else:
+            title_parts.append(")")
+    elif interval:
+        title_parts.append(f"(Static Interval: {interval}s)")
+    ax.set_title(" ".join(title_parts))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(int(d)) for d in densities])
+    ax.legend(loc='upper left')
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+
+    plt.tight_layout()
+
+    if interval:
+        plt.savefig(os.path.join(plot_dir, f"neighbor_receiver_ratio_interval{int(interval*10)}.png"))
+    else:
+        plt.savefig(os.path.join(plot_dir, "neighbor_receiver_ratio_by_density.png"))
     plt.close()
 
 def plot_ramp_grouped_by_buoy_count_with_errors(data_dir, plot_file):
