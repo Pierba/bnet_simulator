@@ -42,6 +42,10 @@ class Metrics:
         self.beacons_collided: int                        = 0
         self.delivered_beacons: dict[int, float]          = {}
         self.discovered_pairs: dict[int, set[int]]        = {}
+        self.neighbor_delta_count: int                    = 0
+        self.neighbor_delta_sum: float                    = 0.0
+        self.neighbor_ratio_count: int                    = 0
+        self.neighbor_ratio_sum: float                    = 0.0
         self.potentially_sent: int                        = 0
         self.reaction_latency_count: int                  = 0
         self.reaction_latency_sum: float                  = 0.0
@@ -131,6 +135,38 @@ class Metrics:
     # Log the number of successful receivers for a beacon
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
+
+    # Log the ratio between the neighbors advertised in a beacon and the receivers
+    # in range at transmission time. A ratio above 1 means the beacon carries
+    # information about more nodes than the sender can physically reach right now,
+    # which is the amplification multihop modes are supposed to provide.
+    # Transmissions with no receiver in range are skipped (ratio undefined).
+    def log_neighbor_ratio(self, n_neighbors: int, n_receivers: int):
+        if not n_receivers:
+            return
+        self.neighbor_ratio_sum += n_neighbors / n_receivers
+        self.neighbor_ratio_count += 1
+
+    # Average neighbors-to-receivers ratio across all logged transmissions
+    def avg_neighbor_ratio(self) -> float:
+        if not self.neighbor_ratio_count:
+            return 0.0
+        return self.neighbor_ratio_sum / self.neighbor_ratio_count
+
+    # Log the signed gap between the neighbors advertised in a beacon and the
+    # receivers in range at transmission time. Positive = the beacon carries
+    # information about more nodes than the sender can physically reach right now.
+    # Unlike the ratio, the delta is well defined with zero receivers in range,
+    # so every transmission contributes a sample.
+    def log_neighbor_delta(self, n_neighbors: int, n_receivers: int):
+        self.neighbor_delta_sum += n_neighbors - n_receivers
+        self.neighbor_delta_count += 1
+
+    # Average neighbors-minus-receivers delta across all transmissions
+    def avg_neighbor_delta(self) -> float:
+        if not self.neighbor_delta_count:
+            return 0.0
+        return self.neighbor_delta_sum / self.neighbor_delta_count
 
     # Calculate Packet Delivery Ratio: packets actually received / packets sent.
     # Both counts are at the per-receiver (transmission x in-range receiver) granularity
@@ -237,6 +273,8 @@ class Metrics:
             "Actually Received": self.actually_received,
             "Successful Receivers": self.total_successful_receivers,
             "Average Neighbors": self.get_final_avg_neighbors(),
+            "Avg Neighbors to Receivers Ratio": self.avg_neighbor_ratio(),
+            "Avg Neighbors to Receivers Delta": self.avg_neighbor_delta(),
             "Avg Unique Nodes Discovered": self.avg_unique_nodes_discovered(),
             "Avg % Network Discovered": self.avg_percentage_network_discovered(),
             "Density": self.density,

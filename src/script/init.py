@@ -133,13 +133,6 @@ def random_position(world_width: float, world_height: float) -> tuple[float, flo
         random.uniform(10, world_height - 10)
     )
 
-# Get random velocity vector for mobile buoys based on a default velocity
-def random_velocity(default_velocity: float) -> tuple[float, float]:
-    return (
-        random.uniform(-1, 1) * default_velocity,
-        random.uniform(-1, 1) * default_velocity
-    )
-
 # Construct and run a single simulation in-process, returning (metrics, simulated_time)
 def build_and_run(
     mode: str,
@@ -159,11 +152,6 @@ def build_and_run(
     positions: list[tuple[float, float]] | None = None,
 ) -> tuple[Metrics | None, float]:
     cfg = ConfigHandler()
-
-    # Injecting cli parameters into the config for simulator components
-    cfg.set('simulation', 'multihop_mode', multihop_mode)
-    cfg.set('world', 'width', world_width)
-    cfg.set('world', 'height', world_height)
 
     # Set the random seed for reproducibility
     random.seed(seed)
@@ -203,6 +191,9 @@ def build_and_run(
         buoy = Buoy(
             position=positions[i],
             is_mobile=mobile,
+            world_width=world_width,
+            world_height=world_height,
+            multihop_mode=multihop_mode,
             scheduler=BeaconScheduler(
                 scheduler_type=mode,
                 static_interval=static_interval,
@@ -210,7 +201,6 @@ def build_and_run(
                 max_interval=max_interval,
                 default_velocity=default_velocity
             ),
-            velocity=random_velocity(default_velocity) if mobile else (0.0, 0.0),
             metrics=metrics is not None
         )
 

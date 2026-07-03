@@ -25,9 +25,11 @@ class Buoy:
     def __init__(
         self,
         scheduler: BeaconScheduler,
+        world_width: float,
+        world_height: float,
+        multihop_mode: str,
         position: tuple[float, float] = (0.0, 0.0),
         is_mobile: bool = False,
-        velocity: tuple[float, float] = (0.0, 0.0),
         metrics: bool = False,
     ):
         cfg = ConfigHandler()
@@ -37,7 +39,9 @@ class Buoy:
         self.scheduler: BeaconScheduler    = scheduler
         self.position: tuple[float, float] = position
         self.is_mobile: bool               = is_mobile
-        self.velocity: tuple[float, float] = velocity
+        # Instantaneous velocity vector, owned by the RWP model: stationary until
+        # the first BUOY_MOVEMENT event, recomputed each movement update
+        self.velocity: tuple[float, float] = (0.0, 0.0)
         self.metrics: bool                 = metrics
 
         # Network state
@@ -62,8 +66,8 @@ class Buoy:
 
         # Network parameters for distance calculations
         self.neighbor_timeout: float = cfg.get('scheduler', 'neighbor_timeout')
-        self.world_width: float      = cfg.get('world', 'width')
-        self.world_height: float     = cfg.get('world', 'height')
+        self.world_width: float      = world_width
+        self.world_height: float     = world_height
 
         # Random Waypoint mobility model state
         # Speed is drawn uniformly from [rwp_speed_min, rwp_speed_max] per leg
@@ -88,7 +92,7 @@ class Buoy:
         self.scheduler_decision_time: float = 0.0
 
         # Multihop mode configuration ('none' | 'append' | 'forwarded')
-        self.multihop_mode: str = cfg.get('simulation', 'multihop_mode')
+        self.multihop_mode: str = multihop_mode
         # Forwarded mode: multihop limit sets TTL for fowarded beacons
         self.multihop_limit: int = cfg.get('simulation', 'multihop_limit')
         # Append mode hop limit (0 = unlimited, 1 = only direct neighbors, etc.).
@@ -120,12 +124,14 @@ class Buoy:
 
     # Activate the buoy, resetting its state and clearing any leftover CSMA pipeline state
     def activate(self):
+        self.state = BuoyState.RECEIVING
         self.active = True
         self.processing = False    # drop CSMA pipeline state left over from a prior cycle
         self.want_to_send = False
 
     # Deactivate the buoy, invalidating any scheduled events and clearing pending/forwarded beacons
     def deactivate(self):
+        self.state = BuoyState.SLEEPING
         self.active = False
         self._generation += 1      # invalidate recurring events scheduled in this cycle
 

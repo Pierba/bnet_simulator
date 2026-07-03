@@ -122,6 +122,10 @@ class Channel:
             is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
+            # Advertised-neighbors vs in-range-receivers, as a ratio and as a signed
+            # delta (both measure the multihop amplification of this transmission)
+            self.metrics.log_neighbor_ratio(len(beacon.neighbors), n_receivers)
+            self.metrics.log_neighbor_delta(len(beacon.neighbors), n_receivers)
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
             # Collision rate counts only beacons lost to collisions (direct
             # collisions plus poisoned earlier receptions).
@@ -176,11 +180,7 @@ class Channel:
 
         # Receiver coordinates resolved once instead of per (transmission x receiver) pair
         # Unpack each position once via the single-element-iterable trick (avoids a double attribute lookup)
-        receivers_pos = [
-            (buoy.id, bx, by) 
-            for buoy, _ in receivers_data 
-            for bx, by in (buoy.position,)
-        ]
+        receivers_pos = [(buoy.id, bx, by) for buoy, _ in receivers_data for bx, by in (buoy.position,)]
 
         for existing, start, end in self.active_transmissions:
             # Skip if this is the same sender
