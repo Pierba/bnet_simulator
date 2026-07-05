@@ -409,12 +409,6 @@ class Buoy:
 
     # Handles buoy movement according to the Random Waypoint mobility model
     def _handle_buoy_movement(self, event: Event, sim_time: float):
-        # If the buoy is still paused at the previous waypoint it stays still and wakes up exactly when the pause expires
-        if sim_time < self.rwp_pause_until:
-            self.velocity = (0.0, 0.0)
-            self._schedule_event(self.rwp_pause_until, EventType.BUOY_MOVEMENT)
-            return
-
         # Moving toward the waypoint
         x, y = self.position
         wx, wy = self.rwp_waypoint
