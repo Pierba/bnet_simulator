@@ -122,10 +122,10 @@ class Channel:
             is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
-            # Advertised-neighbors vs in-range-receivers, as a ratio and as a signed
-            # delta (both measure the multihop amplification of this transmission)
-            self.metrics.log_neighbor_ratio(len(beacon.neighbors), n_receivers)
-            self.metrics.log_neighbor_delta(len(beacon.neighbors), n_receivers)
+            # Advertised-neighbors sum: against the receivers just logged in
+            # potentially_sent it yields the pooled neighbors-to-receivers ratio
+            # and the signed delta (both measure multihop amplification)
+            self.metrics.log_neighbors_announced(len(beacon.neighbors))
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
             # Collision rate counts only beacons lost to collisions (direct
             # collisions plus poisoned earlier receptions).

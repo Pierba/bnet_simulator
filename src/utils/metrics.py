@@ -42,10 +42,7 @@ class Metrics:
         self.beacons_collided: int                        = 0
         self.delivered_beacons: dict[int, float]          = {}
         self.discovered_pairs: dict[int, set[int]]        = {}
-        self.neighbor_delta_count: int                    = 0
-        self.neighbor_delta_sum: float                    = 0.0
-        self.neighbor_ratio_count: int                    = 0
-        self.neighbor_ratio_sum: float                    = 0.0
+        self.neighbors_announced_sum: int                 = 0
         self.potentially_sent: int                        = 0
         self.reaction_latency_count: int                  = 0
         self.reaction_latency_sum: float                  = 0.0
@@ -136,37 +133,32 @@ class Metrics:
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
 
-    # Log the ratio between the neighbors advertised in a beacon and the receivers
-    # in range at transmission time. A ratio above 1 means the beacon carries
-    # information about more nodes than the sender can physically reach right now,
-    # which is the amplification multihop modes are supposed to provide.
-    # Transmissions with no receiver in range are skipped (ratio undefined).
-    def log_neighbor_ratio(self, n_neighbors: int, n_receivers: int):
-        if not n_receivers:
-            return
-        self.neighbor_ratio_sum += n_neighbors / n_receivers
-        self.neighbor_ratio_count += 1
+    # Log the number of neighbors advertised in a transmitted beacon. The
+    # matching receivers-in-range count is not tracked separately: it is the
+    # same quantity already accumulated in potentially_sent, which the ratio
+    # and delta below reuse as denominator (one call each per broadcast).
+    def log_neighbors_announced(self, n_neighbors: int):
+        self.neighbors_announced_sum += n_neighbors
 
-    # Average neighbors-to-receivers ratio across all logged transmissions
+    # Pooled neighbors-to-receivers ratio: total advertised neighbors over the
+    # total reception opportunities (receivers in range, i.e. potentially_sent).
+    # Above 1 the average beacon carries information about more nodes than its
+    # sender can physically reach right now, which is the amplification multihop
+    # modes are supposed to provide. Pooling the sums (instead of averaging
+    # per-transmission ratios) keeps nearly-isolated senders from dominating
+    # the statistic and avoids the upward bias that small denominators give
+    # a mean of ratios.
     def avg_neighbor_ratio(self) -> float:
-        if not self.neighbor_ratio_count:
+        if not self.potentially_sent:
             return 0.0
-        return self.neighbor_ratio_sum / self.neighbor_ratio_count
+        return self.neighbors_announced_sum / self.potentially_sent
 
-    # Log the signed gap between the neighbors advertised in a beacon and the
-    # receivers in range at transmission time. Positive = the beacon carries
-    # information about more nodes than the sender can physically reach right now.
-    # Unlike the ratio, the delta is well defined with zero receivers in range,
-    # so every transmission contributes a sample.
-    def log_neighbor_delta(self, n_neighbors: int, n_receivers: int):
-        self.neighbor_delta_sum += n_neighbors - n_receivers
-        self.neighbor_delta_count += 1
-
-    # Average neighbors-minus-receivers delta across all transmissions
+    # Average neighbors-minus-receivers delta across all transmissions: the
+    # same amplification expressed as an absolute node count instead of a factor
     def avg_neighbor_delta(self) -> float:
-        if not self.neighbor_delta_count:
+        if not self.beacons_sent:
             return 0.0
-        return self.neighbor_delta_sum / self.neighbor_delta_count
+        return (self.neighbors_announced_sum - self.potentially_sent) / self.beacons_sent
 
     # Calculate Packet Delivery Ratio: packets actually received / packets sent.
     # Both counts are at the per-receiver (transmission x in-range receiver) granularity
