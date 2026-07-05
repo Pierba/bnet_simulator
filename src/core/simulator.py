@@ -16,7 +16,7 @@ MIN_BUOYS_NUM: int = 3
 PERCENTAGE_MIN_BUOYS: float = 0.2
 
 # Sim-time delay before the first buoy-array update in the ramp/random scenarios
-FIRST_ARRAY_UPDATE_DELAY: float = 30.0
+FIRST_ARRAY_UPDATE_DELAY: float = 10.0
 
 # Constants for metrics sampling intervals based on the scenario type
 SAMPLE_INTERVAL_RAMP: float = 5.0

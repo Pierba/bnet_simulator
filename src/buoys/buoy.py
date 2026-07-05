@@ -73,10 +73,10 @@ class Buoy:
         self.rwp_speed_max: float = cfg.get('buoys', 'rwp_speed_max')
         
         # Pause is drawn uniformly from [rwp_pause_min, rwp_pause_max] on waypoint arrival
-        self.rwp_pause_min: float = cfg.get('buoys', 'rwp_pause_min')
-        self.rwp_pause_max: float = cfg.get('buoys', 'rwp_pause_max')
-        self.rwp_pause_until: float            = 0.0
-        self.rwp_dt: float        = 0.5 # Time interval for movement updates in seconds
+        self.rwp_pause_min: float   = cfg.get('buoys', 'rwp_pause_min')
+        self.rwp_pause_max: float   = cfg.get('buoys', 'rwp_pause_max')
+        self.rwp_pause_until: float = 0.0
+        self.rwp_dt: float          = 0.5 # Time interval for movement updates in seconds
 
         # Randomly pick initial waypoint and speed when first spawned
         self.rwp_waypoint: tuple[float, float] = self._pick_rwp_waypoint()
