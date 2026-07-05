@@ -699,7 +699,7 @@ I risultati principali sono definiti come segue.
 \paragraph{Percentuale media di rete scoperta.} Ogni boa $i$ accumula l'insieme $S_i$
 dei nodi \emph{unici} di cui \`e venuta a conoscenza: da ogni beacon ricevuto si uniscono il
 mittente, l'eventuale origine (in modalit\`a forwarded) e tutti i nodi della lista
-annunciata. Detto $n$ il numero di boe e $N$ la densit\`a nominale della rete,
+annunciata. Detto $n$ il numero di boe che hanno ricevuto almeno un beacon e $N$ la densit\`a nominale della rete:
 \begin{equation}
   \overline{U} = \frac{1}{n} \sum_{i=1}^{n} |S_i|,
   \qquad
@@ -707,8 +707,8 @@ annunciata. Detto $n$ il numero di boe e $N$ la densit\`a nominale della rete,
   \label{eq:netdisc}
 \end{equation}
 dove il denominatore $N-1$ esclude la boa stessa dall'insieme dei nodi scopribili.
-$D_{\%}$ \`e la metrica di consapevolezza: quanta parte della rete il nodo medio
-conosce.
+$D_{\%}$ \`e quindi la metrica di consapevolezza, ovvero quanta parte
+della rete conosce il nodo medio tra quelli che sono stati rilevati.
 
 \paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Misura l'affidabilit\`a del
 singolo link radio. Per ogni trasmissione, il canale conta i destinatari entro la portata
@@ -752,7 +752,35 @@ non ideale (Eq.~\ref{eq:delivery-prob}):
 Vale $PL \ge CR$, e la differenza tra le due evidenzia il contributo delle perdite 
 dovute al canale rispetto a quelle della contesa.
 
-Oltre a queste vengono registrate anche le latenze: la \emph{latenza di
+\paragraph{Neighbors-to-receivers ratio and delta (rapporto e differenza tra vicini annunciati e destinatari
+in portata).} Misura l'amplificazione dei nodi annunciati dai beacon per mezzo delle modalit\`a di
+multihop. A ogni trasmissione il canale registra la lunghezza della lista vicini di questi
+e il numero di possibili destinatari entro il raggio di trasmissione, gli stessi
+gi\`a conteggiati come opportunit\`a di ricezione nell'Eq.~\ref{eq:bpdr}. Dette $a_t$ e
+$r_t$ queste suddette quantit\`a relative alla trasmissione $t$, il rapporto \`e calcolato sui totali:
+\begin{equation}
+  \rho = \frac{\sum_{t} a_t}{\sum_{t} r_t},
+  \label{eq:neighratio}
+\end{equation}
+ossia il rapporto tra la lunghezza media delle liste annunciate e il numero medio di
+destinatari raggiungibili per trasmissione. Un valore di $\rho$ prossimo a $1$ indica che
+i beacon trasportano informazione all'incirca pari all'insieme dei nodi che i mittenti
+possono raggiungere fisicamente in quel momento. Valori superiori segnalano invece che i
+beacon annunciano pi\`u nodi di quanti i mittenti ne possano raggiungere direttamente.
+Questa amplificazione rileva l'efficacia della modalit\`a append, che estende la conoscenza con i nodi
+scoperti a pi\`u hop (Sezione~\ref{sec:append-impl}). 
+
+Utilizzando queste stesse quantit\`a 
+si deriva anche il differenziale medio:
+\begin{equation}
+    \Delta_{a_t, r_t} = \frac{1}{T}\sum_t (a_t - r_t),
+    \label{eq:neighdelta}
+\end{equation}
+con $T$ il numero totale di
+trasmissioni.
+
+\paragraph{}
+Oltre a queste metriche vengono registrate anche le latenze: la \emph{latenza di
 consegna} (tempo tra generazione e prima ricezione di un beacon), la \emph{latenza di
 reazione} (tempo perch\'e un nodo scopra per la prima volta una data origine) e la
 gi\`a citata latenza di scheduler (Sezione~\ref{sec:txpipeline}).

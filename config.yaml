@@ -26,7 +26,7 @@ simulation:
   - append
   - forward
   # Maximum hops for forward mode
-  multihop_limit: 1
+  multihop_limit: 5
   # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
   # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2
@@ -56,7 +56,7 @@ buoys:
 network:
   bit_rate: 1000000
   speed_of_light: 300000000.0
-  communication_range_max: 80.0
+  communication_range_max: 120.0
   communication_range_high_prob: 70.0
   delivery_prob_high: 0.9
   delivery_prob_low: 0.15
