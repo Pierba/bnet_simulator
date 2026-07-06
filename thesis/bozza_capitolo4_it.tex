@@ -1,0 +1,237 @@
+% =====================================================================
+%  BOZZA - Capitolo 4 (italiano)
+%  Risultati: protocolli di beaconing e valutazione sperimentale.
+%  Le sezioni su SBP, ADAB e ACAB provengono dal Capitolo 2 e sono
+%  state riviste nel registro; dalla fine della Sezione "Protocolli di
+%  beaconing" in poi prosegue l'autore con la valutazione.
+% =====================================================================
+
+\chapter{Risultati}
+\label{ch:risultati}
+
+Questo capitolo presenta la valutazione sperimentale delle modalit\`a multi-hop
+introdotte nel Capitolo~\ref{ch:contributo}. Poich\'e ogni configurazione
+sperimentale combina una delle due modalit\`a con uno dei protocolli di
+beaconing che regolano gli intervalli di trasmissione, il capitolo si apre con
+la descrizione dei tre protocolli --- SBP, ADAB e ACAB --- preesistenti nel
+simulatore e parte del modello di comunicazione (Sezione~\ref{sec:commodel});
+seguono la definizione delle metriche impiegate nella valutazione
+(Sezione~\ref{sec:eval-metrics}) e l'analisi delle prestazioni ottenute nelle
+simulazioni.
+
+% ---------------------------------------------------------------------
+\section{Protocolli di beaconing}
+\label{sec:beaconing}
+I tre protocolli agiscono esclusivamente sull'istante di generazione del
+beacon: una volta generato, il frame attraversa la pipeline di trasmissione
+CSMA/CA descritta nel Capitolo~\ref{ch:simulatore}. Ciascun protocollo pu\`o
+essere combinato con una qualunque delle modalit\`a multi-hop del
+Capitolo~\ref{ch:contributo}.
+
+\subsection{Static Beaconing Protocol (SBP)}
+\label{sec:sbp}
+Lo SBP costituisce il protocollo di riferimento: ogni boa trasmette un beacon a
+intervallo fisso $BI_{\text{static}}$, indipendentemente dalle condizioni della
+rete. La semplicit\`a e la prevedibilit\`a del comportamento ne fanno la base di
+confronto naturale; tuttavia, negli scenari densi l'assenza di adattamento
+accresce la probabilit\`a di collisione e degrada l'affidabilit\`a, mentre negli
+scenari sparsi l'intervallo fisso produce trasmissioni pi\`u frequenti del
+necessario. Tali limiti motivano l'adozione di protocolli adattivi.
+
+\subsection{Adaptive Density-Aware Beaconing (ADAB)}
+\label{sec:adab}
+ADAB regola l'intervallo sulla base di un'unica grandezza locale: il numero di
+vicini presenti in tabella. A ogni decisione di scheduling il nodo rileva il
+numero di vicini correnti $N_t$ e ne deriva un fattore di densit\`a normalizzato
+\begin{equation}
+  f_t = \min\!\left(1,\; \frac{N_t}{\nthr}\right),
+  \qquad \nthr = 15,
+  \label{eq:adab-density}
+\end{equation}
+dove $\nthr$ \`e la soglia oltre la quale la congestione \`e considerata
+rilevante. L'intervallo successivo \`e ottenuto da una funzione quadratica del
+fattore di densit\`a, interpolata fra un minimo e un massimo, con un jitter
+moltiplicativo $\delta$ che desincronizza le trasmissioni dei nodi:
+\begin{equation}
+  BI_{t+1} = \Big[\,\bimin + f_t^{\,2}\,(\bimax-\bimin)\,\Big]\,(1+\delta),
+  \qquad \delta \sim \mathcal{U}[-\eta,\eta],\;\; \eta=0.05,
+  \label{eq:adab}
+\end{equation}
+con $BI_{t+1}$ vincolato all'intervallo $[\bimin,\bimax]$. Con pochi vicini
+$f_t\approx 0$ e la boa trasmette a intervalli prossimi a $\bimin$, favorendo
+una scoperta rapida; man mano che $N_t$ si avvicina a $\nthr$, il termine
+quadratico spinge l'intervallo verso $\bimax$, riducendo le trasmissioni dove la
+contesa \`e maggiore. La dipendenza quadratica mantiene quindi il nodo reattivo
+alle basse densit\`a e ne accentua il rallentamento all'aumentare della
+congestione. I valori adottati sono $\bimax = \SI{5.0}{\second}$ e $\bimin$
+configurabile (negli esperimenti $\bimin \in \{0.25, 0.5, 1.0\}\,\si{\second}$).
+
+\subsection{Adaptive Context-Aware Beaconing (ACAB)}
+\label{sec:acab}
+La densit\`a non \`e l'unico segnale locale utile a stabilire l'opportunit\`a di
+una trasmissione. ACAB combina tre segnali: la densit\`a dei vicini, il tempo
+trascorso dall'ultimo contatto e la mobilit\`a del nodo.
+
+\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un conteggio
+normalizzato dei vicini, con una soglia pi\`u bassa:
+\begin{equation}
+  s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
+  \qquad \nthr^{\mathrm{ACAB}} = 10 .
+  \label{eq:acab-den}
+\end{equation}
+
+\paragraph{Componente di tempo dall'ultimo contatto.} La ricezione recente di un
+beacon riduce l'urgenza di trasmettere; un periodo prolungato privo di contatti
+la accresce. Detto $\Delta = t - t_{\text{ultimo contatto}}$ il tempo trascorso
+dall'ultimo beacon ricevuto e $\tau_c = \SI{20}{\second}$ la durata oltre la
+quale un contatto non \`e pi\`u considerato recente:
+\begin{equation}
+  s_{\mathrm{con}} =
+  \begin{cases}
+    \max\!\big(0,\; 1 - \Delta/\tau_c\big) & N_t>0 \text{ e contatto registrato},\\
+    0 & \text{altrimenti.}
+  \end{cases}
+  \label{eq:acab-con}
+\end{equation}
+Un nodo contattato di recente produce $s_{\mathrm{con}}\to 1$ (e rallenta); un
+nodo isolato o a lungo silenzioso produce $0$ (e trasmette pi\`u di frequente).
+
+\paragraph{Componente di mobilit\`a.} Un nodo in rapido movimento invalida in
+breve tempo l'informazione di posizione annunciata e deve pertanto aggiornarla
+con maggiore frequenza. Con velocit\`a $v=\lVert\mathbf{v}\rVert$ e velocit\`a
+di riferimento $v_{\text{ref}}$ (la velocit\`a di default, pari a
+\SI{15}{\metre\per\second}):
+\begin{equation}
+  s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
+  \label{eq:acab-mob}
+\end{equation}
+
+\paragraph{Combinazione e calcolo dell'intervallo.} I tre punteggi sono
+combinati mediante pesi definiti nella configurazione,
+$(w_d,w_c,w_m)=(0.4,0.3,0.3)$, che ne determinano il contributo relativo. La
+mobilit\`a riduce il backoff, da cui il termine $1-s_{\mathrm{mob}}$:
+\begin{equation}
+  s = w_d\,s_{\mathrm{den}} + w_c\,s_{\mathrm{con}} + w_m\,(1 - s_{\mathrm{mob}}).
+  \label{eq:acab-blend}
+\end{equation}
+Il punteggio $s$ sostituisce $f_t$ nell'espressione dell'intervallo di ADAB
+(Eq.~\ref{eq:adab}): ACAB rallenta cos\`i una boa densa, contattata di recente e
+ferma, e mantiene pi\`u frequente una boa isolata, silenziosa o in movimento.
+Rispetto ad ADAB, che impiega la sola densit\`a, ACAB costruisce il punteggio di
+backoff a partire da tre segnali e richiede quindi il mantenimento di un numero
+maggiore di variabili di stato; l'overhead computazionale resta comunque
+trascurabile per i dispositivi considerati. Il calcolo dell'intervallo \`e
+dettagliato nel Capitolo~\ref{ch:simulatore}.
+
+% ---------------------------------------------------------------------
+% Da qui in poi: valutazione delle prestazioni delle simulazioni
+% (sezioni a cura dell'autore).
+% ---------------------------------------------------------------------
+
+% ---------------------------------------------------------------------
+\section{Metriche di valutazione}
+\label{sec:eval-metrics}
+Questa sezione definisce le metriche con cui sono valutate le prestazioni
+delle configurazioni sperimentali. I valori sono calcolati al termine di ogni
+simulazione a partire dai dati grezzi accumulati dalla classe \texttt{Metrics}
+(Sezione~\ref{sec:metrics}); per ciascuna metrica si indica dapprima che cosa
+esprime e quindi la formula del calcolo effettuato.
+
+\paragraph{Percentuale media di rete scoperta.} Esprime la consapevolezza
+della topologia, ovvero quanta parte della rete conosce in media una boa tra
+quelle che hanno ricevuto almeno un beacon. Ogni boa $i$ accumula l'insieme
+$S_i$ dei nodi \emph{unici} di cui \`e venuta a conoscenza: da ogni beacon
+ricevuto si uniscono il mittente, l'eventuale origine (in modalit\`a
+forwarded) e tutti i nodi della lista annunciata. Detto $n$ il numero di boe
+che hanno ricevuto almeno un beacon e $N$ la densit\`a nominale della rete:
+\begin{equation}
+  \overline{U} = \frac{1}{n} \sum_{i=1}^{n} |S_i|,
+  \qquad
+  D_{\%} = \frac{\overline{U}}{N-1} \cdot 100,
+  \label{eq:netdisc}
+\end{equation}
+dove il denominatore $N-1$ esclude la boa stessa dall'insieme dei nodi
+scopribili.
+
+\paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Esprime
+l'affidabilit\`a del singolo link radio, ossia la probabilit\`a che un frame
+in aria raggiunga integro un nodo in ascolto. Per ogni trasmissione, il canale
+conta i destinatari entro la portata (opportunit\`a di ricezione) e le boe
+contano le ricezioni andate a buon fine:
+\begin{equation}
+  \text{B-PDR} = \frac{R_{\text{rx}}}{R_{\text{opp}}},
+  \label{eq:bpdr}
+\end{equation}
+con $R_{\text{rx}}$ il totale delle ricezioni riuscite e $R_{\text{opp}}$ il
+totale delle opportunit\`a (trasmissione $\times$ destinatario in portata).
+
+\paragraph{PDR di rete.} Esprime la capacit\`a della rete di consegnare i
+beacon \emph{unici}, escludendo le copie: un beacon generato \`e considerato
+consegnato la prima volta che raggiunge un qualunque nodo (i duplicati della
+stessa coppia origine--timestamp non vengono riconteggiati). I rilanci della
+modalit\`a forwarded sono esclusi dal denominatore, perch\'e ritrasmettono
+beacon gi\`a esistenti e conteggiarli interferirebbe con il confronto tra le
+modalit\`a:
+\begin{equation}
+  \text{PDR}_{\text{rete}} = \frac{B_{\text{consegnati}}}{B_{\text{inviati}} - B_{\text{inoltrati}}},
+  \label{eq:netpdr}
+\end{equation}
+dove $B_{\text{inviati}}$ conta tutte le trasmissioni e $B_{\text{inoltrati}}$
+i soli rilanci.
+
+\paragraph{Collision rate.} Esprime la frazione delle opportunit\`a di
+ricezione perse per collisione, incluse le ricezioni revocate
+(\texttt{poisoned}) dal meccanismo del terminale nascosto
+(Sezione~\ref{sec:broadcast-impl}):
+\begin{equation}
+  CR = \frac{C_{\text{dirette}} + C_{\text{revocate}}}{R_{\text{opp}}},
+  \label{eq:collrate}
+\end{equation}
+con $C_{\text{dirette}}$ le ricezioni perse per collisione diretta e
+$C_{\text{revocate}}$ quelle revocate a posteriori.
+
+\paragraph{Packet loss.} Esprime la frazione complessiva delle opportunit\`a
+di ricezione perse, a prescindere dalla causa: collisioni, ricezioni revocate
+e perdita probabilistica del canale non ideale (Eq.~\ref{eq:delivery-prob}):
+\begin{equation}
+  PL = \frac{C_{\text{dirette}} + C_{\text{revocate}} + L_{\text{canale}}}{R_{\text{opp}}},
+  \label{eq:packetloss}
+\end{equation}
+con $L_{\text{canale}}$ le perdite dovute al canale. Vale $PL \ge CR$, e la
+differenza tra le due evidenzia il contributo delle perdite dovute al canale
+rispetto a quelle della contesa.
+
+\paragraph{Neighbors-to-receivers ratio and delta (rapporto e differenza tra
+vicini annunciati e destinatari in portata).} Esprimono l'amplificazione
+dell'informazione di vicinato trasportata dai beacon rispetto alla copertura
+fisica del mittente, ossia l'efficacia delle modalit\`a multihop
+nell'annunciare pi\`u nodi di quanti ne siano direttamente raggiungibili. A
+ogni trasmissione il canale registra la lunghezza della lista vicini
+annunciata e il numero di possibili destinatari entro il raggio di
+trasmissione, gli stessi gi\`a conteggiati come opportunit\`a di ricezione
+nell'Eq.~\ref{eq:bpdr}. Dette $a_t$ e $r_t$ queste quantit\`a relative alla
+trasmissione $t$, il rapporto \`e calcolato sui totali:
+\begin{equation}
+  \rho = \frac{\sum_{t} a_t}{\sum_{t} r_t},
+  \label{eq:neighratio}
+\end{equation}
+ossia il rapporto tra la lunghezza media delle liste annunciate e il numero
+medio di destinatari raggiungibili per trasmissione. Un valore di $\rho$
+prossimo a $1$ indica che i beacon trasportano informazione all'incirca pari
+all'insieme dei nodi che i mittenti possono raggiungere fisicamente in quel
+momento; valori superiori segnalano invece che i beacon annunciano pi\`u nodi
+di quanti i mittenti ne possano raggiungere direttamente. Questa
+amplificazione rileva l'efficacia della modalit\`a append, che estende la
+conoscenza con i nodi scoperti a pi\`u hop (Sezione~\ref{sec:append-impl}).
+Dalle stesse quantit\`a si deriva anche il differenziale medio:
+\begin{equation}
+    \Delta_{a_t, r_t} = \frac{1}{T}\sum_t (a_t - r_t),
+    \label{eq:neighdelta}
+\end{equation}
+con $T$ il numero totale di trasmissioni.
+
+\paragraph{Latenze.} Esprimono i tempi caratteristici della diffusione dei
+beacon nella rete. Vengono registrate la \emph{latenza di consegna} (tempo tra
+generazione e prima ricezione di un beacon), la \emph{latenza di reazione}
+(tempo perch\'e un nodo scopra per la prima volta una data origine) e la
+gi\`a citata latenza di scheduler (Sezione~\ref{sec:txpipeline}).

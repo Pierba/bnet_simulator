@@ -240,8 +240,8 @@ trasmettere un frame, cos\`i come implementato negli handler di \texttt{buoy.py}
 Il punto di partenza \`e l'evento periodico \texttt{SCHEDULER\_CHECK}: la boa interroga
 il proprio \texttt{BeaconScheduler} (\texttt{should\_send()}), che decide in base al
 protocollo attivo --- intervallo fisso per SBP, intervallo adattivo calcolato con le
-Eq.~\ref{eq:adab} e~\ref{eq:acab-blend} per ADAB e ACAB --- se \`e il momento di
-trasmettere. In caso affermativo viene abilitata la flag \texttt{want\_to\_send} e, se non
+Eq.~\ref{eq:adab} e~\ref{eq:acab-blend} (Capitolo~\ref{ch:risultati}) per ADAB e
+ACAB --- se \`e il momento di trasmettere. In caso affermativo viene abilitata la flag \texttt{want\_to\_send} e, se non
 c'\`e gi\`a una contesa in corso, parte la pipeline CSMA/CA. Il flag booleano
 \texttt{processing} serve propio a rilevare questa cosa: garantisce che ogni boa gestisca al pi\`u una
 pipeline alla volta, a prescindere dal numero di beacon propri o di inoltri in attesa.
@@ -694,96 +694,9 @@ Questo valore misura la densit\`a reale della rete, indipendente da ci\`o che i
 protocolli riescono a scoprire. Al termine del run le metriche vengono esportate in CSV:
 un elenco dei risultati per ogni combinazione di parametri e la serie temporale della scoperta dei nodi
 (campionata ogni \SI{8}{\second} per static e random e ogni \SI{5}{\second} per ramp).
-I risultati principali sono definiti come segue.
-
-\paragraph{Percentuale media di rete scoperta.} Ogni boa $i$ accumula l'insieme $S_i$
-dei nodi \emph{unici} di cui \`e venuta a conoscenza: da ogni beacon ricevuto si uniscono il
-mittente, l'eventuale origine (in modalit\`a forwarded) e tutti i nodi della lista
-annunciata. Detto $n$ il numero di boe che hanno ricevuto almeno un beacon e $N$ la densit\`a nominale della rete:
-\begin{equation}
-  \overline{U} = \frac{1}{n} \sum_{i=1}^{n} |S_i|,
-  \qquad
-  D_{\%} = \frac{\overline{U}}{N-1} \cdot 100,
-  \label{eq:netdisc}
-\end{equation}
-dove il denominatore $N-1$ esclude la boa stessa dall'insieme dei nodi scopribili.
-$D_{\%}$ \`e quindi la metrica di consapevolezza, ovvero quanta parte
-della rete conosce il nodo medio tra quelli che sono stati rilevati.
-
-\paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Misura l'affidabilit\`a del
-singolo link radio. Per ogni trasmissione, il canale conta i destinatari entro la portata
-(opportunit\`a di ricezione) e le boe contano le ricezioni andate a buon fine:
-\begin{equation}
-  \text{B-PDR} = \frac{R_{\text{rx}}}{R_{\text{opp}}},
-  \label{eq:bpdr}
-\end{equation}
-con $R_{\text{rx}}$ il totale delle ricezioni riuscite e $R_{\text{opp}}$ il totale
-delle opportunit\`a (trasmissione $\times$ destinatario in portata). 
-Questa metrica rappresenta la probabilit\`a che un frame in aria
-raggiunga integro un nodo in ascolto.
-
-\paragraph{PDR di rete.} Misura invece la consegna dei beacon \emph{unici}, escludendo
-le copie: un beacon generato \`e considerato consegnato la prima volta che raggiunge un
-qualunque nodo (i duplicati della stessa coppia origine--timestamp non vengono
-riconteggiati). I rilanci della modalit\`a forwarded sono esclusi dal denominatore,
-perch\'e ritrasmettono beacon gi\`a esistenti e conteggiarli interferirebbe con il confronto tra le modalit\`a:
-\begin{equation}
-  \text{PDR}_{\text{rete}} = \frac{B_{\text{consegnati}}}{B_{\text{inviati}} - B_{\text{inoltrati}}},
-  \label{eq:netpdr}
-\end{equation}
-dove $B_{\text{inviati}}$ conta tutte le trasmissioni e $B_{\text{inoltrati}}$ i soli
-rilanci.
-
-\paragraph{Collision rate.} Rapporto che esprime le opportunit\`a di ricezione perse per
-collisione, incluse le ricezioni revocate (\texttt{poisoned}) dal meccanismo del terminale nascosto
-(Sezione~\ref{sec:broadcast-impl}):
-\begin{equation}
-  CR = \frac{C_{\text{dirette}} + C_{\text{revocate}}}{R_{\text{opp}}}.
-  \label{eq:collrate}
-\end{equation}
-
-\paragraph{Packet loss.} Rapporto complessivo delle opportunit\`a di ricezione perse,
-a prescindere dalla causa: collisioni, ricezioni revocate e perdita probabilistica del canale
-non ideale (Eq.~\ref{eq:delivery-prob}):
-\begin{equation}
-  PL = \frac{C_{\text{dirette}} + C_{\text{revocate}} + L_{\text{canale}}}{R_{\text{opp}}}.
-  \label{eq:packetloss}
-\end{equation}
-Vale $PL \ge CR$, e la differenza tra le due evidenzia il contributo delle perdite 
-dovute al canale rispetto a quelle della contesa.
-
-\paragraph{Neighbors-to-receivers ratio and delta (rapporto e differenza tra vicini annunciati e destinatari
-in portata).} Misura l'amplificazione dei nodi annunciati dai beacon per mezzo delle modalit\`a di
-multihop. A ogni trasmissione il canale registra la lunghezza della lista vicini di questi
-e il numero di possibili destinatari entro il raggio di trasmissione, gli stessi
-gi\`a conteggiati come opportunit\`a di ricezione nell'Eq.~\ref{eq:bpdr}. Dette $a_t$ e
-$r_t$ queste suddette quantit\`a relative alla trasmissione $t$, il rapporto \`e calcolato sui totali:
-\begin{equation}
-  \rho = \frac{\sum_{t} a_t}{\sum_{t} r_t},
-  \label{eq:neighratio}
-\end{equation}
-ossia il rapporto tra la lunghezza media delle liste annunciate e il numero medio di
-destinatari raggiungibili per trasmissione. Un valore di $\rho$ prossimo a $1$ indica che
-i beacon trasportano informazione all'incirca pari all'insieme dei nodi che i mittenti
-possono raggiungere fisicamente in quel momento. Valori superiori segnalano invece che i
-beacon annunciano pi\`u nodi di quanti i mittenti ne possano raggiungere direttamente.
-Questa amplificazione rileva l'efficacia della modalit\`a append, che estende la conoscenza con i nodi
-scoperti a pi\`u hop (Sezione~\ref{sec:append-impl}). 
-
-Utilizzando queste stesse quantit\`a 
-si deriva anche il differenziale medio:
-\begin{equation}
-    \Delta_{a_t, r_t} = \frac{1}{T}\sum_t (a_t - r_t),
-    \label{eq:neighdelta}
-\end{equation}
-con $T$ il numero totale di
-trasmissioni.
-
-\paragraph{}
-Oltre a queste metriche vengono registrate anche le latenze: la \emph{latenza di
-consegna} (tempo tra generazione e prima ricezione di un beacon), la \emph{latenza di
-reazione} (tempo perch\'e un nodo scopra per la prima volta una data origine) e la
-gi\`a citata latenza di scheduler (Sezione~\ref{sec:txpipeline}).
+Le metriche derivate da questi dati grezzi, con le rispettive formule di
+calcolo, sono definite nella Sezione~\ref{sec:eval-metrics} del
+Capitolo~\ref{ch:risultati}, a introduzione della valutazione sperimentale.
 
 % ---------------------------------------------------------------------
 \section*{Sintesi del capitolo}
