@@ -1,16 +1,16 @@
 % =====================================================================
 %  BOZZA - Capitolo 2 (italiano)
-%  Contributo: consapevolezza multihop (modalita' forwarding aggregato e forwarding singolo).
+%  Contributo: conoscenza multi-hop dei nodi (modalita' forwarding aggregato e forwarding singolo).
 %  NB: le descrizioni dei protocolli di beaconing (SBP, ADAB, ACAB)
 %      sono state spostate nel capitolo dei risultati
 %      (bozza_capitolo4_it.tex).
 % =====================================================================
 
-\chapter{Awareness multi-hop}
+\chapter{Conoscenza multi-hop della rete}
 \label{ch:contributo}
 
 Nel protocollo ProSafe le boe inviano beacon Wi-Fi per notificare la loro presenza alle imbarcazioni nelle vicinanze. 
-Questa soluzione permette alle imbarcazioni di acquisire conoscenza rigurado le boe limitrofe (entro circa 120 m). 
+Questa soluzione permette alle imbarcazioni di acquisire conoscenza riguardo le boe limitrofe (entro circa 120 m).
 Tuttavia, estendere la conoscenza della presenza di boe oltre tale distanza aiuterebbe molto le imbarcazioni ad essere in allerta tempestivamente.
 
 Per superare questo limite, in questo capitolo vengono proposti protocolli di beaconing multi-hop, 
@@ -22,15 +22,14 @@ L'introduzione del forwarding, tuttavia, pone nuove sfide. L'inoltro indiscrimin
 incrementando la probabilità di collisioni e il consumo energetico dei dispositivi. Per questo motivo sono stati progettati e confrontati due differenti 
 protocolli di disseminazione multi-hop, caratterizzati da strategie di inoltro differenti: il forwarding singolo, nel quale ogni beacon viene ritrasmesso individualmente, 
 e il forwarding aggregato, nel quale più beacon vengono raccolti e trasmessi all'interno di un unico pacchetto. 
-L'obiettivo è valutare il compromesso tra estensione della copertura, affidabilità della disseminazione e occupazione del canale radio
+L'obiettivo è valutare il compromesso tra estensione della copertura, affidabilità della disseminazione e occupazione del canale radio.
 
 % ---------------------------------------------------------------------
 \section{Struttura e funzionamento del beacon}
 \label{sec:commodel}
 ProSafe effettua la scoperta di prossimit\`a a livello MAC IEEE~802.11, senza associazione
 ad access point n\'e ricorso a servizi di livello IP. I beacon sono frame di dimensione
-variabile trasmessi in broadcast. Il payload modellato nel simulatore (classe \texttt{Beacon}) 
-comprende i campi seguenti:
+variabile trasmessi in broadcast. Il payload del beacon comprende i campi seguenti:
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{sender id} --- identificatore univoco della boa trasmittente ($16$ byte);
   \item \textbf{posizione} --- coordinate correnti riferite al piano di simulazione ($8$ byte);
@@ -63,22 +62,27 @@ Tali protocolli sono preesistenti al contributo di questa tesi e la loro descriz
 dettagliata \`e riportata nel Capitolo~\ref{ch:risultati}.
 
 % ---------------------------------------------------------------------
-\section{Contributo sull'awareness dei nodi}
+\section{Contributo sulla conoscenza dei nodi}
 \label{sec:multihop}
-Il contributo di questa tesi estende tale consapevolezza oltre il singolo hop. Per gli
-scopi del sistema \`e vantaggioso che un nodo apprenda anche l'esistenza di nodi distanti,
-o schermati da altri nodi, e che propaghi in modo efficiente l'informazione in suo
-possesso; ogni trasmissione dedicata alla propagazione, tuttavia, compete per lo stesso
-canale, gi\`a sotto contesa e privo di riscontri. Le due modalit\`a descritte nelle
+Con il beaconing a singolo hop descritto nella sezione precedente, ogni boa apprende
+l'esistenza dei soli vicini diretti, ossia dei nodi dai quali riceve beacon. Il
+contributo di questa tesi estende questa conoscenza oltre il primo hop: per gli scopi
+del sistema \`e infatti vantaggioso che un nodo apprenda anche l'esistenza di boe pi\`u
+distanti, o schermate da altri nodi, e che diffonda in modo efficiente l'informazione in
+suo possesso. Ogni trasmissione dedicata alla diffusione della conoscenza, tuttavia,
+occupa il medesimo canale condiviso, gi\`a sotto contesa; inoltre, poich\'e le
+trasmissioni avvengono in broadcast e senza riscontri di ricezione (ACK), non \`e
+possibile accertare che l'informazione diffusa sia stata effettivamente ricevuta. Ne
+deriva un compromesso tra l'ampiezza della conoscenza acquisita dai nodi e
+l'occupazione del canale necessaria a diffonderla. Le due modalit\`a descritte nelle
 sezioni successive propongono due approcci alternativi a questo compromesso.
 
 \subsection{Forwarding singolo}
 \label{sec:forward}
-In modalit\`a forwarding singolo (\texttt{forward} nella configurazione) una boa ritrasmette i beacon ricevuti. Ogni beacon trasporta un
+In modalit\`a forwarding singolo una boa ritrasmette i beacon ricevuti. Ogni beacon trasporta un
 \emph{origin id} (il mittente originale) e un \emph{hop limit} $\ell$, un contatore con
 funzione di TTL (\emph{Time To Live}). Quando una boa riceve un beacon non originato da
-s\'e stessa e con $\ell > 0$, ne accoda una copia nella coda di inoltro
-(\texttt{pending\_forward\_beacons}). All'inoltro il contatore viene decrementato,
+s\'e stessa e con $\ell > 0$, ne accoda una copia nella coda di inoltro. All'inoltro il contatore viene decrementato,
 \begin{equation}
   \ell' = \ell - 1,
   \label{eq:ttl}
@@ -92,7 +96,7 @@ desincronizza i molteplici ricevitori dello stesso frame, i quali altrimenti
 contenderebbero il canale simultaneamente. 
 
 In assenza di controlli il forwarding pu\`o degenerare in un \emph{broadcast storm};
-l'implementazione corrente adotta quindi tre meccanismi di contenimento.
+la modalit\`a adotta quindi tre meccanismi di contenimento.
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{Unicit\`a dell'origine.} Ogni boa memorizza, per ciascun origin id
   $o$, il timestamp pi\`u recente gi\`a inoltrato $\tau_o$. Un beacon di origine $o$ e
@@ -107,7 +111,7 @@ l'implementazione corrente adotta quindi tre meccanismi di contenimento.
   (Eq.~\ref{eq:ttl}), limita la profondit\`a di propagazione; negli esperimenti \`e
   valorizzato in funzione del raggio massimo di trasmissione.
   \item \textbf{Coda limitata.} I beacon in attesa di inoltro risiedono in una coda di
-  dimensione massima \texttt{pending\_queue\_limit}. A coda piena i nuovi beacon vengono
+  dimensione massima prefissata. A coda piena i nuovi beacon vengono
   scartati senza essere registrati, cosicch\'e una copia successiva possa essere accodata
   qualora si liberi spazio. Se per\`o il beacon ricevuto proviene da un mittente gi\`a
   presente in coda con timestamp ancora valido (non scaduto), la copia precedente viene
@@ -119,7 +123,7 @@ proprio e con TTL positivo, osservando il limite di coda.
 
 \subsection{Forwarding aggregato}
 \label{sec:append}
-In modalit\`a forwarding aggregato (\texttt{append} nella configurazione) una boa allega a ogni beacon l'insieme completo dei nodi di cui \`e
+In modalit\`a forwarding aggregato una boa allega a ogni beacon l'insieme completo dei nodi di cui \`e
 attualmente a conoscenza: i vicini diretti (a $1$ hop) e i \emph{nodi scoperti} in modo
 indiretto tramite le liste annunciate dagli altri. La modalit\`a non genera frame
 aggiuntivi: l'informazione viaggia sui beacon che il nodo trasmetterebbe comunque e
@@ -157,7 +161,7 @@ I due meccanismi presentano vantaggi e svantaggi complementari. Il forwarding ag
 frame aggiuntivi e aggrega l'intera conoscenza della boa in un unico pacchetto, ma \`e
 vincolato dalla crescita della dimensione di quest'ultimo (Eq.~\ref{eq:beacon-size}):
 quanti pi\`u nodi una boa conosce, tanto pi\`u grande --- e costoso in airtime --- diventa
-ogni suo beacon. Il forwarding singolo estende la portata della consapevolezza dei nodi, poich\'e
+ogni suo beacon. Il forwarding singolo estende la portata della conoscenza dei nodi, poich\'e
 un beacon pu\`o raggiungere nodi esterni che esulano dal raggio del mittente originale, ma incrementa
 notevolmente il traffico e, con esso, la probabilit\`a di collisione e la latenza. Quale dei due
 approcci convenga nella rete in esame --- con aggiornamenti locali dei nodi e privi di
@@ -170,7 +174,7 @@ Durante lo sviluppo sono stati progettati due accorgimenti volti a contenere il 
 delle due modalit\`a multi-hop appena descritte: un
 \hyperref[sec:append-hoplimit]{\emph{limite di hop}} per il forwarding aggregato e un
 \hyperref[sec:fwdgate]{\emph{gate di forwarding}} per il forwarding singolo. Entrambi sono
-presenti nel codice, ma non sono stati impiegati negli esperimenti di questa tesi; la
+stati progettati, ma non sono stati impiegati negli esperimenti di questa tesi; la
 loro valutazione \`e demandata ai lavori futuri.
 
 \subsection{Gate di forwarding density-aware per il forwarding singolo}
@@ -178,8 +182,8 @@ loro valutazione \`e demandata ai lavori futuri.
 La modalit\`a forwarding singolo della Sezione~\ref{sec:forward} inoltra ogni beacon fresco,
 non proprio ed entro il TTL, con il solo vincolo della coda. Nelle reti dense ci\`o pu\`o
 produrre numerosi inoltri ridondanti, poich\'e molte boe nello stesso raggio di
-trasmissione inoltrano il medesimo beacon. Un'estensione progettata, ma non attiva
-nell'implementazione impiegata in questa tesi, \`e un gate di forwarding che decide, una
+trasmissione inoltrano il medesimo beacon. Un'estensione progettata, ma non impiegata
+negli esperimenti di questa tesi, \`e un gate di forwarding che decide, una
 sola volta all'atto dell'accodamento, se inoltrare un beacon ricevuto, con
 probabilit\`a:
 \begin{equation}
@@ -191,7 +195,7 @@ probabilit\`a:
   \label{eq:fwdgate}
 \end{equation}
 dove $N$ \`e il numero di vicini del nodo inoltrante, $n_0$ il numero base atteso di
-inoltranti per cascata (\texttt{forward\_density\_baseline}$\,=5$) e $f_q$ il quadrato
+inoltranti per cascata (parametro configurabile, pari a $5$ nel progetto) e $f_q$ il quadrato
 dell'ultimo punteggio di backoff calcolato dagli scheduler adattivi
 (Eq.~\ref{eq:adab-density}, Capitolo~\ref{ch:risultati}). Il fattore $n_0/N$ dirada gli
 inoltri nelle zone dense, cosicch\'e in media soltanto $\approx n_0$ degli $N$ candidati
@@ -200,8 +204,7 @@ gi\`a impiegato per il calcolo dell'intervallo dei beacon propri: una boa che st
 attenuando le proprie trasmissioni riduce anche la frazione di inoltri, fino a un minimo
 del $30\%$.
 
-Nel codice il gate \`e implementato (\texttt{should\_forward}) ma non invocato, e il
-parametro \texttt{forward\_density\_baseline} \`e caricato ma inattivo: gli esperimenti
+Il gate non \`e stato attivato: gli esperimenti
 impiegano la modalit\`a forwarding singolo senza gate. La valutazione del suo impatto su inoltro,
 collisioni, latenza e copertura, insieme alla taratura di $n_0$, \`e demandata ai lavori
 futuri.
@@ -211,8 +214,8 @@ futuri.
 In modalit\`a forwarding aggregato (Sezione~\ref{sec:append}) una boa annuncia tutti i nodi scoperti,
 indipendentemente dalla loro distanza in hop; nelle reti dense la lista annunciata si
 allunga e con essa la dimensione del beacon (Eq.~\ref{eq:beacon-size}). Un limite di hop
-per il forwarding aggregato (\texttt{append\_hop\_limit}) \`e gi\`a caricato dalla configurazione ma
-\emph{non} applicato. Poich\'e la distanza $h_j'$ di ogni voce (Eq.~\ref{eq:append-hop})
+per il forwarding aggregato \`e stato previsto in fase di progettazione ma
+\emph{non} applicato negli esperimenti. Poich\'e la distanza $h_j'$ di ogni voce (Eq.~\ref{eq:append-hop})
 \`e comunque registrata, sarebbe sufficiente impiegarla per escludere dall'annuncio i
 nodi oltre una determinata soglia di hop, contenendo cos\`i la crescita del beacon. La
 taratura del limite e l'effetto su copertura e collisioni sono demandati ai lavori
