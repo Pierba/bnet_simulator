@@ -3,9 +3,7 @@ import os
 import csv
 from utils import logging
 
-# Minimum sim-time gap between two samples of the network-discovery growth curve.
-# Discovery only ever grows, so coarse sampling still captures the full curve while
-# keeping the series small and the per-broadcast bookkeeping cost bounded.
+# Minimum sim-time gap between two samples of the network-discovery growth curve
 DISCOVERY_SAMPLE_INTERVAL: float = 2.0
 
 # Class to track and summarize metrics for the BNet simulation
@@ -32,33 +30,28 @@ class Metrics:
         self.multihop_mode: str         = multihop_mode
         
         # Metrics tracking
-        self.actually_received: int                       = 0
-        self.avg_neighbors_count: int                     = 0
-        self.avg_neighbors_sum: float                     = 0.0
-        self.beacons_sent: int                            = 0
-        self.beacons_forwarded: int                       = 0
-        self.beacons_received: int                        = 0
-        self.beacons_lost: int                            = 0
-        self.beacons_collided: int                        = 0
-        self.delivered_beacons: dict[int, float]          = {}
-        self.discovered_pairs: dict[int, set[int]]        = {}
-        self.neighbors_announced_sum: int                 = 0
-        self.potentially_sent: int                        = 0
-        self.reaction_latency_count: int                  = 0
-        self.reaction_latency_sum: float                  = 0.0
-        self.scheduler_latency_count: int                 = 0
-        self.scheduler_latency_sum: float                 = 0.0
-        self.time_series: list                            = []
-        # Growth of the average % of network discovered over sim time. Sampled on
-        # broadcast (throttled by DISCOVERY_SAMPLE_INTERVAL) so the discovery curve
-        # can be plotted for the densest run of a sweep.
-        self.discovery_time_series: list                  = []
-        self._last_discovery_sample_time: float           = -1.0
-        self.total_latency: float                         = 0.0
-        self.total_successful_receivers: int          = 0
-        # Per-buoy count of unique nodes discovered (its reachable-node count).
-        # De-duplication is done buoy-side, which reports the running size here.
-        self.unique_nodes_per_buoy: dict[int, set[int]]     = {}
+        self.actually_received: int                     = 0
+        self.avg_neighbors_count: int                   = 0
+        self.avg_neighbors_sum: float                   = 0.0
+        self.beacons_sent: int                          = 0
+        self.beacons_forwarded: int                     = 0
+        self.beacons_received: int                      = 0
+        self.beacons_lost: int                          = 0
+        self.beacons_collided: int                      = 0
+        self.delivered_beacons: dict[int, float]        = {}
+        self.discovered_pairs: dict[int, set[int]]      = {}
+        self.neighbors_announced_sum: int               = 0
+        self.potentially_sent: int                      = 0
+        self.reaction_latency_count: int                = 0
+        self.reaction_latency_sum: float                = 0.0
+        self.scheduler_latency_count: int               = 0
+        self.scheduler_latency_sum: float               = 0.0
+        self.time_series: list                          = []
+        self.discovery_time_series: list                = []
+        self._last_discovery_sample_time: float         = -1.0
+        self.total_latency: float                       = 0.0
+        self.total_successful_receivers: int            = 0
+        self.unique_nodes_per_buoy: dict[int, set[int]] = {}
 
     # Set of unique nodes discovered by each buoy
     def set_unique_nodes_per_buoy(self, buoy_id: int, unique_nodes: set[int]):
@@ -133,48 +126,33 @@ class Metrics:
     def log_successful_receivers(self, count: int):
         self.total_successful_receivers += count
 
-    # Log the number of neighbors advertised in a transmitted beacon. The
-    # matching receivers-in-range count is not tracked separately: it is the
-    # same quantity already accumulated in potentially_sent, which the ratio
-    # and delta below reuse as denominator (one call each per broadcast).
+    # Log the number of neighbors advertised in a transmitted beacon
     def log_neighbors_announced(self, n_neighbors: int):
         self.neighbors_announced_sum += n_neighbors
 
-    # Pooled neighbors-to-receivers ratio: total advertised neighbors over the
-    # total reception opportunities (receivers in range, i.e. potentially_sent).
-    # Above 1 the average beacon carries information about more nodes than its
-    # sender can physically reach right now, which is the amplification multihop
-    # modes are supposed to provide. Pooling the sums (instead of averaging
-    # per-transmission ratios) keeps nearly-isolated senders from dominating
-    # the statistic and avoids the upward bias that small denominators give
-    # a mean of ratios.
+    # Neighbors-to-receivers ratio: total advertised neighbors over the total reception opportunities
     def avg_neighbor_ratio(self) -> float:
         if not self.potentially_sent:
             return 0.0
         return self.neighbors_announced_sum / self.potentially_sent
 
-    # Average neighbors-minus-receivers delta across all transmissions: the
-    # same amplification expressed as an absolute node count instead of a factor
+    # Average neighbors-minus-receivers delta across all transmissions
     def avg_neighbor_delta(self) -> float:
         if not self.beacons_sent:
             return 0.0
         return (self.neighbors_announced_sum - self.potentially_sent) / self.beacons_sent
 
-    # Calculate Packet Delivery Ratio: packets actually received / packets sent.
-    # Both counts are at the per-receiver (transmission x in-range receiver) granularity
-    # and include forwarded beacons as individual packets, just like origin beacons.
+    # Calculate Packet Delivery Ratio: packets actually received / packets sent (transmission x in-range receiver)
     def packet_delivery_ratio(self) -> float:
         return self.actually_received / self.potentially_sent if self.potentially_sent else 0.0
 
-    # Calculate True Packet Delivery Ratio: unique beacons delivered / unique beacons
-    # generated. Forwarded copies are excluded from the denominator: they re-transmit
-    # existing beacons, and counting them made the ratio incomparable across modes
+    # Calculate True Packet Delivery Ratio: unique beacons delivered / unique beacons generated
     def delivery_ratio(self) -> float:
         originated = self.beacons_sent - self.beacons_forwarded
         return self.beacons_received / originated if originated else 0.0
 
     # Average number of unique nodes discovered per buoy: how many other nodes
-    # the average node in the network can reach (its reachability, as a count).
+    # the average node in the network can reach
     def avg_unique_nodes_discovered(self) -> float:
         if not self.unique_nodes_per_buoy:
             return 0.0
@@ -182,16 +160,13 @@ class Metrics:
         node_counts = [len(nodes) for nodes in self.unique_nodes_per_buoy.values()]
         return sum(node_counts) / len(node_counts)
 
-    # Reachability of the average node as a percentage of the whole network.
-    # density - 1 excludes the buoy itself from the set of reachable nodes.
+    # Reachability of the average node as a percentage of the whole network
     def avg_percentage_network_discovered(self) -> float:
         if self.density <= 1:
             return 0.0
         return (self.avg_unique_nodes_discovered() / (self.density - 1)) * 100
 
-    # Sample the current avg % of network discovered for the growth-over-time curve.
-    # Called on every broadcast but throttled to one sample per DISCOVERY_SAMPLE_INTERVAL
-    # of sim time, so the densest run can be plotted without bloating the series.
+    # Sample the current avg % of network discovered for the growth-over-time curve
     def log_discovery_timepoint(self, sim_time: float):
         if (
             self._last_discovery_sample_time >= 0

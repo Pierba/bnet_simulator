@@ -199,3 +199,443 @@ beacon nella rete. Vengono registrate la \emph{latenza di consegna} (tempo tra
 generazione e prima ricezione di un beacon), la \emph{latenza di reazione}
 (tempo perch\'e un nodo scopra per la prima volta una data origine) e la
 gi\`a citata latenza di scheduler (tempo trascorso tra la decisione di trasmettere e l’effettivo inizio della trasmissione, Sezione~\ref{sec:txpipeline}).
+
+% ---------------------------------------------------------------------
+\section{Piano degli esperimenti}
+\label{sec:eval-setup}
+La valutazione confronta le tre modalit\`a di inoltro --- \emph{single-hop}
+(nessun inoltro, base di confronto), \emph{forwarding aggregato} (append) e
+\emph{forwarding singolo} (forward) --- al variare della densit\`a della rete e
+delle condizioni del canale. Ogni configurazione sperimentale \`e identificata
+dalla quadrupla (modalit\`a multihop, protocollo di beaconing, intervallo
+minimo di beaconing, condizione del canale); per ciascuna quadrupla la
+densit\`a varia da 20 a 100 boe a passi di 20, in un'area di
+$500 \times 500\,\si{\metre\squared}$, con scenario \emph{random}
+(variabilit\`a del 10\% per aggiornamento) e durata simulata di
+\SI{120}{\second}. Ogni punto \`e la media di 10 repliche indipendenti con
+semi diversi; dove indicato, le bande ombreggiate nei grafici temporali
+rappresentano la deviazione standard tra le repliche. La campagna qui
+analizzata adotta SBP come protocollo di beaconing: il suo intervallo fisso
+rende direttamente confrontabile il costo delle modalit\`a di inoltro, senza
+che un adattamento dell'intervallo mascheri gli effetti della contesa.
+% NOTA: se verranno completate le campagne con ADAB/ACAB, estendere qui
+% e reintrodurre i protocolli adattivi nella griglia sperimentale.
+
+Le condizioni del canale sono due. Nel \emph{canale ideale}
+(\texttt{ideal\_channel = true}) ogni frame che raggiunge un nodo in portata
+viene consegnato, salvo collisione: le uniche perdite derivano dalla contesa,
+quindi $PL = CR$. Nel \emph{canale non ideale}
+(\texttt{ideal\_channel = false}) la consegna \`e probabilistica secondo il
+modello a due soglie dell'Eq.~\ref{eq:delivery-prob} (probabilit\`a 0.9 entro
+\SI{70}{\metre}, 0.15 fino a \SI{120}{\metre}): alle perdite da collisione si
+sommano gli errori di canale e la differenza $PL - CR$ ne misura il
+contributo. Gli intervalli minimi di beaconing considerati sono
+$BI \in \{1.0, 0.5, 0.25\}\,\si{\second}$. La
+Tabella~\ref{tab:eval-grid} riassume la griglia sperimentale.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Griglia dei parametri sperimentali]{Griglia dei parametri della
+  campagna sperimentale. Ogni combinazione \`e mediata su 10 repliche.}
+  \label{tab:eval-grid}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parametro} & \textbf{Valori} \\
+    \midrule
+    Modalit\`a multihop & single-hop, append, forward (limite 4 hop) \\
+    Protocollo di beaconing & SBP \\
+    Intervallo di beaconing $BI$ & 1.0, 0.5, \SI{0.25}{\second} \\
+    Densit\`a (numero di boe) & 20, 40, 60, 80, 100 \\
+    Canale & ideale, non ideale \\
+    Scenario & random (variabilit\`a 10\%) \\
+    Durata / repliche & \SI{120}{\second} / 10 semi \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Lettura dei grafici di confronto.} Nei grafici di confronto tra
+modalit\`a, le barre raggruppate per densit\`a confrontano single-hop, append
+e forward sulla stessa metrica; i grafici temporali mostrano invece
+l'evoluzione della scoperta della rete nella configurazione pi\`u densa
+(100 boe). I
+risultati sono presentati prima per il canale ideale
+(Sezione~\ref{sec:res-ideal}), che isola l'effetto della contesa, poi per il
+canale non ideale (Sezione~\ref{sec:res-error}), che aggiunge le perdite
+probabilistiche; seguono l'analisi dell'effetto dell'intervallo di beaconing
+(Sezione~\ref{sec:res-interval}) e la discussione complessiva
+(Sezione~\ref{sec:discussione}).
+
+% ---------------------------------------------------------------------
+\section{Risultati con canale ideale}
+\label{sec:res-ideal}
+In assenza di errori di canale ogni perdita \`e imputabile alla contesa:
+questa condizione isola il costo intrinseco delle modalit\`a di inoltro, che
+accrescono il traffico (forward) o la dimensione dei frame (append) rispetto
+al beaconing single-hop.
+
+\subsection{Scoperta della rete}
+\label{sec:res-ideal-disc}
+% Figure suggerite (cartella "senza errore"):
+%   mode_comparison_avg_percentage_network_discovered_interval-<tag>.png
+%   mode_comparison_discovery_growth_interval-<tag>.png
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/ideal/mode_comparison_avg_percentage_network_discovered_interval-1_0.png}
+  \caption[Percentuale di rete scoperta, canale ideale]{Percentuale media di
+  rete scoperta al variare della densit\`a per le tre modalit\`a di inoltro
+  (canale ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:ideal-discovery}
+\end{figure}
+La Figura~\ref{fig:ideal-discovery} mostra la percentuale media di rete
+scoperta ($D_{\%}$, Eq.~\ref{eq:netdisc}). Il single-hop \`e limitato dalla
+portata radio: una boa scopre soltanto i nodi da cui riceve direttamente,
+perci\'o $D_{\%}$ cresce con la densit\`a solo per effetto della maggiore
+connettivit\`a locale, passando da circa l'81\% a 20 boe a circa il 91\% a
+100 boe senza mai raggiungere la copertura completa. Le due modalit\`a
+multi-hop estendono la conoscenza oltre la portata: append veicola
+l'informazione dei vicini all'interno dei beacon periodici, forward la
+propaga con ritrasmissioni esplicite. Entrambe saturano la metrica:
+gi\`a a 20 boe superano il 99\% e da 40 boe in su raggiungono di fatto il
+100\% a ogni densit\`a. Il divario rispetto al single-hop \`e massimo nella
+configurazione pi\`u sparsa ($\approx$19 punti percentuali a 20 boe), dove i
+collegamenti diretti sono pochi e l'informazione di secondo e terzo hop \`e
+determinante, e si riduce a $\approx$9 punti alle densit\`a maggiori.
+
+La dinamica temporale della scoperta \`e riportata nella
+Figura~\ref{fig:ideal-growth} per la configurazione pi\`u densa.
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/ideal/mode_comparison_discovery_growth_interval-1_0.png}
+  \caption[Crescita della scoperta nel tempo, canale ideale]{Evoluzione
+  temporale della percentuale di rete scoperta nella configurazione a 100 boe
+  (canale ideale, $BI=\SI{1.0}{\second}$); le bande indicano la deviazione
+  standard tra le repliche.}
+  \label{fig:ideal-growth}
+\end{figure}
+Le tre curve differiscono soprattutto nella velocit\`a di convergenza.
+Append raggiunge il 100\% in circa 3--4 secondi: sono sufficienti pochi cicli
+di beaconing perch\'e le liste di vicinato annunciate propaghino la
+conoscenza dell'intera topologia. Forward sale anch'esso rapidamente
+($\approx$97\% dopo 5 secondi) ma completa la scoperta pi\`u gradualmente,
+intorno ai 20 secondi: ogni ritrasmissione veicola un solo beacon di
+origine, quindi la copertura degli ultimi nodi richiede pi\`u scambi. Il
+single-hop, privo di meccanismi di estensione, converge lentamente verso un
+plateau parziale: supera l'80\% solo dopo circa 30 secondi e si assesta
+attorno al 91--92\% a fine simulazione. Le bande di deviazione standard sono
+pressoch\'e nulle per le modalit\`a multi-hop e visibilmente pi\`u ampie per
+il single-hop, la cui scoperta dipende dagli incontri casuali dettati dalla
+mobilit\`a delle singole repliche.
+
+\subsection{Affidabilit\`a e contesa}
+\label{sec:res-ideal-pdr}
+% Figure suggerite (cartella "senza errore"):
+%   mode_comparison_pdr_interval-<tag>.png
+%   mode_comparison_collision_rate_interval-<tag>.png
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/ideal/mode_comparison_pdr_interval-1_0.png}
+  \caption[B-PDR, canale ideale]{B-PDR al variare della densit\`a per le tre
+  modalit\`a di inoltro (canale ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:ideal-pdr}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/ideal/mode_comparison_collision_rate_interval-1_0.png}
+  \caption[Collision rate, canale ideale]{Collision rate al variare della
+  densit\`a (canale ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:ideal-collision}
+\end{figure}
+La maggiore conoscenza della rete ha un costo in termini di contesa. In
+modalit\`a forward ogni beacon ricevuto pu\`o generare una ritrasmissione:
+il traffico offerto cresce e con esso la probabilit\`a di collisione,
+specialmente alle densit\`a elevate. In modalit\`a append il numero di
+trasmissioni resta quello del beaconing periodico, ma i frame pi\`u lunghi
+occupano il canale pi\`u a lungo, accrescendo la finestra di vulnerabilit\`a
+alle collisioni.
+
+I dati confermano questa gerarchia di costo. Il single-hop mantiene un B-PDR
+superiore a 0.93 a ogni densit\`a, con un collision rate che non supera 0.07.
+Append degrada in modo graduale: da 0.99 a 20 boe a circa 0.74 a 100 boe,
+con collision rate 0.27 nel caso peggiore. Forward crolla invece gi\`a alle
+densit\`a intermedie: 0.68 a 40 boe, 0.44 a 60 e appena 0.26 a 100 boe, dove
+quasi tre opportunit\`a di ricezione su quattro ($CR \approx 0.74$) sono
+perse per collisione. Le ritrasmissioni moltiplicano il traffico offerto in
+proporzione alla densit\`a, innescando un circolo vizioso: pi\`u vicini
+significano pi\`u inoltri, quindi pi\`u collisioni. Nel canale ideale packet
+loss e collision rate coincidono ($PL = CR$, come atteso dall'assenza di
+errori di canale), e infatti in ogni configurazione risulta
+$\text{B-PDR} + PL \approx 1$: il confronto tra le
+Figure~\ref{fig:ideal-pdr} e~\ref{fig:ideal-collision} lo verifica come
+controllo di coerenza dei dati. Append rappresenta quindi il miglior
+compromesso tra conoscenza e affidabilit\`a: ottiene la stessa scoperta di
+forward a una frazione del suo costo in collisioni.
+
+\subsection{Efficienza informativa dei beacon}
+\label{sec:res-ideal-ratio}
+% Figura suggerita (cartella "senza errore"):
+%   mode_comparison_neighbor_receiver_ratio_interval-<tag>.png
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/ideal/mode_comparison_neighbor_receiver_ratio_interval-1_0.png}
+  \caption[Rapporto vicini/riceventi, canale ideale]{Rapporto tra nodi
+  annunciati nel beacon e riceventi in portata al momento della trasmissione
+  (canale ideale, $BI=\SI{1.0}{\second}$); la linea tratteggiata orizzontale
+  indica la parit\`a (rapporto = 1), le linee tratteggiate per modalit\`a il
+  delta medio vicini--riceventi.}
+  \label{fig:ideal-ratio}
+\end{figure}
+Il rapporto tra i nodi annunciati in un beacon e i riceventi effettivamente in
+portata quantifica l'\emph{amplificazione informativa} dell'inoltro: valori
+superiori a 1 indicano che il beacon trasporta conoscenza relativa a nodi che
+il mittente non pu\`o raggiungere direttamente, ovvero informazione acquisita
+per via multi-hop.
+
+In modalit\`a append il rapporto cresce da circa 4.5 a 20 boe a 6 a 100 boe:
+ogni beacon annuncia in media sei volte pi\`u nodi di quanti possano
+riceverlo, e il delta medio vicini--riceventi passa da $+10$ a $+80$,
+avvicinandosi al limite teorico $N-1$ meno i riceventi in portata --- segno
+che le liste annunciate arrivano a coprire l'intera rete. Single-hop e
+forward restano invece prossimi alla parit\`a (rapporto $\approx$1.3, delta
+compreso tra $+1$ e $+5$): il primo perch\'e annuncia solo i vicini diretti,
+il secondo perch\'e l'informazione aggiuntiva viaggia in beacon ritrasmessi
+separatamente anzich\'e in liste aggregate. L'amplificazione informativa di
+append \`e dunque ottenuta a parit\`a di numero di trasmissioni, al solo
+costo di frame pi\`u lunghi.
+
+% ---------------------------------------------------------------------
+\section{Risultati con canale non ideale}
+\label{sec:res-error}
+Il canale non ideale sovrappone alle collisioni le perdite probabilistiche
+del modello a due soglie: i beacon oltre \SI{70}{\metre} vengono consegnati
+con probabilit\`a 0.15, il che riduce drasticamente l'affidabilit\`a dei
+collegamenti lunghi --- proprio quelli su cui l'inoltro multi-hop costruisce
+il proprio vantaggio. Questa sezione ripercorre le metriche della
+Sezione~\ref{sec:res-ideal} nelle stesse configurazioni, con l'obiettivo di
+valutare la robustezza delle modalit\`a di inoltro in condizioni realistiche.
+
+\subsection{Scoperta della rete}
+\label{sec:res-error-disc}
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/error/mode_comparison_avg_percentage_network_discovered_interval-1_0.png}
+  \caption[Percentuale di rete scoperta, canale non ideale]{Percentuale media
+  di rete scoperta al variare della densit\`a (canale non ideale,
+  $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-discovery}
+\end{figure}
+Il confronto con la Figura~\ref{fig:ideal-discovery} mostra che il degrado si
+concentra sul single-hop, la cui scoperta cala di 5--7 punti percentuali a
+ogni densit\`a (dal 76\% a 20 boe all'84--85\% a 100 boe): ogni beacon perso
+dal canale \`e per esso un'occasione di scoperta irrimediabilmente persa, e
+la copertura resta lontana dal valore gi\`a parziale del caso ideale. Le
+modalit\`a multi-hop assorbono invece quasi completamente le perdite: a
+parte la configurazione pi\`u sparsa (20 boe, dove append si ferma attorno
+al 94\%), da 40 boe in su entrambe restano sopra il 99\%. La ridondanza
+dell'inoltro --- la stessa informazione raggiunge un nodo lungo percorsi e in
+istanti diversi --- compensa la perdita probabilistica dei singoli frame, e
+il vantaggio sul single-hop si amplifica rispetto al canale ideale
+(fino a $\approx$18 punti a 20 boe e $\approx$15 punti a 100 boe).
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/error/mode_comparison_discovery_growth_interval-1_0.png}
+  \caption[Crescita della scoperta nel tempo, canale non ideale]{Evoluzione
+  temporale della percentuale di rete scoperta nella configurazione a 100 boe
+  (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-growth}
+\end{figure}
+La dinamica temporale (Figura~\ref{fig:error-growth}) conserva l'ordinamento
+del caso ideale ma ne dilata i tempi: append completa la scoperta in circa
+5--6 secondi (contro 3--4), forward raggiunge il 90\% intorno ai 10 secondi
+e si avvicina asintoticamente al 100\% solo verso fine simulazione, mentre il
+single-hop cresce lentamente fino all'84--85\% a 120 secondi, senza plateau
+evidente. Le perdite del canale allungano quindi la coda della scoperta ---
+servono pi\`u tentativi perch\'e un beacon superi i collegamenti a bassa
+probabilit\`a --- ma non ne cambiano l'esito per le modalit\`a multi-hop.
+
+\subsection{Affidabilit\`a, collisioni e perdite}
+\label{sec:res-error-pdr}
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/error/mode_comparison_pdr_interval-1_0.png}
+  \caption[B-PDR, canale non ideale]{B-PDR al variare della densit\`a
+  (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-pdr}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/error/mode_comparison_loss_rate_interval-1_0.png}
+  \caption[Packet loss, canale non ideale]{Packet loss complessivo al variare
+  della densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-loss}
+\end{figure}
+Nel canale non ideale il packet loss (Eq.~\ref{eq:packetloss}) scompone le
+perdite in due contributi: la contesa ($CR$) e gli errori di canale
+($PL - CR$). Il confronto tra la Figura~\ref{fig:error-loss} e il collision
+rate consente di attribuire il degrado a ciascuna causa.
+
+Il modello di canale impone anzitutto un tetto all'affidabilit\`a,
+indipendente dalla modalit\`a: gi\`a a 20 boe, dove la contesa \`e
+trascurabile, il B-PDR di tutte le configurazioni si ferma a 0.42--0.45 e il
+packet loss parte da una base di circa 0.55--0.58. Tale valore riflette la
+geometria delle opportunit\`a di ricezione: la maggior parte dei riceventi in
+portata cade nella corona esterna (70--\SI{120}{\metre}), dove la
+probabilit\`a di consegna \`e appena 0.15. Su questa base i comportamenti
+divergono con la densit\`a. Il single-hop resta pressoch\'e piatto (B-PDR
+$\approx$0.41 e $PL \approx 0.59$ a 100 boe): le sue perdite sono dominate
+dal canale, non dalla contesa ($CR \le 0.03$). Append aggiunge una contesa
+moderata ($CR \approx 0.18$ a 100 boe, B-PDR 0.34), mentre forward somma al
+tetto del canale il proprio traffico di ritrasmissione: $CR$ sale a 0.56 e il
+packet loss complessivo raggiunge 0.81, con B-PDR 0.19. \`E interessante
+notare che il collision rate di forward risulta inferiore a quello del caso
+ideale a parit\`a di densit\`a (0.56 contro 0.74): i beacon persi dal canale
+non vengono ricevuti e dunque nemmeno rilanciati, sicch\'e l'errore di canale
+agisce indirettamente da freno sul traffico di inoltro.
+
+\subsection{Efficienza informativa dei beacon}
+\label{sec:res-error-ratio}
+\begin{figure}[htbp]
+  \centering
+  % TODO: \includegraphics[width=\textwidth]{main/images/error/mode_comparison_neighbor_receiver_ratio_interval-1_0.png}
+  \caption[Rapporto vicini/riceventi, canale non ideale]{Rapporto tra nodi
+  annunciati e riceventi in portata (canale non ideale,
+  $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-ratio}
+\end{figure}
+Il quadro \`e analogo al canale ideale, con valori lievemente ridotti:
+append cresce da un rapporto di circa 2.6 a 20 boe a 5.9 a 100 boe (delta da
+$+4.8$ a $+77$), mentre single-hop e forward restano attorno alla parit\`a.
+La riduzione rispetto al caso ideale (a 20 boe il rapporto di append passa da
+4.5 a 2.6) riflette il pi\`u lento popolamento delle tabelle dei vicini: le
+perdite del canale ritardano sia l'acquisizione dell'informazione da
+annunciare sia, per il single-hop, il mantenimento stesso della tabella ---
+il cui delta diventa lievemente negativo ($-0.7$ a 100 boe), segno di
+tabelle che sottostimano i riceventi effettivamente in portata.
+
+% ---------------------------------------------------------------------
+\section{Effetto dell'intervallo di beaconing}
+\label{sec:res-interval}
+Le sezioni precedenti hanno fissato $BI=\SI{1.0}{\second}$; questa sezione
+analizza la sensibilit\`a dei risultati all'intervallo, ripetendo i confronti
+con $BI=\SI{0.5}{\second}$ e $BI=\SI{0.25}{\second}$. Intervalli pi\`u brevi
+accelerano la scoperta e riducono la latenza di reazione, ma moltiplicano il
+traffico offerto e quindi la contesa. La Tabella~\ref{tab:interval-summary}
+riassume scoperta e affidabilit\`a nella configurazione pi\`u densa.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Sensibilit\`a all'intervallo di beaconing (100 boe)]{Percentuale
+  di rete scoperta e B-PDR a 100 boe al variare dell'intervallo di beaconing,
+  nei due regimi di canale. Valori medi su 10 repliche.}
+  \label{tab:interval-summary}
+  \begin{tabular}{llcccccc}
+    \toprule
+    & & \multicolumn{2}{c}{\textbf{Single-hop}} & \multicolumn{2}{c}{\textbf{Append}} & \multicolumn{2}{c}{\textbf{Forward}} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+    \textbf{Canale} & $BI$ (\si{\second}) & $D_{\%}$ & B-PDR & $D_{\%}$ & B-PDR & $D_{\%}$ & B-PDR \\
+    \midrule
+    ideale     & 1.0  & $\sim$91 & 0.93 & 100 & 0.74 & 100      & 0.26 \\
+    ideale     & 0.5  & $\sim$91 & 0.87 & 100 & 0.51 & $\sim$99.5 & 0.21 \\
+    ideale     & 0.25 & $\sim$91 & 0.75 & 100 & 0.23 & $\sim$98.5 & 0.18 \\
+    \midrule
+    non ideale & 1.0  & $\sim$84 & 0.41 & 100 & 0.34 & $\sim$99.5 & 0.19 \\
+    non ideale & 0.5  & $\sim$87 & 0.39 & 100 & 0.25 & $\sim$98.5 & $\sim$0.17 \\ % TODO: verificare B-PDR forward da CSV (barra coperta dalla legenda)
+    non ideale & 0.25 & $\sim$88 & 0.35 & 100 & 0.13 & $\sim$96   & 0.13 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Tre osservazioni emergono dai dati. In primo luogo, per il single-hop
+l'intervallo breve \`e un beneficio soltanto nel canale non ideale, dove la
+maggiore frequenza di trasmissione offre pi\`u occasioni di superare i
+collegamenti a bassa probabilit\`a ($D_{\%}$ dall'84 all'88\% passando da
+1.0 a \SI{0.25}{\second}); nel canale ideale la scoperta \`e gi\`a satura al
+proprio limite strutturale e l'unico effetto \`e il degrado del B-PDR (da
+0.93 a 0.75). In secondo luogo, append paga l'intervallo aggressivo in modo
+severo: a $BI=\SI{0.25}{\second}$ il collision rate nel canale ideale
+raggiunge 0.77 a 100 boe (dal valore 0.27 con $BI=\SI{1.0}{\second}$) e il
+B-PDR crolla a 0.23, senza alcun guadagno di scoperta, gi\`a completa
+all'intervallo pi\`u lento. In terzo luogo, per forward l'intervallo breve
+diventa controproducente anche sul piano della scoperta: a 100 boe $D_{\%}$
+scende dal 100\% ($BI=\SI{1.0}{\second}$) al 98.5\% nel canale ideale e al
+96\% circa in quello non ideale, poich\'e la congestione autoindotta
+(collision rate fino a 0.82) sopprime proprio le ritrasmissioni che
+dovrebbero diffondere l'informazione. Per entrambe le modalit\`a multi-hop
+l'intervallo di \SI{1.0}{\second} risulta dunque il compromesso migliore:
+la scoperta \`e gi\`a massima e ogni riduzione dell'intervallo si traduce
+esclusivamente in contesa aggiuntiva.
+
+% ---------------------------------------------------------------------
+\section{Discussione}
+\label{sec:discussione}
+I risultati delineano un compromesso netto tra conoscenza della rete e
+affidabilit\`a delle trasmissioni, il cui esito \`e per\`o asimmetrico tra le
+due modalit\`a di inoltro. Il guadagno di scoperta \`e sostanzialmente
+identico --- entrambe portano $D_{\%}$ al 100\% dove il single-hop si ferma
+al 91\% (canale ideale) o all'84\% (canale non ideale) --- ma il prezzo
+pagato \`e molto diverso. Append ottiene l'amplificazione informativa a
+parit\`a di numero di trasmissioni, allungando i frame: il suo collision
+rate cresce in modo contenuto (0.27 a 100 boe nel canale ideale) e il B-PDR
+si mantiene su valori utilizzabili (0.74). Forward paga invece ogni hop con
+una trasmissione aggiuntiva: il traffico cresce con la densit\`a fino a
+saturare il canale (collision rate 0.74) e il B-PDR crolla a 0.26, un
+terzo di quello di append a parit\`a di scoperta. La dominanza di append \`e
+sistematica: a ogni densit\`a, intervallo e condizione di canale
+considerati, append eguaglia la scoperta di forward con affidabilit\`a
+superiore. L'unico vantaggio residuo di forward \`e nella fase transitoria a
+bassissima contesa, dove le ritrasmissioni esplicite completano la scoperta
+dei nodi pi\`u lontani senza dipendere dalla lunghezza delle liste
+annunciate.
+
+Il canale non ideale non ribalta il quadro, ma ne sposta i termini: il tetto
+di affidabilit\`a imposto dal modello a due soglie (B-PDR $\le 0.45$ gi\`a in
+assenza di contesa) ridimensiona il divario tra le modalit\`a, mentre la
+ridondanza dell'inoltro si rivela un meccanismo di compensazione efficace,
+mantenendo la scoperta sopra il 99\% dove il single-hop perde ulteriori
+5--7 punti. Quanto all'intervallo di beaconing, la Sezione~\ref{sec:res-interval}
+mostra che ridurlo amplifica il trade-off senza spostarne l'equilibrio: con
+l'inoltro attivo la scoperta \`e gi\`a satura a $BI=\SI{1.0}{\second}$ e ogni
+trasmissione aggiuntiva si converte in contesa, fino al caso limite di
+forward la cui congestione autoindotta erode la scoperta stessa.
+
+Restano infine i limiti della valutazione: la durata di \SI{120}{\second} e
+l'area fissa di $500 \times 500\,\si{\metre\squared}$, il modello di canale a
+due soglie privo di interferenze esterne e ostacoli, l'assenza dei protocolli
+adattivi ADAB e ACAB dalla campagna qui presentata e il limite di 4 hop per
+la modalit\`a forward, i cui effetti a diametri di rete maggiori non sono
+stati esplorati.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Sintesi qualitativa del confronto tra modalit\`a]{Sintesi
+  qualitativa del confronto tra le modalit\`a di inoltro.}
+  \label{tab:summary}
+  \begin{tabular}{lccc}
+    \toprule
+    & \textbf{Single-hop} & \textbf{Append} & \textbf{Forward} \\
+    \midrule
+    Scoperta della rete ($D_{\%}$) & parziale (76--91\%) & completa & completa \\
+    Velocit\`a di scoperta & lenta, senza plateau & molto rapida ($<$\SI{6}{\second}) & rapida \\
+    Affidabilit\`a (B-PDR) & massima & intermedia & bassa in reti dense \\
+    Contesa (collision rate) & trascurabile & moderata & elevata, cresce con la densit\`a \\
+    Robustezza al canale non ideale & scarsa (perde 5--7 p.p.) & alta & alta \\
+    Overhead & nessuno & frame pi\`u lunghi & trasmissioni aggiuntive \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\section{Sintesi del capitolo}
+\label{sec:risultati-sintesi}
+Il capitolo ha valutato le modalit\`a di inoltro multi-hop su una griglia di
+densit\`a, intervalli di beaconing e condizioni di canale. Entrambe le
+modalit\`a portano la scoperta della rete a valori prossimi al 100\%, contro
+il 76--91\% del beaconing single-hop, e la mantengono anche in presenza di
+perdite probabilistiche del canale. Il forwarding aggregato (append) si \`e
+dimostrato la strategia dominante: ottiene la stessa conoscenza del
+forwarding singolo con un collision rate da due a tre volte inferiore,
+poich\'e affida la diffusione dell'informazione all'allungamento dei frame
+anzich\'e a trasmissioni aggiuntive. Il forwarding singolo resta competitivo
+solo in reti sparse, mentre nelle reti dense la sua contesa autoindotta ne
+erode sia l'affidabilit\`a sia, agli intervalli pi\`u aggressivi, la scoperta
+stessa. Le implicazioni di questi risultati e i possibili sviluppi sono
+discussi nel capitolo conclusivo.

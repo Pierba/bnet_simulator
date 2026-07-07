@@ -122,18 +122,10 @@ class Channel:
             is_forward = beacon.origin_id is not None and beacon.origin_id != beacon.sender_id
             self.metrics.log_sent(is_forward)
             self.metrics.log_potentially_sent(n_receivers)
-            # Advertised-neighbors sum: against the receivers just logged in
-            # potentially_sent it yields the pooled neighbors-to-receivers ratio
-            # and the signed delta (both measure multihop amplification)
             self.metrics.log_neighbors_announced(len(beacon.neighbors))
             self.metrics.log_successful_receivers(actual_successful - poisoned_count)
-            # Collision rate counts only beacons lost to collisions (direct
-            # collisions plus poisoned earlier receptions).
             self.metrics.log_collision(collision_lost + poisoned_count)
-            # Total error counts every lost beacon: collisions, probabilistic
-            # channel loss and poisoned receptions.
             self.metrics.log_lost(total_lost + poisoned_count)
-            # Sample the network-discovery growth curve (throttled inside metrics)
             self.metrics.log_discovery_timepoint(sim_time)
 
     # Returns active buoys (excluding the sender) within communication range of the beacon

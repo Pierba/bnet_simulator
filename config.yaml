@@ -22,11 +22,11 @@ simulation:
   enable_file_logging: false
   # Multihop modes to run; one batch per mode (subset of: none, append, forward)
   multihop_modes:
-  # - none
+  - none
   - append
   - forward
   # Maximum hops for forward mode
-  multihop_limit: 5
+  multihop_limit: 4
   # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
   # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2
