@@ -198,10 +198,11 @@ def main():
             ramp_positions = arrange_buoys_randomly(max_buoys, world_width, world_height)
             positions_by_density = {max_buoys: ramp_positions}
         else:
-            positions_by_density = {
-                density: arrange_buoys_randomly(density, world_width, world_height)
-                for density in densities
-            }
+            positions_by_density, positions, prev_density = {}, [], 0
+            for density in densities:
+                positions.extend(arrange_buoys_randomly(density - prev_density, world_width, world_height))
+                positions_by_density[density] = positions.copy()
+                prev_density = density
 
         # Write the layout to a single JSON file and plot it once (it no longer varies
         # per interval). The file feeds the plot_initial_positions.py subprocess.
