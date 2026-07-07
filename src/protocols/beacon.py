@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Tuple, List, Optional, Set
 
-BASE_BIT_SIZE = 33  # sender_id(16) + mobile(1) + position(8) + timestamp(4)
+BASE_BIT_SIZE = 28  # sender_id(16) + position(8) + timestamp(4)
 BYTE_SIZE = 8
 
 @dataclass(slots=True)
@@ -30,7 +30,6 @@ class Beacon:
         
         # Add multihop fields only if used (forward mode)
         if self.origin_id is not None:
-            base += 16  # origin_id
-            base += 4   # hop_limit
-        
+            base += 20  # origin_id (16) + hop_limit (4)
+
         return base * BYTE_SIZE

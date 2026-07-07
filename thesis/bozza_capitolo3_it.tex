@@ -12,10 +12,10 @@
 \label{ch:simulatore}
 Questo capitolo descrive la struttura del simulatore e di tutte le sue componenti
 dal punto di vista funzionale e implementativo.
-Si apre con le motivazioni alla base della scelta di sviluppare un simulatore
-personalizzato (Sezione~\ref{sec:why}). Vengono poi mostrate le relazioni tra le classi per mezzo di un
+Si apre con una breve descrizione delle sue funzionalit\`a e della sua composizione (Sezione~\ref{sec:composizione}). 
+Vengono poi mostrate le relazioni tra le classi per mezzo di un
 diagramma UML. Inoltre vi \`e anche una sezione dedicata all'implementazione vera e propria delle 
-modalit\`a multihop \emph{append} e \emph{forwarded} --- il contributo principale di questa tesi, esposto nel
+modalit\`a multihop \emph{forwarding aggregato} e \emph{forwarding singolo} --- il contributo principale di questa tesi, esposto nel
 Capitolo~\ref{ch:contributo} ---, che ne descrive le strutture dati, il funzionamento della pipeline di trasmissione 
 e i meccanismi di contenimento cos\`i come sono nel codice. 
 Di seguito vi \`e l'elenco delle sezioni inerenti a tutte le componenti sulle quali si sviluppa il capitolo:
@@ -25,16 +25,14 @@ Di seguito vi \`e l'elenco delle sezioni inerenti a tutte le componenti sulle qu
  \item \hyperref[sec:multihop-impl]{\textbf{Implementazione delle modalit\`a multihop}}
  \item \hyperref[sec:channel]{\textbf{Funzionamento del canale}}
  \item \hyperref[sec:config]{\textbf{Parametri di configurazione}}
- \item \hyperref[sec:metrics]{\textbf{Raccolta e utilizzo delle metriche}}
+ \item \hyperref[sec:metrics]{\textbf{Raccolta delle metriche}}
 \end{enumerate}
 Il capitolo si chiude con una sintesi di quanto presentato.
 
 % ---------------------------------------------------------------------
-\section{Motivazione alla base della creazione del simulatore}
-\label{sec:why}
-I simulatori open-source popolari come ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp} offrono funzionalit\`a molto avanzate, ma
-richiedono di gestire complessit\`a e overhead superflui ai fini dei nostri esperimenti.
-Per quest'ultimi, un simulatore custom a eventi discreti contiene solo ci\`o che serve: 
+\section{Composizione del simulatore}
+\label{sec:composizione}
+Il simulatore presenta esclusivamente le funzionalit\`a necessarie per gli esperimenti finali: 
 comportamento delle boe, funzionamento del canale, logica di beaconing e metriche. 
 Presenta una codebase dalle dimensioni relativamente modeste ed \`e facile da modificare.
 Inoltre, per la riproducibilit\`a dei test, occorre semplicemente configurare i parametri
@@ -62,11 +60,9 @@ Di seguito vi \`e l'elenco delle componenti con annesse brevi descrizioni per og
   \item \texttt{Metrics} accumula gli esiti riportati da canale e boe 
   (invii, consegne, collisioni, perdite, latenze) insieme a quelli ottenuti 
   dalle scansioni periodiche della topologia di rete (numero medio di vicini per nodo). 
-  Grazie a questi dati raccolti calcola le metriche --- delivery ratio, PDR,
-  percentuale di rete scoperta --- e le esporta in formato CSV al termine della simulazione
-  (Sezione~\ref{sec:metrics});
-  \item \texttt{BeaconScheduler} implementa i tre protocolli di beaconing descritti nel
-  Capitolo~\ref{ch:contributo} (SBP, ADAB, ACAB) dietro un'interfaccia comune 
+  Grazie a questi dati raccolti calcola le metriche (Sezione~\ref{sec:eval-metrics} del Capitolo~\ref{ch:risultati}) e le esporta in formato CSV al termine della simulazione;
+  \item \texttt{BeaconScheduler} implementa i tre protocolli di beaconing accennati nel
+  Capitolo~\ref{ch:contributo} --- e descritti nel Capitolo~\ref{ch:risultati} --- (SBP, ADAB, ACAB) dietro un'interfaccia comune 
   che restituisce in output l'intervallo prima della prossima trasmissione;
   \item \texttt{Beacon} \`e una dataclass che costituisce il pacchetto in transito all'interno del canale;
   dispone inoltre di un unico metodo che restituisce la sua dimensione in bit per dedurne 
@@ -85,7 +81,7 @@ al fine di mantenere l'incapsulamento delle classi.
   }
   \caption[Diagramma UML delle classi del simulatore]{%
     Diagramma UML delle classi del simulatore. \texttt{Simulator} gestisce le boe e
-    usa canale e metriche; \texttt{Buoy} crea i beacon e li trasmette sul canale
+    usa canale e metriche; \texttt{Buoy} crea i beacon e li trasmette sul \texttt{Channel}
     assecondando il proprio scheduler. Tutte le componenti leggono i parametri dal
     singleton \texttt{ConfigHandler} e condividono le definizioni di \texttt{Event}
     ed \texttt{EventType}.}
@@ -95,7 +91,7 @@ al fine di mantenere l'incapsulamento delle classi.
 % ---------------------------------------------------------------------
 \section{Architettura del simulatore}
 \label{sec:simulatore}
-Il simulatore poggia su un'architettura a eventi discreti che riguardano componenti modulari,
+Il simulatore si basa su un'architettura a eventi discreti che riguardano componenti modulari,
 quali:
 \begin{itemize}[nosep]
     \item il simulatore: modellato nella classe \texttt{Simulator} (\texttt{core/simulator.py});
@@ -122,7 +118,7 @@ Il codice sorgente \`e organizzato in moduli con responsabilit\`a separate:
   tabelle dei vicini, mobilit\`a;
   \item \texttt{protocols/beacon.py} --- struttura del frame e calcolo della sua dimensione;
   \item \texttt{protocols/scheduler.py} --- protocolli di beaconing SBP, ADAB e ACAB
-  (Capitolo~\ref{ch:contributo});
+  (Capitoli~\ref{ch:contributo} e~\ref{ch:risultati});
   \item \texttt{config/config\_handler.py} --- lettura centralizzata della configurazione;
   \item \texttt{utils/metrics.py} --- raccolta ed esportazione delle metriche;
   \item \texttt{run.py} e \texttt{script/init.py} --- rispettivamente l'avviatore di simulazioni parallele
@@ -143,7 +139,7 @@ Ciascun evento \`e composto dai seguenti attributi:
 \begin{itemize}[leftmargin=1.4em, nosep]
     \item \texttt{time} --- timestamp del tempo simulato;
     \item \texttt{event\_type} --- enum del tipo specifico di evento;
-    \item \texttt{target\_obj} --- istanza oggetto che andr\`a ad eseguire l'handler specifico per gestire l'evento definito dall'\texttt{event\_type};
+    \item \texttt{target\_obj} --- istanza dell'oggetto che andr\`a ad eseguire l'handler specifico per gestire l'evento definito dall'\texttt{event\_type};
     \item \texttt{data} --- oggetto facoltativo contenente dati in input per l'handler (\texttt{beacon} e \texttt{\_gen}).
 \end{itemize}
 Di seguito vengono definite nello specifico le \emph{enum} che valorizzano \texttt{event\_type} con annesse le entit\`a
@@ -186,8 +182,8 @@ simulazione; in questo modo un errore isolato non invalida l'intera esecuzione d
 \subsection{Dinamicit\`a della topologia di rete}
 \label{sec:dynamics}
 La composizione della rete durante la simulazione dipende dal parametro
-\texttt{scenario}, gi\`a introdotto nel Capitolo~\ref{ch:contributo}, che pu\`o essere
-\texttt{static}, \texttt{ramp} o \texttt{random}. La logica risiede nell'handler
+\texttt{scenario} che pu\`o essere \texttt{static}, \texttt{ramp} o \texttt{random}. 
+La logica risiede nell'handler
 dell'evento \texttt{BUOY\_ARRAY\_UPDATE}, schedulato per la prima volta dopo
 \SI{30}{\second} di tempo simulato (cos\`i la rete parte da una condizione assestata) e
 poi rischedulato periodicamente:
@@ -212,7 +208,7 @@ pulizia dei vicini e il movimento per le boe mobili). La disattivazione pone il 
 opposto: gli eventi gi\`a in coda per quella boa non possono essere rimossi da uno heap in
 modo efficiente. Si \`e adottato perci\`o un sistema \emph{cancellazione pigra}: ogni boa mantiene un
 contatore di generazione, incrementato a ogni disattivazione e incluso (campo
-\texttt{\_gen}) negli eventi che essa schedula. Quando un evento viene
+\texttt{\_gen}) negli eventi che essa schedula (Sezione~\ref{sec:event}). Quando un evento viene
 estratto dalla coda, la boa lo scarta se \`e inattiva o se la generazione dell'evento non
 coincide pi\`u con la sua attuale: gli eventi ``vecchi'' vengono cos\`i ignorati, senza costi
 di rimozione. Alla disattivazione vengono inoltre svuotate la coda di inoltro
@@ -224,7 +220,7 @@ rientra in rete non rilancia informazioni obsolete.
 \label{sec:buoy}
 La boa \`e la componente pi\`u complessa del simulatore: implementa la politica CSMA/CA di 
 accesso al mezzo, la creazione e la ricezione dei beacon e il modello di mobilit\`a RWP (Sezione~\ref{sec:rwp}).
-\`E inoltre il moderatore delle due modalit\`a multihop, la cui implementazione \`e
+\`E inoltre il moderatore delle due modalit\`a multihop descritte nel Capitolo~\ref{ch:contributo}, la cui implementazione \`e
 approfondita nella sezione dedicata (Sezione~\ref{sec:multihop-impl}). 
 Il suo comportamento \`e organizzato come una macchina a stati finiti
 (enum \texttt{BuoyState}): \texttt{RECEIVING} \`e lo stato di riposo in cui la boa
@@ -239,9 +235,8 @@ La Figura~\ref{fig:tx-pipeline} mostra il percorso completo che porta una boa a
 trasmettere un frame, cos\`i come implementato negli handler di \texttt{buoy.py}.
 Il punto di partenza \`e l'evento periodico \texttt{SCHEDULER\_CHECK}: la boa interroga
 il proprio \texttt{BeaconScheduler} (\texttt{should\_send()}), che decide in base al
-protocollo attivo --- intervallo fisso per SBP, intervallo adattivo calcolato con le
-Eq.~\ref{eq:adab} e~\ref{eq:acab-blend} (Capitolo~\ref{ch:risultati}) per ADAB e
-ACAB --- se \`e il momento di trasmettere. In caso affermativo viene abilitata la flag \texttt{want\_to\_send} e, se non
+protocollo attivo --- intervallo fisso per SBP, intervallo adattivo per ADAB e
+ACAB calcolato rispettivamente con le Eq.~\ref{eq:adab} e~\ref{eq:acab-blend} (Capitolo~\ref{ch:risultati})  --- se \`e il momento di trasmettere. In caso affermativo viene abilitata la flag \texttt{want\_to\_send} e, se non
 c'\`e gi\`a una contesa in corso, parte la pipeline CSMA/CA. Il flag booleano
 \texttt{processing} serve propio a rilevare questa cosa: garantisce che ogni boa gestisca al pi\`u una
 pipeline alla volta, a prescindere dal numero di beacon propri o di inoltri in attesa.
@@ -268,7 +263,7 @@ La contesa segue i principi della DCF richiamati nel Capitolo~\ref{ch:contributo
   vinta. I beacon propri hanno la precedenza: se la flag \texttt{want\_to\_send} \`e alzata viene
   creato e trasmesso un beacon nuovo, altrimenti viene rilanciato il primo beacon della
   coda di inoltro con il TTL decrementato (Eq.~\ref{eq:ttl},
-  Sezione~\ref{sec:forwarded-impl}). Se dopo l'invio la coda di
+  Sezione~\ref{sec:forward-impl}). Se dopo l'invio la coda di
   inoltro contiene ancora qualcosa, la boa rientra immediatamente in contesa dal punto 1; in caso
   contrario rilascia il lock (\texttt{processing}) e torna in ascolto.
 \end{enumerate}
@@ -358,7 +353,7 @@ la prossima velocit\`a (Eq.~\ref{eq:rwp-draw}) e sosta per una pausa casuale
 scaduta la quale rinizia il processo con la tratta successiva. 
 Il prossimo evento \texttt{BUOY\_MOVEMENT} viene fissato direttamente all'istante in cui la pausa
 scade. Durante la sosta la velocit\`a nulla azzera la componente di mobilit\`a di
-ACAB, che percepisce il nodo come fermo e ne rallenta la trasmissione dei beacon.
+ACAB (Eq.~\ref{eq:acab-mob}), che percepisce il nodo come fermo e ne rallenta la trasmissione dei beacon.
 
 Due propriet\`a del modello sono rilevanti per la lettura degli esperimenti. La prima
 \`e geometrica: poich\'e il piano \`e convesso e i waypoint sono punti interni, ne segue che 
@@ -375,10 +370,10 @@ mantiene la mobilit\`a media.
 % ---------------------------------------------------------------------
 \section{Implementazione delle modalit\`a multihop}
 \label{sec:multihop-impl}
-Questa sezione descrive la realizzazione delle due modalit\`a multihop \emph{append} e
-\emph{forwarded} --- il contributo principale di questa tesi --- la cui logica di protocollo
+Questa sezione descrive la realizzazione delle due modalit\`a multihop \emph{forwarding aggregato} e
+\emph{forwarding singolo} --- il contributo principale di questa tesi --- la cui logica di protocollo
 \`e stata definita nel Capitolo~\ref{ch:contributo} (Sezioni~\ref{sec:append}
-e~\ref{sec:forwarded}). Entrambe sono gestite nella classe \texttt{Buoy} e, a seconda della modalit\`a attivata
+e~\ref{sec:forward}). Entrambe sono gestite nella classe \texttt{Buoy} e, a seconda della modalit\`a attivata
 (\texttt{multihop\_mode} $\in$ \{\texttt{none}, \texttt{append}, \texttt{forward}\}),
 si alterano due comportamenti del nodo: la creazione del beacon
 (\texttt{create\_beacon}) e la ricezione di questi
@@ -395,27 +390,60 @@ Oltre alla tabella dei vicini diretti \texttt{neighbors} --- comune a tutte le
 modalit\`a, mappa l'id del vicino nella coppia (timestamp dell'ultimo contatto,
 posizione) --- ogni boa mantiene tre strutture specifiche per i multihop:
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item \texttt{discovered\_nodes} (append) --- la tabella dei nodi scoperti della
+  \item \texttt{discovered\_nodes} (forwarding aggregato) --- la tabella dei nodi scoperti della
   Sezione~\ref{sec:append}: un dizionario che mappa l'id di ogni nodo appreso
   indirettamente nella tripla (timestamp, posizione, distanza in hop);
-  \item \texttt{pending\_forward\_beacons} (forwarded) --- la coda di inoltro,
+  \item \texttt{pending\_forward\_beacons} (forwarding singolo) --- la coda di inoltro,
   realizzata come dizionario indicizzato per \emph{origin id}. Sfruttando
   l'ordinamento di inserimento dei dizionari Python, la struttura si comporta da coda
   FIFO con una comoda propriet\`a in pi\`u: per ogni origine pu\`o esistere al massimo una
   copia in attesa. Quando arriva un beacon pi\`u fresco di uno gi\`a accodato dalla
   stessa origine, la voce viene sovrascritta sul posto conservando la posizione in
   coda: questo e ci\`o che garantisce la politica di sostituzione descritta nella
-  Sezione~\ref{sec:forwarded};
-  \item \texttt{forwarded\_beacons} (forwarded) --- la memoria di deduplicazione: per
+  Sezione~\ref{sec:forward};
+  \item \texttt{forwarded\_beacons} (forwarding singolo) --- la memoria che previene il \emph{broadcast storm}: per
   ogni origin id si conserva il timestamp pi\`u recente gi\`a accettato per l'inoltro,
   ovvero il $\tau_o$ dell'Eq.~\ref{eq:dedup}.
 \end{itemize}
 
 % ---------------------------------------------------------------------
-\subsection{Modalit\`a append: annuncio e integrazione delle liste}
+\subsection{Modalit\`a forwarding singolo: accodamento e inoltro}
+\label{sec:forward-impl}
+In fase di creazione del beacon, la lista annunciata resta quella dei soli vicini diretti, ma
+vengono valorizzati i campi \texttt{origin\_id} (con l'id della boa stessa) e
+\texttt{hop\_limit} (con il TTL iniziale \texttt{multihop\_limit}).
+
+L'accodamento avviene alla ricezione secondo tre filtri a cascata: il
+beacon non deve essere stato originato dalla boa stessa (per non rilanciare il proprio
+eco ricevuto da un vicino), deve avere TTL positivo e deve essere pi\`u fresco
+dell'ultimo gi\`a accettato dalla stessa origine (Eq.~\ref{eq:dedup}, confronto con
+\texttt{forwarded\_beacons}). Superati questi controlli, la voce entra in coda se c'\`e
+posto oppure se l'origine \`e gi\`a presente; in quest'ultimo caso si sostituisce la copia pi\`u
+vecchia. Allo stesso tempo, la decisione viene registrata nella memoria di
+deduplicazione. A coda piena il beacon viene invece scartato \emph{senza} registrare
+la decisione, cosicch\'e una copia successiva possa entrare se nel frattempo si \`e
+liberato spazio.
+
+L'inoltro \`e integrato nella stessa pipeline CSMA/CA dei beacon propri
+(Sezione~\ref{sec:txpipeline}): non esiste un percorso di trasmissione privilegiato
+per gli inoltri. Se al momento dell'accodamento la boa non \`e impegnata in una pipeline, ne
+avvia una dopo il jitter casuale $\delta \sim \mathcal{U}[0, \SI{0.05}{\second}]$ che
+desincronizza i nodi ricevitori dello stesso frame, i quali altrimenti
+contenderebbero il canale tutti insieme. A ogni contesa vinta viene trasmesso un solo
+frame, con precedenza ai beacon propri; quando \`e il turno di un inoltro, il metodo
+\texttt{\_transmit\_forward\_beacon} estrae la voce in testa alla coda e ne costruisce una copia (tramite \texttt{forward\_beacon()})
+in cui la boa inoltrante ne diviene il nuovo mittente inserendovi la propria posizione ---
+necessaria al canale per calcolare portata e propagazione --- mentre origine,
+timestamp e lista dei vicini restano immutati e il TTL viene decrementato
+(Eq.~\ref{eq:ttl}). Se dopo l'invio la coda non \`e vuota, la boa rientra
+immediatamente in contesa senza rilasciare il lock \texttt{processing}; altrimenti la
+pipeline termina e la boa torna in ascolto.
+
+% ---------------------------------------------------------------------
+\subsection{Modalit\`a forwarding aggregato: annuncio e integrazione delle liste}
 \label{sec:append-impl}
 In fase di creazione, il beacon annuncia i vicini diretti della boa mittente, ciascuno a
-distanza di hop $1$; in modalit\`a append la lista di questi viene estesa con l'intero contenuto
+distanza di hop $1$; in modalit\`a forwarding aggregato la lista di questi viene estesa con l'intero contenuto
 di \texttt{discovered\_nodes}, ciascuna voce con la distanza in hop registrata al
 momento della scoperta (Eq.~\ref{eq:append-hop}). Il costo di questa modalit\`a \`e determinato
 dalla lista dei vicini pi\`u lunga che accresce proporzionalmente la dimensione del frame (Eq.~\ref{eq:beacon-size}).
@@ -439,57 +467,24 @@ segue quattro passi, nell'ordine:
   vera al primo incontro.
 \end{enumerate}
 Il costo computazionale per beacon ricevuto \`e lineare nella lunghezza della lista
-annunciata e nessuna delle operazioni interferisce con la pipeline di trasmissione: in append la
+annunciata e nessuna delle operazioni interferisce con la pipeline di trasmissione: nel forwarding aggregato la
 consapevolezza viaggia esclusivamente sui beacon che la boa avrebbe comunque inviato.
 
 % ---------------------------------------------------------------------
-\subsection{Modalit\`a forwarded: accodamento e rilancio}
-\label{sec:forwarded-impl}
-In fase di creazione del beacon, la lista annunciata resta quella dei soli vicini diretti, ma
-vengono valorizzati i campi \texttt{origin\_id} (con l'id della boa stessa) e
-\texttt{hop\_limit} (con il TTL iniziale \texttt{multihop\_limit}).
-
-L'accodamento avviene alla ricezione secondo tre filtri a cascata: il
-beacon non deve essere stato originato dalla boa stessa (per non rilanciare il proprio
-eco ricevuto da un vicino), deve avere TTL positivo e deve essere pi\`u fresco
-dell'ultimo gi\`a accettato dalla stessa origine (Eq.~\ref{eq:dedup}, confronto con
-\texttt{forwarded\_beacons}). Superati questi controlli, la voce entra in coda se c'\`e
-posto oppure se l'origine \`e gi\`a presente; in quest'ultimo caso si sostituisce la copia pi\`u
-vecchia. Allo stesso tempo, la decisione viene registrata nella memoria di
-deduplicazione. A coda piena il beacon viene invece scartato \emph{senza} registrare
-la decisione, cosicch\'e una copia successiva possa entrare se nel frattempo si \`e
-liberato spazio.
-
-Il rilancio \`e integrato nella stessa pipeline CSMA/CA dei beacon propri
-(Sezione~\ref{sec:txpipeline}): non esiste un percorso di trasmissione privilegiato
-per gli inoltri. Se al momento dell'accodamento la boa non \`e impegnata in una pipeline, ne
-avvia una dopo il jitter casuale $\delta \sim \mathcal{U}[0, \SI{0.05}{\second}]$ che
-desincronizza i nodi ricevitori dello stesso frame, i quali altrimenti
-contenderebbero il canale tutti insieme. A ogni contesa vinta viene trasmesso un solo
-frame, con precedenza ai beacon propri; quando \`e il turno di un inoltro, il metodo
-\texttt{\_transmit\_forward\_beacon} estrae la voce in testa alla coda e ne costruisce una copia (tramite \texttt{forward\_beacon()})
-in cui la boa inoltrante ne diviene il nuovo mittente inserendovi la propria posizione ---
-necessaria al canale per calcolare portata e propagazione --- mentre origine,
-timestamp e lista dei vicini restano immutati e il TTL viene decrementato
-(Eq.~\ref{eq:ttl}). Se dopo l'invio la coda non \`e vuota, la boa rientra
-immediatamente in contesa senza rilasciare il lock \texttt{processing}; altrimenti la
-pipeline termina e la boa torna in ascolto.
-
-% ---------------------------------------------------------------------
-\subsection{Igiene dello stato multihop}
+\subsection{Prevenzione delle informazioni obsolete}
 \label{sec:multihop-cleanup}
 Le strutture accumulate dalle due modalit\`a non crescono senza controllo. L'evento
 periodico \texttt{NEIGHBOR\_CLEANUP} rimuove ogni voce pi\`u vecchia di \texttt{neighbor\_timeout} (\SI{7}{\second}) per ogni struttura da dati:
-in append le voci di \texttt{discovered\_nodes}, in forwarded sia le decisioni di
-deduplicazione ormai stantie in \texttt{forwarded\_beacons}, sia i beacon rimasti in coda troppo a lungo in \texttt{pending\_forward\_beacons}. 
+nel forwarding aggregato le voci di \texttt{discovered\_nodes}, nel forwarding singolo sia le decisioni di
+inoltro ormai stantie in \texttt{forwarded\_beacons}, sia i beacon rimasti in coda troppo a lungo in \texttt{pending\_forward\_beacons}. 
 Alla disattivazione di una boa negli scenari dinamici (Sezione~\ref{sec:dynamics}), coda di inoltro e memoria di
 deduplicazione vengono inoltre svuotate per intero, per il motivo spiegato in precedenza nella sezione~\ref{sec:dynamics}
 
 Infine, il codice contiene gi\`a le due predisposizioni discusse tra i possibili
-miglioramenti del Capitolo~\ref{ch:contributo}: il parametro
+miglioramenti del Capitolo~\ref{ch:contributo}: il gate di forwarding \texttt{should\_forward}
+\`e presente nello scheduler ma disattivato (Sezione~\ref{sec:fwdgate}) e il parametro
 \texttt{append\_hop\_limit} \`e caricato dalla configurazione ma non applicato
-(Sezione~\ref{sec:append-hoplimit}) e il gate di forwarding \texttt{should\_forward}
-\`e presente nello scheduler ma disattivato (Sezione~\ref{sec:fwdgate}). Gli
+(Sezione~\ref{sec:append-hoplimit}). Gli
 esperimenti di questa tesi usano quindi le due modalit\`a nella forma sopra
 descritta.
 
@@ -534,7 +529,7 @@ La durata della trasmissione dipende dalla dimensione del beacon
   \label{eq:txtime}
 \end{equation}
 quindi un beacon che annuncia molti nodi occupa il mezzo pi\`u a lungo, \`e il costo
-in airtime della modalit\`a append discusso nella Sezione~\ref{sec:tradeoff}. La
+in airtime della modalit\`a forwarding aggregato discusso nella Sezione~\ref{sec:tradeoff}. La
 trasmissione viene registrata tra quelle attive e i destinatari sono tutte le boe attive
 entro la portata massima dal mittente; per ciascun destinatario elegibile alla ricezione viene schedulato 
 un evento \texttt{RECEPTION} all'istante $t_{\text{fine}} + d/c$.
@@ -558,7 +553,7 @@ registra i destinatari con una consegna valida e una collisione successiva ne ri
 voce. Durante la \texttt{RECEPTION} --- evento che era gi\`a in coda e perci\`o non pi\`u rimovibile --- 
 la boa destinataria non trova il proprio id nell'insieme e quindi non processa nulla: \`e l'equivalente
 simulativo di una radio che riceve bit corrotti. Queste ricezioni revocate
-(\texttt{poisoned}) vengono annesse alle collisioni quando si tracciano le metriche.
+vengono annesse alle collisioni quando si tracciano le metriche.
 
 \paragraph{Perdita probabilistica con canale non ideale.} Se il canale non \`e ideale
 (\texttt{ideal\_channel} disattivato), ogni consegna sopravvissuta alle collisioni viene
@@ -567,7 +562,7 @@ messa alla prova da una probabilit\`a dipendente dalla distanza:
   P_{\text{rx}}(d) =
   \begin{cases}
     p_{\text{high}} = 0.9 & d \le r_{\text{high}} = \SI{70}{\metre},\\[2pt]
-    p_{\text{low}} = 0.15 & r_{\text{high}} < d \le r_{\text{max}} = \SI{80}{\metre},\\[2pt]
+    p_{\text{low}} = 0.15 & r_{\text{high}} < d \le r_{\text{max}} = \SI{120}{\metre},\\[2pt]
     0 & d > r_{\text{max}},
   \end{cases}
   \label{eq:delivery-prob}
@@ -628,8 +623,8 @@ simulation:
   enable_file_logging: false # log su file (debug)
   multihop_modes: [none, append, forwarded]
                              # modalita' multihop da simulare
-  multihop_limit: 1          # TTL iniziale dei beacon
-  append_hop_limit: 2        # orizzonte in hop dell'append 
+  multihop_limit: 5          # TTL iniziale dei beacon
+  append_hop_limit: 2        # orizzonte in hop del forwarding aggregato
                              # (caricato ma NON attivo (*@Sez.~\ref{sec:append-hoplimit}@*))
   pending_queue_limit: 50    # capienza della coda di inoltro
   forward_density_baseline: 5
@@ -651,7 +646,7 @@ network:
   bit_rate: 1000000          # bit rate del canale [bit/s]
   speed_of_light: 300000000.0
                              # velocita' di propagazione del segnale [m/s]
-  communication_range_max: 80.0
+  communication_range_max: 120.0
                              # portata massima r_max [m]
   communication_range_high_prob: 70.0
                              # soglia di consegna affidabile r_high [m]
@@ -679,7 +674,7 @@ scheduler:
 \end{lstlisting}
 
 % ---------------------------------------------------------------------
-\section{Raccolta e utilizzo delle metriche}
+\section{Raccolta delle metriche}
 \label{sec:metrics}
 La classe \texttt{Metrics} accumula i dati della simulazione senza che le altre
 componenti possano accedervi ai metodi: il canale registra gli esiti di ogni trasmissione
@@ -691,7 +686,7 @@ attive e contando le coppie entro la portata massima, con costo $O(n \log n)$ an
 $O(n^2)$; se $P$ \`e l'insieme delle coppie in portata e $n$ le boe attive, la media \`e
 $2\,|P| / n$, poich\`e ogni coppia rappresenta due distinte relazioni di vicinato.
 Questo valore misura la densit\`a reale della rete, indipendente da ci\`o che i
-protocolli riescono a scoprire. Al termine del run le metriche vengono esportate in CSV:
+protocolli riescono a scoprire. Al termine delle simulazioni le metriche vengono esportate in CSV:
 un elenco dei risultati per ogni combinazione di parametri e la serie temporale della scoperta dei nodi
 (campionata ogni \SI{8}{\second} per static e random e ogni \SI{5}{\second} per ramp).
 Le metriche derivate da questi dati grezzi, con le rispettive formule di
@@ -707,7 +702,7 @@ costituiscono il contributo della tesi; il modello di canale calibrato
 sul campo, con propagazione, collisioni dirette e da terminale nascosto e perdita
 probabilistica; il modello di mobilit\`a Random Waypoint; la gestione della popolazione
 dinamica; la configurazione centralizzata nel
-singleton YAML e la raccolta ed utilizzo delle metriche in ciascuna simulazione.
+singleton YAML e la raccolta delle metriche.
 Il simulatore offre una piattaforma controllata e riproducibile per valutare i
 protocolli di broadcast. Il prossimo capitolo presenta la metodologia sperimentale e i
 risultati.

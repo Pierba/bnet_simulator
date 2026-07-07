@@ -11,13 +11,13 @@
 
 Questo capitolo presenta la valutazione sperimentale delle modalit\`a multi-hop
 introdotte nel Capitolo~\ref{ch:contributo}. Poich\'e ogni configurazione
-sperimentale combina una delle due modalit\`a con uno dei protocolli di
+di simulazione combina una delle due modalit\`a con uno dei protocolli di
 beaconing che regolano gli intervalli di trasmissione, il capitolo si apre con
-la descrizione dei tre protocolli --- SBP, ADAB e ACAB --- preesistenti nel
-simulatore e parte del modello di comunicazione (Sezione~\ref{sec:commodel});
-seguono la definizione delle metriche impiegate nella valutazione
-(Sezione~\ref{sec:eval-metrics}) e l'analisi delle prestazioni ottenute nelle
-simulazioni.
+la descrizione dei tre protocolli --- SBP, ADAB e ACAB --- gi\`a esistenti nel simulatore.
+Seguono la descrizione dello scenario di rete adottato negli esperimenti
+(Sezione~\ref{sec:scenario}), la definizione delle metriche impiegate nella
+valutazione (Sezione~\ref{sec:eval-metrics}) e l'analisi delle prestazioni
+ottenute nelle simulazioni.
 
 % ---------------------------------------------------------------------
 \section{Protocolli di beaconing}
@@ -120,8 +120,19 @@ ferma, e mantiene pi\`u frequente una boa isolata, silenziosa o in movimento.
 Rispetto ad ADAB, che impiega la sola densit\`a, ACAB costruisce il punteggio di
 backoff a partire da tre segnali e richiede quindi il mantenimento di un numero
 maggiore di variabili di stato; l'overhead computazionale resta comunque
-trascurabile per i dispositivi considerati. Il calcolo dell'intervallo \`e
-dettagliato nel Capitolo~\ref{ch:simulatore}.
+trascurabile per i dispositivi considerati.
+
+% ---------------------------------------------------------------------
+\section{Dinamicit\`a della rete}
+\label{sec:scenario}
+La dinamicit\`a della rete dipende dallo \texttt{scenario}
+configurato (\emph{static}, \emph{ramp}, \emph{random}), che determina l'evoluzione del
+numero di nodi nel corso della simulazione --- meccanismo descritto nella Sezione~\ref{sec:dynamics} del Capitolo~\ref{ch:simulatore}. 
+Ai fini della valutazione sperimentale \`e
+stato adottato lo scenario random: la popolazione di nodi cresce e decresce periodicamente
+di una frazione percentuale definita dalla configurazione, cos\`i da riprodurre il
+comportamento di una rete reale, in cui i nodi entrano ed escono di continuo dal raggio di
+copertura radio.
 
 % ---------------------------------------------------------------------
 % Da qui in poi: valutazione delle prestazioni delle simulazioni
@@ -137,24 +148,24 @@ simulazione a partire dai dati grezzi accumulati dalla classe \texttt{Metrics}
 (Sezione~\ref{sec:metrics}); per ciascuna metrica si indica dapprima che cosa
 esprime e quindi la formula del calcolo effettuato.
 
-\paragraph{Percentuale media di rete scoperta.} Esprime la consapevolezza
-della topologia, ovvero quanta parte della rete conosce in media una boa tra
-quelle che hanno ricevuto almeno un beacon. Ogni boa $i$ accumula l'insieme
-$S_i$ dei nodi \emph{unici} di cui \`e venuta a conoscenza: da ogni beacon
-ricevuto si uniscono il mittente, l'eventuale origine (in modalit\`a
-forwarded) e tutti i nodi della lista annunciata. Detto $n$ il numero di boe
-che hanno ricevuto almeno un beacon e $N$ la densit\`a nominale della rete:
+\paragraph{Percentuale media di rete scoperta.} Esprime la conoscenza media
+della topologia di rete, ovvero quanta parte della rete conosce in media ciascuna boa. 
+Ogni boa $i$ accumula l'insieme
+$S_i$ dei nodi \emph{unici} di cui \`e venuta a conoscenza:  con ogni beacon
+ricevuto si uniscono ad esso il mittente, l'eventuale origine (in modalit\`a
+forwarding singolo) e tutti i nodi della lista annunciata. Detta $N$ la densit\`a della rete:
 \begin{equation}
-  \overline{U} = \frac{1}{n} \sum_{i=1}^{n} |S_i|,
+  \overline{U} = \frac{1}{N} \sum_{i=1}^{N} |S_i|,
   \qquad
   D_{\%} = \frac{\overline{U}}{N-1} \cdot 100,
   \label{eq:netdisc}
 \end{equation}
-dove il denominatore $N-1$ esclude la boa stessa dall'insieme dei nodi
-scopribili.
+dove il denominatore $N-1$ \`e il massimo numero di nodi che una boa pu\`o
+scoprire, poich\'e $S_i$ non include mai la boa stessa. A scoperta completa
+ogni $|S_i|$ vale $N-1$, dunque $\overline{U}=N-1$ e $D_{\%}=100\%$.
 
 \paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Esprime
-l'affidabilit\`a del singolo link radio, ossia la probabilit\`a che un frame
+l'affidabilit\`a delle trasmissioni, ossia la probabilit\`a che un frame
 in aria raggiunga integro un nodo in ascolto. Per ogni trasmissione, il canale
 conta i destinatari entro la portata (opportunit\`a di ricezione) e le boe
 contano le ricezioni andate a buon fine:
@@ -165,73 +176,26 @@ contano le ricezioni andate a buon fine:
 con $R_{\text{rx}}$ il totale delle ricezioni riuscite e $R_{\text{opp}}$ il
 totale delle opportunit\`a (trasmissione $\times$ destinatario in portata).
 
-\paragraph{PDR di rete.} Esprime la capacit\`a della rete di consegnare i
-beacon \emph{unici}, escludendo le copie: un beacon generato \`e considerato
-consegnato la prima volta che raggiunge un qualunque nodo (i duplicati della
-stessa coppia origine--timestamp non vengono riconteggiati). I rilanci della
-modalit\`a forwarded sono esclusi dal denominatore, perch\'e ritrasmettono
-beacon gi\`a esistenti e conteggiarli interferirebbe con il confronto tra le
-modalit\`a:
-\begin{equation}
-  \text{PDR}_{\text{rete}} = \frac{B_{\text{consegnati}}}{B_{\text{inviati}} - B_{\text{inoltrati}}},
-  \label{eq:netpdr}
-\end{equation}
-dove $B_{\text{inviati}}$ conta tutte le trasmissioni e $B_{\text{inoltrati}}$
-i soli rilanci.
-
 \paragraph{Collision rate.} Esprime la frazione delle opportunit\`a di
-ricezione perse per collisione, incluse le ricezioni revocate
-(\texttt{poisoned}) dal meccanismo del terminale nascosto
-(Sezione~\ref{sec:broadcast-impl}):
+ricezione $R_{\text{opp}}$ perse per collisione:
 \begin{equation}
-  CR = \frac{C_{\text{dirette}} + C_{\text{revocate}}}{R_{\text{opp}}},
+  CR = \frac{C}{R_{\text{opp}}},
   \label{eq:collrate}
 \end{equation}
-con $C_{\text{dirette}}$ le ricezioni perse per collisione diretta e
-$C_{\text{revocate}}$ quelle revocate a posteriori.
+con $C$ il totale delle collisioni avvenute, sia dirette che provocate da un terminale nascosto (Sezione~\ref{sec:broadcast-impl}).
 
 \paragraph{Packet loss.} Esprime la frazione complessiva delle opportunit\`a
-di ricezione perse, a prescindere dalla causa: collisioni, ricezioni revocate
-e perdita probabilistica del canale non ideale (Eq.~\ref{eq:delivery-prob}):
+di ricezione $R_{\text{opp}}$ perse a causa di collisioni ed errori del canale non ideale (Eq.~\ref{eq:delivery-prob}):
 \begin{equation}
-  PL = \frac{C_{\text{dirette}} + C_{\text{revocate}} + L_{\text{canale}}}{R_{\text{opp}}},
+  PL = \frac{C + E_{\text{canale}}}{R_{\text{opp}}},
   \label{eq:packetloss}
 \end{equation}
-con $L_{\text{canale}}$ le perdite dovute al canale. Vale $PL \ge CR$, e la
+con $E_{\text{canale}}$ le perdite dovute al canale. Vale $PL \ge CR$, e la
 differenza tra le due evidenzia il contributo delle perdite dovute al canale
 rispetto a quelle della contesa.
 
-\paragraph{Neighbors-to-receivers ratio and delta (rapporto e differenza tra
-vicini annunciati e destinatari in portata).} Esprimono l'amplificazione
-dell'informazione di vicinato trasportata dai beacon rispetto alla copertura
-fisica del mittente, ossia l'efficacia delle modalit\`a multihop
-nell'annunciare pi\`u nodi di quanti ne siano direttamente raggiungibili. A
-ogni trasmissione il canale registra la lunghezza della lista vicini
-annunciata e il numero di possibili destinatari entro il raggio di
-trasmissione, gli stessi gi\`a conteggiati come opportunit\`a di ricezione
-nell'Eq.~\ref{eq:bpdr}. Dette $a_t$ e $r_t$ queste quantit\`a relative alla
-trasmissione $t$, il rapporto \`e calcolato sui totali:
-\begin{equation}
-  \rho = \frac{\sum_{t} a_t}{\sum_{t} r_t},
-  \label{eq:neighratio}
-\end{equation}
-ossia il rapporto tra la lunghezza media delle liste annunciate e il numero
-medio di destinatari raggiungibili per trasmissione. Un valore di $\rho$
-prossimo a $1$ indica che i beacon trasportano informazione all'incirca pari
-all'insieme dei nodi che i mittenti possono raggiungere fisicamente in quel
-momento; valori superiori segnalano invece che i beacon annunciano pi\`u nodi
-di quanti i mittenti ne possano raggiungere direttamente. Questa
-amplificazione rileva l'efficacia della modalit\`a append, che estende la
-conoscenza con i nodi scoperti a pi\`u hop (Sezione~\ref{sec:append-impl}).
-Dalle stesse quantit\`a si deriva anche il differenziale medio:
-\begin{equation}
-    \Delta_{a_t, r_t} = \frac{1}{T}\sum_t (a_t - r_t),
-    \label{eq:neighdelta}
-\end{equation}
-con $T$ il numero totale di trasmissioni.
-
-\paragraph{Latenze.} Esprimono i tempi caratteristici della diffusione dei
+\paragraph{Latenze.} Esprimono i tempi relativi alla diffusione dei
 beacon nella rete. Vengono registrate la \emph{latenza di consegna} (tempo tra
 generazione e prima ricezione di un beacon), la \emph{latenza di reazione}
 (tempo perch\'e un nodo scopra per la prima volta una data origine) e la
-gi\`a citata latenza di scheduler (Sezione~\ref{sec:txpipeline}).
+gi\`a citata latenza di scheduler (tempo trascorso tra la decisione di trasmettere e l’effettivo inizio della trasmissione, Sezione~\ref{sec:txpipeline}).
