@@ -1,22 +1,22 @@
 simulation:
   schedulers:
   - static
-  # - dynamic_adab
-  # - dynamic_acab
+  - dynamic_adab
+  - dynamic_acab
   min_buoys: 20
-  max_buoys: 100
+  max_buoys: 120
   step_buoys: 20
   intervals:
    - 1.0   
    - 0.5
    - 0.25
-  duration: 120
+  duration: 200
   num_processes: 10
   ideal_channel: true
   # Options: static, ramp, random
   scenario: random          
   # Percentage of buoys that can change per update in random scenario 
-  random_variability: 0.10
+  random_variability: 0.3
   enable_metrics: true
   enable_logging: false
   enable_file_logging: false
@@ -26,7 +26,7 @@ simulation:
   - append
   - forward
   # Maximum hops for forward mode
-  multihop_limit: 4
+  multihop_limit: 7
   # Append mode hop horizon (1 = direct neighbors only, 0 = unlimited).
   # CURRENTLY INACTIVE — not enforced in code; append advertises all discovered nodes.
   append_hop_limit: 2
@@ -38,11 +38,11 @@ simulation:
   forward_density_baseline: 5
 
 world:
-  width: 500.0
-  height: 500.0
+  width: 800.0
+  height: 800.0
 
 buoys:
-  mobile_percentage: 0.4
+  mobile_percentage: 0.3
   default_velocity: 15.0
   # m/s – lower bound per leg
   rwp_speed_min: 5.0 
