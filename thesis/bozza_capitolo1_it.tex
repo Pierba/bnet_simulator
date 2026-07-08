@@ -1,68 +1,152 @@
 % =====================================================================
 %  BOZZA - Capitolo 1 (italiano)
-%  Introduzione e accenno allo stato dell'arte
+%  Introduzione: progetto di tirocinio, obiettivi, attivita' svolte,
+%  accenno allo stato dell'arte e struttura della tesi.
 % =====================================================================
 \chapter{Introduzione}
 \label{ch:introduzione}
 
+Questa tesi documenta il progetto svolto durante il tirocinio interno presso
+il Dipartimento di Informatica della Sapienza Universit\`a di Roma, nel
+gruppo di ricerca della Prof.ssa Gaia Maselli. Il tirocinio si inserisce nel
+progetto ProSafe~\cite{prosafe}, un sistema di boe intelligenti per la
+sicurezza di prossimit\`a nelle acque costiere, e ha avuto come obiettivo
+l'estensione del suo simulatore con meccanismi di conoscenza multi-hop della
+rete e la loro valutazione sperimentale. Questo capitolo introduce il
+contesto del progetto, il problema affrontato, gli obiettivi assegnati e le
+attivit\`a svolte, e si chiude con un accenno allo stato dell'arte e con la
+struttura del documento.
+
 % ---------------------------------------------------------------------
-\section{Contesto e motivazione}
+\section{Il contesto: il progetto ProSafe}
 \label{sec:intro-contesto}
 Le acque costiere mettono a contatto due popolazioni che faticano a vedersi.
 Da un lato ci sono i mezzi grandi --- motoscafi, traghetti, pescherecci ---
 dotati di radar e del sistema di identificazione automatica (AIS). Dall'altro
 ci sono le persone in acqua e i piccoli mezzi attorno a loro: nuotatori,
 snorkeler, sub, pagaiatori e kayaker. Gli strumenti che proteggono la prima
-popolazione non sono stati pensati per rilevare la seconda. I sistemi AIS
-sono costosi, assorbono molta energia e non sono obbligatori per i piccoli
-mezzi. I beacon satellitari sono pensati per le emergenze gi\`a in corso, non
-per la consapevolezza continua necessaria a evitare le collisioni. Il
-tracciamento via smartphone dipende dalla copertura cellulare, che a poche
-centinaia di metri dalla costa \`e gi\`a inaffidabile. Il risultato \`e un
-divario di visibilit\`a: proprio gli utenti marittimi pi\`u vulnerabili sono
-invisibili ai mezzi che pi\`u facilmente possono ferirli.
+popolazione non sono stati pensati per rilevare la seconda: i sistemi AIS
+sono costosi, energivori e non obbligatori per i piccoli mezzi; i beacon
+satellitari sono pensati per le emergenze gi\`a in corso, non per la
+consapevolezza continua necessaria a evitare le collisioni; il tracciamento
+via smartphone dipende dalla copertura cellulare, gi\`a inaffidabile a poche
+centinaia di metri dalla costa. Il risultato \`e un divario di visibilit\`a:
+proprio gli utenti marittimi pi\`u vulnerabili sono invisibili ai mezzi che
+pi\`u facilmente possono ferirli.
 
-Colmare questo divario richiede una tecnologia al tempo stesso economica, a
-basso consumo, a corto raggio e priva di infrastruttura fissa. Il Wi-Fi
-(IEEE~802.11) soddisfa questi requisiti proprio perch\'e \`e onnipresente:
-l'economia di scala dei chipset di largo consumo ne abbatte il costo, e la
-rilevazione di prossimit\`a basata su Wi-Fi \`e gi\`a stata sperimentata con
-successo in altri domini~\cite{goel-wifi}. Una boa costruita attorno a uno di
-questi chipset pu\`o trasmettere un breve frame che annuncia la propria
-posizione senza associarsi ad alcun access point, senza connessione a Internet
-e senza un coordinatore centrale; a un'imbarcazione basta restare in ascolto.
+Il progetto ProSafe~\cite{prosafe}, sviluppato dal gruppo di ricerca presso
+cui si \`e svolto il tirocinio e presentato alla trentesima edizione della
+European Wireless Conference, colma questo divario con una tecnologia al
+tempo stesso economica, a basso consumo, a corto raggio e priva di
+infrastruttura fissa: il Wi-Fi (IEEE~802.11). L'economia di scala dei chipset
+di largo consumo ne abbatte il costo, e la rilevazione di prossimit\`a basata
+su Wi-Fi \`e gi\`a stata sperimentata con successo in altri
+domini~\cite{vanhyfte-proximity}. In ProSafe delle boe intelligenti dotate di
+GPS trasmettono periodicamente un breve frame broadcast che ne annuncia la
+posizione, senza associarsi ad alcun access point, senza connessione a
+Internet e senza un coordinatore centrale; alle imbarcazioni basta restare in
+ascolto per generare un allarme locale quando una boa \`e in portata.
 L'hardware costa poche decine di euro, il raggio utile in acqua aperta \`e
 dell'ordine del centinaio di metri e il sistema degrada in modo graduale,
-perch\'e non c'\`e nulla di centralizzato che possa guastarsi. \`E questa
-l'idea alla base di ProSafe, il sistema di boe intelligenti entro cui si
-colloca il presente lavoro.
+perch\'e non c'\`e nulla di centralizzato che possa guastarsi. Accanto al
+sistema, il progetto comprende un simulatore a eventi discreti dedicato al
+beaconing Wi-Fi senza infrastruttura --- descritto nel
+Capitolo~\ref{ch:simulatore} --- con cui i protocolli vengono valutati in
+condizioni controllate e riproducibili: \`e su questo simulatore che si \`e
+concentrato il lavoro di tirocinio.
 
 % ---------------------------------------------------------------------
-\section{Il problema: scalabilit\`a del broadcast e consapevolezza oltre un hop}
+\section{Il problema affrontato}
 \label{sec:intro-problema}
-Il Wi-Fi, per\`o, non \`e stato progettato per il broadcast in contesti critici
-per la sicurezza. La sua Distributed Coordination Function (DCF) arbitra il
-mezzo con parametri CSMA/CA fissi, che non si adattano al numero di nodi in
-contesa. A peggiorare le cose, i frame broadcast non vengono mai confermati:
-il mittente non riceve riscontro, non pu\`o accorgersi di una collisione e non
-pu\`o quindi ricorrere al backoff esponenziale binario che protegge il traffico
-unicast. Al crescere del numero di boe nel raggio radio cresce la
-probabilit\`a che due trasmettano insieme, e i beacon coinvolti vanno persi in
-silenzio. Per un sistema di sicurezza \`e la modalit\`a di guasto peggiore:
-un beacon perso \`e una persona non rilevata, e nessuno se ne accorge.
+Nel protocollo ProSafe di partenza ogni beacon informa soltanto sul proprio
+mittente: la conoscenza di ciascun nodo si ferma ai vicini entro la portata
+radio, circa \SI{120}{\metre}. Un'imbarcazione che si avvicina a un gruppo di
+nuotatori, per\`o, ha interesse a conoscere l'intero gruppo, compresi i
+membri momentaneamente schermati da un'onda, da uno scafo o semplicemente
+troppo lontani. La consapevolezza dovrebbe quindi propagarsi oltre il singolo
+hop radio.
 
-A questo si aggiunge un secondo problema. Un beacon, da solo, informa soltanto
-sul proprio mittente. Un'imbarcazione che si avvicina a un gruppo di nuotatori,
-per\`o, ha interesse a conoscere l'intero gruppo, compresi i membri
-momentaneamente nascosti da un'onda o da uno scafo. La consapevolezza dovrebbe
-quindi propagarsi oltre il singolo hop radio. Ma ogni trasmissione spesa per
-propagarla compete per lo stesso canale --- gi\`a scarso e privo di conferme ---
-che il problema di scalabilit\`a sta gi\`a mettendo sotto pressione. La
-frequenza di beaconing (\emph{quando} trasmettere) e la propagazione della
-consapevolezza (\emph{fino a dove} diffondere ci\`o che si ascolta) non sono
-quindi parametri indipendenti: attingono allo stesso budget di canale e vanno
-progettate insieme. Questa tesi si concentra sul secondo aspetto, senza mai
+Estendere la propagazione non \`e per\`o gratuito. Il Wi-Fi non \`e stato
+progettato per il broadcast in contesti critici per la sicurezza: la sua
+Distributed Coordination Function (DCF) arbitra il mezzo con parametri
+CSMA/CA fissi, che non si adattano al numero di nodi in contesa, e i frame
+broadcast non vengono mai confermati --- il mittente non riceve riscontro,
+non pu\`o accorgersi di una collisione e non pu\`o ricorrere al backoff
+esponenziale binario che protegge il traffico unicast. Al crescere del numero
+di boe nel raggio radio cresce la probabilit\`a che due trasmettano insieme,
+e i beacon coinvolti vanno persi in silenzio. Per un sistema di sicurezza \`e
+la modalit\`a di guasto peggiore: un beacon perso \`e una persona non
+rilevata, e nessuno se ne accorge. Ogni trasmissione spesa per propagare la
+consapevolezza oltre il primo hop compete per lo stesso canale --- gi\`a
+scarso e privo di conferme --- che la scalabilit\`a del broadcast sta gi\`a
+mettendo sotto pressione. La frequenza di beaconing (\emph{quando}
+trasmettere) e la propagazione della consapevolezza (\emph{fino a dove}
+diffondere ci\`o che si ascolta) non sono quindi parametri indipendenti:
+attingono allo stesso budget di canale e vanno progettate insieme. Il
+progetto di tirocinio si \`e concentrato sul secondo aspetto, senza mai
 perdere di vista il primo.
+
+% ---------------------------------------------------------------------
+\section{Obiettivi del tirocinio}
+\label{sec:intro-obiettivi}
+Il punto di partenza del tirocinio \`e il simulatore a eventi discreti di
+ProSafe, che gi\`a modellava il canale broadcast calibrato su misure sul
+campo, la contesa CSMA/CA, la mobilit\`a dei nodi e i tre protocolli di
+beaconing che regolano gli istanti di trasmissione: il riferimento statico
+SBP, l'adattamento basato sulla densit\`a ADAB~\cite{prosafe} e lo scheduler
+context-aware ACAB. Su questa base, gli obiettivi assegnati al progetto sono
+stati i seguenti:
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{progettare} meccanismi di disseminazione multi-hop con cui le
+  boe condividono la conoscenza della rete oltre il primo hop radio,
+  contenendo il costo in traffico e collisioni;
+  \item \textbf{implementarli} nel simulatore esistente, integrandoli con la
+  pipeline di trasmissione e con i protocolli di beaconing gi\`a presenti,
+  senza alterare il comportamento delle componenti preesistenti;
+  \item \textbf{valutarli} con una campagna sperimentale sistematica, che ne
+  quantifichi il compromesso tra estensione della copertura, affidabilit\`a
+  della consegna e scalabilit\`a al crescere della densit\`a dei nodi.
+\end{enumerate}
+
+% ---------------------------------------------------------------------
+\section{Attivit\`a svolte e contributi}
+\label{sec:intro-contributi}
+Il lavoro si \`e articolato in quattro attivit\`a principali, che
+costituiscono i contributi di questa tesi.
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{Studio del sistema esistente.} La prima fase ha riguardato
+  l'analisi del protocollo ProSafe e dell'architettura del simulatore ---
+  ciclo a eventi discreti, macchina a stati della boa, modello di canale e
+  protocolli di beaconing --- necessaria per individuare i punti di
+  estensione senza comprometterne il determinismo e la riproducibilit\`a.
+  \item \textbf{Progettazione e implementazione di due modalit\`a di
+  conoscenza multi-hop} (contributo centrale). La modalit\`a di
+  \emph{forwarding aggregato} allega a ogni beacon la lista dei nodi
+  conosciuti senza inviare frame in pi\`u; la modalit\`a di \emph{forwarding
+  singolo} rilancia attivamente i beacon ricevuti entro un limite di hop, con
+  meccanismi di contenimento del broadcast storm (deduplicazione per origine,
+  TTL, coda limitata). Le due modalit\`a rappresentano scelte opposte nel
+  compromesso fra copertura e costo di canale e si combinano liberamente con
+  ciascuno dei tre protocolli di beaconing, cos\`i da valutare insieme la
+  decisione su \emph{quando} trasmettere e quella su \emph{che cosa}
+  propagare. Sono stati inoltre progettati due miglioramenti --- un limite di
+  hop per il forwarding aggregato e un gate di inoltro density-aware ---
+  presenti nel codice ma la cui valutazione \`e demandata ai lavori futuri.
+  \item \textbf{Estensione della raccolta delle metriche.} Alle metriche
+  esistenti si sono affiancate la percentuale media di rete scoperta e le
+  latenze di consegna e di reazione, cos\`i da distinguere l'affidabilit\`a
+  del singolo link radio (B-PDR) dalla consapevolezza effettiva che i nodi
+  costruiscono della rete.
+  \item \textbf{Campagna sperimentale e analisi dei risultati.} Le tre
+  modalit\`a di inoltro sono state confrontate combinando due condizioni di
+  canale, tre intervalli di beaconing e tre protocolli su cinque livelli di
+  densit\`a, con 20 repliche indipendenti per configurazione. I risultati
+  (Capitolo~\ref{ch:risultati}) mostrano che l'inoltro multi-hop \`e
+  indispensabile alla scoperta della rete e che il forwarding aggregato ne
+  eguaglia la copertura a una frazione del costo in collisioni del forwarding
+  singolo, specie in combinazione con il beaconing adattivo.
+\end{enumerate}
 
 % ---------------------------------------------------------------------
 \section{Accenno allo stato dell'arte}
@@ -80,7 +164,8 @@ minuti e segnalazione ai centri di soccorso anzich\'e ai mezzi vicini. Le
 applicazioni per smartphone dipendono dalla copertura cellulare al largo e da
 un'infrastruttura a terra. Ciascuna di queste tecnologie \`e quindi troppo
 costosa, troppo lenta o legata a un'infrastruttura, e nessuna affronta la
-rilevazione continua a corto raggio.
+rilevazione continua a corto raggio: \`e il vuoto che ProSafe~\cite{prosafe}
+mira a colmare.
 
 \paragraph{MAC IEEE~802.11 e broadcast.}
 La DCF \`e costruita sul Carrier-Sense Multiple Access with Collision
@@ -103,13 +188,16 @@ Lo schema pi\`u semplice trasmette a periodo fisso: banale da analizzare, ma
 con un carico di canale che cresce linearmente con il numero di nodi. Gli
 schemi adattivi regolano invece la frequenza in base alle condizioni locali.
 La letteratura, proveniente soprattutto dalle reti veicolari e mobili ad hoc,
-propone adattamento basato sulla densit\`a~\cite{takai-dvcs}, sulla
-mobilit\`a~\cite{alotaibi-adaptive} e context-aware, che pesa pi\`u fattori
-insieme~\cite{sommer-adaptive}; le rassegne sulla scoperta dei dispositivi ne
-confermano i guadagni di efficienza~\cite{chen-survey}, e gli studi sulle
-VANET quelli di affidabilit\`a~\cite{zhao-vanet}. La maggior parte di questi
-schemi assume per\`o link bidirezionali, accesso coordinato o instradamento a
-livello IP: condizioni che il contesto marittimo non offre.
+propone adattamento basato sul carico e sulla densit\`a
+locale~\cite{schmidt-adaptive}, sulla dinamica dei
+vicini~\cite{alotaibi-adaptive} e context-aware, che pesa pi\`u fattori
+insieme~\cite{sommer-adaptive}; le rassegne sul beaconing adattivo ne
+confermano i guadagni di efficienza e affidabilit\`a~\cite{shah-survey}. La
+maggior parte di questi schemi assume per\`o link bidirezionali, accesso
+coordinato o instradamento a livello IP: condizioni che il contesto marittimo
+non offre. I protocolli adattivi di ProSafe --- ADAB e ACAB, richiamati nel
+Capitolo~\ref{ch:risultati} --- adottano la stessa filosofia operando
+esclusivamente a livello MAC.
 
 \paragraph{Consapevolezza oltre un hop.}
 Estendere la consapevolezza oltre i vicini diretti si ottiene di solito in due
@@ -119,8 +207,9 @@ frame ricevuti entro un limite di hop. Il flooding massimizza la portata ma
 \`e noto per il \emph{broadcast storm}~\cite{broadcaststorm}: in reti dense i
 rilanci ridondanti collidono e congestionano il mezzo. Il piggyback \`e pi\`u
 economico, ma limitato quanto a distanza e freschezza dell'informazione che
-pu\`o trasportare. Le modalit\`a \emph{append} e \emph{forwarded} studiate in
-questa tesi realizzano rispettivamente il primo e il secondo approccio.
+pu\`o trasportare. Le modalit\`a di forwarding aggregato e di forwarding
+singolo progettate in questo lavoro realizzano rispettivamente il primo e il
+secondo approccio.
 
 \paragraph{Il ruolo della simulazione.}
 Gli esperimenti fisici con molti nodi sono costosi e difficili da riprodurre,
@@ -128,56 +217,21 @@ e i dispiegamenti in mare aggravano ogni difficolt\`a. I simulatori
 generalisti come ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp} offrono stack
 completi, ma con un overhead notevole quando lo studio mira a un singolo
 meccanismo. Per domande mirate a livello MAC un simulatore dedicato \`e spesso
-preferibile, al prezzo di una validazione attenta: qui \`e ottenuta calibrando
-il modello di canale su misure sul campo.
-
-% ---------------------------------------------------------------------
-\section{Contributi della tesi}
-\label{sec:intro-contributi}
-Il punto di partenza \`e un simulatore a eventi discreti dedicato al beaconing
-Wi-Fi senza infrastruttura, che gi\`a modellava il canale broadcast e i
-protocolli di beaconing. Su questa base la tesi d\`a i contributi seguenti.
-
-\begin{enumerate}[leftmargin=1.4em]
-  \item \textbf{Due meccanismi di consapevolezza multihop} (contributo
-  centrale). Si implementano e si confrontano la modalit\`a \emph{append},
-  che allega a ogni beacon la lista dei nodi conosciuti senza inviare frame
-  in pi\`u, e la modalit\`a \emph{forwarded}, che rilancia attivamente i
-  beacon ricevuti entro un limite di hop, con meccanismi di contenimento del
-  broadcast storm (deduplicazione per origine, TTL, coda limitata). I due
-  meccanismi estendono la conoscenza che ogni nodo ha della rete e
-  rappresentano due scelte opposte nel compromesso fra copertura e costo di
-  canale. Si progettano inoltre due miglioramenti --- un limite di hop per
-  l'append e un gate di forwarding density-aware --- presenti nel codice ma
-  la cui valutazione \`e lasciata ai lavori futuri.
-  \item \textbf{Il confronto sistematico con tre protocolli di beaconing.}
-  Le due modalit\`a si combinano con ciascuno dei protocolli gi\`a presenti
-  nel simulatore --- il riferimento statico SBP, l'adattamento basato sulla
-  densit\`a ADAB e lo scheduler context-aware ACAB, che fonde densit\`a dei
-  vicini, tempo dall'ultimo contatto e mobilit\`a del nodo --- cos\`i da
-  valutare insieme la decisione su \emph{quando} trasmettere e quella su
-  \emph{che cosa} propagare.
-  \item \textbf{Una suite di metriche disaccoppiata.} Si separa
-  l'affidabilit\`a del singolo link radio (B-PDR) dalla consegna dei beacon
-  unici a livello di rete (PDR di rete), e si aggiungono la percentuale di
-  rete scoperta e le latenze di consegna e di reazione, cos\`i da distinguere
-  l'affidabilit\`a del canale dalla consapevolezza effettiva dei nodi.
-  \item \textbf{Una valutazione controllata e riproducibile.} Il modello di
-  canale \`e calibrato su misure sul campo, la mobilit\`a segue il modello
-  Random Waypoint e la popolazione di boe varia nel tempo, per valutare i
-  protocolli in condizioni vicine a quelle reali ma ripetibili.
-\end{enumerate}
+preferibile, al prezzo di una validazione attenta: nel simulatore di ProSafe
+essa \`e ottenuta calibrando il modello di canale su misure sul campo.
 
 % ---------------------------------------------------------------------
 \section{Struttura della tesi}
 \label{sec:intro-struttura}
-Il Capitolo~\ref{ch:contributo} presenta il contributo della tesi: introduce
+Il resto del documento \`e organizzato come segue. Il
+Capitolo~\ref{ch:contributo} presenta il contributo del progetto: introduce
 il modello di comunicazione e la struttura del beacon, descrive le due
-modalit\`a multihop con le formule che ne governano il comportamento e chiude
-con i due miglioramenti progettati ma non ancora attivi. Il Capitolo~\ref{ch:simulatore} descrive l'implementazione: il
-motore a eventi discreti, la macchina a stati della boa, la realizzazione
-delle modalit\`a multihop, il modello di canale calibrato, la configurazione,
-le metriche e il modello di mobilit\`a. Il Capitolo~\ref{ch:risultati}
-richiama i tre protocolli di beaconing che regolano gli istanti di
-trasmissione e riporta la valutazione sperimentale; il capitolo conclusivo
-riassume il lavoro e indica gli sviluppi futuri.
+modalit\`a multi-hop con le formule che ne governano il comportamento e
+chiude con i due miglioramenti progettati ma non ancora attivi. Il
+Capitolo~\ref{ch:simulatore} descrive l'implementazione: il motore a eventi
+discreti, la macchina a stati della boa, la realizzazione delle modalit\`a
+multi-hop, il modello di canale calibrato, la configurazione, le metriche e
+il modello di mobilit\`a. Il Capitolo~\ref{ch:risultati} richiama i tre
+protocolli di beaconing che regolano gli istanti di trasmissione e riporta la
+valutazione sperimentale condotta; il capitolo conclusivo riassume il lavoro
+svolto durante il tirocinio e indica gli sviluppi futuri.

@@ -1,10 +1,8 @@
 % =====================================================================
 %  BOZZA - Sommario (italiano)
 %
-%  Versione italiana qualitativa dell'abstract, allineata alla nuova
-%  struttura a tre capitoli scritti (Introduzione, Contributo,
-%  Implementazione). Niente numeri specifici: i risultati quantitativi
-%  arriveranno nel capitolo dedicato.
+%  Allineato alla struttura definitiva della tesi (progetto di
+%  tirocinio: introduzione, contributo, implementazione, risultati).
 % =====================================================================
 \chapter*{Sommario}
 \addcontentsline{toc}{chapter}{Sommario}
@@ -13,26 +11,32 @@ Nuotatori, snorkeler, sub e kayaker sono poco visibili alle imbarcazioni che
 condividono le acque costiere. Le tecnologie di sicurezza pensate per le grandi
 navi, come l'AIS, i beacon satellitari di emergenza e il tracciamento cellulare,
 sono troppo costose, troppo lente o legate a un'infrastruttura che al largo non
-esiste. Un'alternativa praticabile \`e usare la radio Wi-Fi gi\`a presente in
-molti dispositivi come beacon di prossimit\`a senza infrastruttura: delle boe
-intelligenti trasmettono periodicamente brevi frame broadcast con la propria
-posizione, che le imbarcazioni vicine ascoltano.
+esiste. Il progetto ProSafe affronta il problema con boe intelligenti che
+trasmettono periodicamente brevi frame broadcast Wi-Fi con la propria
+posizione, che le imbarcazioni vicine ascoltano senza bisogno di alcuna
+infrastruttura.
 
-Questa tesi lavora su un simulatore a eventi discreti per il beaconing broadcast
-IEEE~802.11 e si concentra sulla propagazione della consapevolezza oltre il
-singolo hop radio. Il contributo principale \`e l'implementazione e il confronto
-di due meccanismi che estendono la conoscenza che ogni nodo ha della rete: la
-modalit\`a \emph{append}, che aggiunge a ogni beacon la lista dei nodi gi\`a
-conosciuti senza inviare frame in pi\`u, e la modalit\`a \emph{forwarded}, che
-rilancia attivamente i beacon ricevuti entro un limite di hop. Accanto a questi
-meccanismi si descrivono i protocolli che decidono \emph{quando} una boa
-trasmette: il beaconing statico a intervallo fisso (SBP), l'adattamento basato
-sulla densit\`a (ADAB) e lo scheduler context-aware ACAB, che combina densit\`a
-dei vicini, tempo dall'ultimo contatto e mobilit\`a del nodo.
+Questa tesi documenta il progetto svolto durante un tirocinio interno presso
+il gruppo di ricerca che sviluppa ProSafe. Nel protocollo di partenza la
+conoscenza di ogni nodo si ferma ai vicini entro la portata radio; il lavoro
+di tirocinio ha esteso il simulatore a eventi discreti del progetto con due
+meccanismi che propagano la consapevolezza oltre il singolo hop: il
+\emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi gi\`a
+conosciuti senza inviare frame in pi\`u, e il \emph{forwarding singolo}, che
+rilancia i beacon ricevuti entro un limite di hop con meccanismi di
+contenimento del broadcast storm. Le due modalit\`a si combinano con i
+protocolli che decidono \emph{quando} una boa trasmette: il beaconing statico
+a intervallo fisso (SBP), l'adattamento basato sulla densit\`a (ADAB) e lo
+scheduler context-aware ACAB.
 
-Il modello di canale \`e calibrato su misure in mare aperto, la mobilit\`a segue
-il modello Random Waypoint e la popolazione di boe varia nel tempo per imitare gli
-utenti che entrano ed escono dall'acqua. I capitoli che seguono presentano la
-motivazione del lavoro, il progetto dei due meccanismi multihop con le formule che
-ne governano il comportamento, e l'implementazione nel simulatore. La valutazione
-sperimentale e le conclusioni sono lasciate ai capitoli successivi.
+Il modello di canale \`e calibrato su misure sul campo, la mobilit\`a segue
+il modello Random Waypoint e la popolazione di boe varia nel tempo per
+imitare gli utenti che entrano ed escono dall'acqua. La campagna sperimentale
+--- due condizioni di canale, tre intervalli di beaconing, tre protocolli e
+cinque livelli di densit\`a, con 20 repliche per configurazione --- mostra
+che l'inoltro multi-hop \`e indispensabile alla scoperta della rete e che il
+forwarding aggregato ne eguaglia la copertura a una frazione del costo in
+collisioni del forwarding singolo, diffondendo inoltre la conoscenza pi\`u
+rapidamente; il beaconing adattivo assorbe quasi interamente la contesa
+aggiuntiva introdotta dall'inoltro, rendendo la combinazione ADAB--forwarding
+aggregato il compromesso migliore nelle condizioni realistiche.
