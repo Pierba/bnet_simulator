@@ -1,0 +1,158 @@
+% =====================================================================
+%  BOZZA - Capitolo 5 (italiano)
+%  Conclusioni: riepilogo del lavoro di tirocinio, risultati principali,
+%  limiti dello studio, sviluppi futuri e considerazioni finali.
+% =====================================================================
+\chapter{Conclusioni}
+\label{ch:conclusioni}
+
+Questo capitolo chiude la tesi ripercorrendo il lavoro svolto durante il
+tirocinio e i suoi esiti. Si riepilogano dapprima le attivit\`a condotte
+rispetto agli obiettivi assegnati (Sezione~\ref{sec:concl-riepilogo}), quindi
+i risultati principali della valutazione sperimentale
+(Sezione~\ref{sec:concl-risultati}). Seguono i limiti dello studio
+(Sezione~\ref{sec:concl-limiti}), le direzioni di sviluppo che il lavoro
+lascia aperte (Sezione~\ref{sec:concl-futuro}) e alcune considerazioni
+conclusive (Sezione~\ref{sec:concl-finale}).
+
+% ---------------------------------------------------------------------
+\section{Riepilogo del lavoro svolto}
+\label{sec:concl-riepilogo}
+Il tirocinio si \`e inserito nel progetto ProSafe~\cite{prosafe}, il sistema
+di boe intelligenti per la sicurezza di prossimit\`a nelle acque costiere
+sviluppato dal gruppo di ricerca ospitante. Il protocollo di partenza limita
+la conoscenza di ogni nodo ai vicini entro la portata radio; l'obiettivo del
+progetto era estendere questa conoscenza oltre il primo hop, contenendone il
+costo sul canale, e quantificarne il compromesso con una valutazione
+sperimentale sistematica (Sezione~\ref{sec:intro-obiettivi}).
+
+Tutti e tre gli obiettivi assegnati sono stati raggiunti. Sono state
+progettate due modalit\`a di disseminazione multi-hop dagli approcci opposti:
+il \emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi
+conosciuti senza generare frame aggiuntivi, e il \emph{forwarding singolo},
+che rilancia i beacon ricevuti entro un limite di hop con meccanismi di
+contenimento del broadcast storm (Capitolo~\ref{ch:contributo}). Entrambe
+sono state implementate nel simulatore a eventi discreti del progetto,
+integrandole nella pipeline di trasmissione CSMA/CA esistente senza alterare
+il comportamento delle componenti preesistenti, e affiancandovi le metriche
+necessarie a misurarne gli effetti (Capitolo~\ref{ch:simulatore}). Le
+modalit\`a sono state infine confrontate in una campagna che combina due
+condizioni di canale, tre intervalli di beaconing e tre protocolli di
+scheduling su cinque livelli di densit\`a, con 20 repliche indipendenti per
+configurazione (Capitolo~\ref{ch:risultati}).
+
+% ---------------------------------------------------------------------
+\section{Risultati principali}
+\label{sec:concl-risultati}
+La valutazione sperimentale ha prodotto quattro indicazioni principali.
+
+\paragraph{L'inoltro multi-hop \`e una necessit\`a, non un'ottimizzazione.}
+Nello scenario adottato --- area ampia rispetto alla portata radio e
+popolazione in continuo ricambio --- il beaconing single-hop si ferma al
+63--77\% di rete scoperta nel canale ideale e al 50--68\% in quello con
+perdite, senza mai convergere. Entrambe le modalit\`a multi-hop completano
+invece di fatto la scoperta dai 60 nodi in su, in entrambe le condizioni di
+canale.
+
+\paragraph{Il forwarding aggregato domina il forwarding singolo.} A parit\`a
+di copertura, l'aggregato paga una frazione del costo in contesa del singolo
+(a 100 boe nel canale ideale, collision rate 0.163 contro 0.553 con SBP e
+0.035 contro 0.421 con ACAB) e diffonde la conoscenza pi\`u rapidamente
+(latenza di reazione di circa \SI{16}{ms} contro 89--115~\si{ms}): affidare
+la disseminazione all'allungamento dei frame anzich\'e a trasmissioni
+aggiuntive si \`e rivelata la scelta pi\`u efficiente lungo tutti gli assi
+misurati. Il forwarding singolo conserva la semplicit\`a del meccanismo e un
+delivery ratio migliore nei soli scenari sparsi con canale con perdite.
+
+\paragraph{Il beaconing adattivo rende l'inoltro sostenibile.} ADAB e ACAB
+assorbono quasi interamente la contesa aggiuntiva introdotta dal forwarding
+aggregato --- mantenendo il B-PDR sopra 0.94 nel canale ideale fino a 100 boe
+--- e rendono le prestazioni insensibili all'intervallo di beaconing
+configurato, l\`a dove SBP degrada rapidamente con densit\`a e frequenza di
+trasmissione. Segnali puramente locali, come il conteggio dei vicini,
+bastano dunque a regolare il traffico anche quando il carico \`e amplificato
+dall'inoltro, senza alcun coordinamento centralizzato.
+
+\paragraph{La combinazione migliore dipende dal canale.} Nelle condizioni
+realistiche di canale con perdite, ADAB--forwarding aggregato \`e emerso come
+il compromesso complessivamente migliore: scoperta pressoch\'e completa a
+ogni densit\`a e affidabilit\`a al livello del semplice single-hop.
+ACAB--forwarding aggregato massimizza invece l'affidabilit\`a dove il canale
+\`e buono, ma il suo backoff pi\`u conservativo rallenta la scoperta negli
+scenari sparsi con perdite, dove la ridondanza delle trasmissioni \`e
+proprio ci\`o da cui l'inoltro trae robustezza.
+
+% ---------------------------------------------------------------------
+\section{Limiti dello studio}
+\label{sec:concl-limiti}
+I risultati vanno letti entro i confini della campagna condotta. L'intervallo
+di densit\`a esplorato (20--100 boe, da circa 2 a circa 9 vicini medi) \`e
+rappresentativo di scenari costieri realistici, ma le tendenze osservate
+indicano che il forwarding singolo con SBP \`e gi\`a prossimo alla
+saturazione al limite superiore, e la crescita monotona del collision rate
+suggerisce che nessuna combinazione statica reggerebbe densit\`a molto
+superiori; per il forwarding aggregato il fattore limitante di lungo periodo
+\`e la dimensione del beacon, che cresce con il numero di nodi annunciati e
+allunga i tempi di occupazione del canale. Il modello di canale, pur
+calibrato su misure sul campo, resta una semplificazione a due soglie della
+propagazione reale, e il modello di mobilit\`a Random Waypoint approssima ma
+non riproduce il comportamento di nuotatori e piccoli mezzi. Infine, la
+valutazione \`e interamente simulativa: i risultati quantificano i rapporti
+tra le alternative progettuali nelle stesse identiche condizioni, ma i valori
+assoluti andranno confermati su hardware reale.
+
+% ---------------------------------------------------------------------
+\section{Sviluppi futuri}
+\label{sec:concl-futuro}
+Il lavoro lascia aperte alcune direzioni, in parte gi\`a predisposte nel
+codice durante il tirocinio.
+
+\paragraph{Attivazione dei meccanismi progettati.} I due accorgimenti
+descritti nella Sezione~\ref{sec:improvements} sono presenti nel simulatore
+ma non sono stati impiegati negli esperimenti: il \emph{gate di forwarding
+density-aware} (Eq.~\ref{eq:fwdgate}), che dirada probabilisticamente gli
+inoltri nelle zone dense, potrebbe ridurre il divario di collision rate che
+penalizza il forwarding singolo; il \emph{limite di hop per il forwarding
+aggregato} conterrebbe invece la crescita della dimensione del beacon,
+il fattore limitante della modalit\`a alle densit\`a estreme. La loro
+valutazione e taratura \`e il seguito pi\`u naturale di questo lavoro.
+
+\paragraph{Regimi di densit\`a superiori.} Estendere la scala oltre le 100
+boe permetterebbe di osservare direttamente i punti di saturazione anticipati
+dalle tendenze misurate, e di verificare fino a dove il backoff adattivo
+riesce a rinviare la saturazione dell'airtime del forwarding aggregato.
+
+\paragraph{Ottimizzazione di ACAB per canali con perdite.} La lentezza di
+scoperta di ACAB--aggregato negli scenari sparsi con perdite suggerisce di
+rivederne pesi e soglie --- o di renderli adattivi rispetto alla qualit\`a
+del canale percepita --- cos\`i da recuperare ridondanza dove serve senza
+rinunciare alla prudenza dove il canale \`e affidabile.
+
+\paragraph{Riduzione della latenza di reazione del forwarding singolo.} La
+coda di inoltro FIFO tratta tutte le origini allo stesso modo; politiche di
+priorit\`a (ad esempio privilegiare le origini pi\`u lontane o meno
+annunciate) potrebbero abbattere la latenza di reazione, il principale
+svantaggio temporale della modalit\`a.
+
+\paragraph{Validazione sul campo.} Il passo conclusivo \`e il confronto dei
+risultati simulativi con esperimenti su hardware reale nell'ambito del
+progetto ProSafe, includendo aspetti che il simulatore non modella: consumo
+energetico delle boe, interferenza esterna sul canale e comportamento dei
+chipset Wi-Fi commerciali in trasmissione broadcast.
+
+% ---------------------------------------------------------------------
+\section{Considerazioni conclusive}
+\label{sec:concl-finale}
+Sul piano del progetto, il tirocinio ha consegnato al gruppo di ricerca un
+simulatore esteso con due modalit\`a di disseminazione multi-hop
+configurabili, una suite di metriche pi\`u ricca e una campagna sperimentale
+riproducibile che quantifica il compromesso tra copertura, affidabilit\`a e
+scalabilit\`a: elementi che potranno sostenere le evoluzioni future di
+ProSafe. Sul piano formativo, il lavoro ha richiesto di attraversare l'intero
+ciclo di un'attivit\`a di ricerca --- lo studio di un sistema esistente, la
+progettazione di meccanismi nuovi sotto vincoli stringenti, l'implementazione
+rigorosa in un'architettura a eventi discreti e l'analisi statistica dei
+risultati --- confermando quanto la simulazione, se validata e usata con
+consapevolezza dei suoi limiti, sia uno strumento essenziale per lo studio
+dei protocolli di rete l\`a dove la sperimentazione diretta \`e
+impraticabile.
