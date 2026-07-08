@@ -22,10 +22,10 @@ beaconing che regolano gli intervalli di trasmissione, il capitolo si apre con
 la descrizione dei tre protocolli --- SBP, ADAB e ACAB --- gi\`a esistenti nel
 simulatore. Seguono:
 \begin{enumerate}
-    \item \hyperref[sec:eval-goals]{Obiettivi della valutazione}
-    \item \hyperref[sec:eval-setup]{scenari di simulazione adottati negli esperiment}
-    \item \hyperref[sec:eval-metrics]{Metriche impiegate nella valutazione}
-    \item \hyperref[sec:confronto]{Confronto sperimentale tra le modalit\`a di inoltro}
+    \item \hyperref[sec:eval-goals]{\textbf{Obiettivi della valutazione}}
+    \item \hyperref[sec:eval-setup]{\textbf{Scenari di simulazione adottati negli esperimenti}}
+    \item \hyperref[sec:eval-metrics]{\textbf{Metriche impiegate nella valutazione}}
+    \item \hyperref[sec:confronto]{\textbf{Confronto sperimentale tra le modalit\`a di inoltro}}
 \end{enumerate}
 
 % ---------------------------------------------------------------------
@@ -34,7 +34,7 @@ simulatore. Seguono:
 I tre protocolli agiscono esclusivamente sull'istante di generazione del
 beacon: una volta generato, il frame attraversa la pipeline di trasmissione
 CSMA/CA descritta nel Capitolo~\ref{ch:simulatore}. Ciascun protocollo pu\`o
-essere combinato con qualsiasi modalit\`a multi-hop del
+essere combinato con qualsiasi modalit\`a multi-hop introdotta nel
 Capitolo~\ref{ch:contributo}.
 
 \subsection{Static Beaconing Protocol (SBP)}
@@ -69,13 +69,13 @@ con $BI_{t+1} \in [\bimin,\bimax]$. Con pochi vicini
 $f_t\approx 0$ e la boa trasmette a intervalli prossimi a $\bimin$, favorendo
 una scoperta rapida; man mano che $N_t$ si avvicina a $\nthr$, $f_t$ fa convergere l'intervallo verso $\bimax$:
 \begin{equation}
-    N_t \gtrsim N_{thr} \implies f_t \simeq 1 \implies BI_{t+1} \to \bimax;
+    N_t \gtrsim N_{thr} \implies f_t \simeq 1 \implies BI_{t+1} \to \bimax,
 \end{equation}
 riducendo le trasmissioni dove la contesa \`e maggiore. 
 
 L'adattamento in funzione del numero di vicini mantiene quindi il nodo reattivo
 alle basse densit\`a e ne rallenta le trasmissioni all'aumentare della
-congestione. I valori adottati negli esperimenti sono $\bimax = \SI{5.0}{\second}$ e $\bimin\in \{0.25, 0.5, 1.0\}\,\si{\second}$.
+congestione. I valori adottati negli esperimenti sono $\bimin = \SI{0.25}{\second}$ e $\bimax = \SI{5.0}{\second}$, fissi in tutte le configurazioni: l'intervallo di beaconing variato nella campagna (Sezione~\ref{sec:eval-scenarios}) agisce sul solo SBP.
 
 \subsection{Adaptive Context-Aware Beaconing (ACAB)}
 \label{sec:acab}
@@ -90,14 +90,14 @@ trascorso dall'ultimo contatto e la mobilit\`a del nodo.
 \end{equation}
 
 \paragraph{Componente di tempo dall'ultimo contatto.} La ricezione recente di un
-beacon riduce l'urgenza di trasmettere; un periodo prolungato privo di contatti
-la accresce. Detto $\Delta = t - t_{\text{ultimo contatto}}$ il tempo trascorso
-dall'ultimo beacon ricevuto e $\tau_c = \SI{20}{\second}$ la durata oltre la
+beacon riduce l'urgenza di trasmettere, mentre un periodo prolungato privo di contatti
+la accresce. Detto $\Delta_t = t - t_{\text{ultimo contatto}}$ il tempo trascorso
+dall'ultimo beacon ricevuto --- con $t_{\text{ultimo contatto}}$ pari all'istante dell'ultima ricezione avvenuta (se non \`e mai avvenuta alcuna ricezione, \`e pari a -$\infty$) --- e $\tau_c = \SI{20}{\second}$ la durata oltre la
 quale un contatto non \`e pi\`u considerato recente:
 \begin{equation}
   s_{\mathrm{con}} =
   \begin{cases}
-    \max\!\big(0,\; 1 - \Delta/\tau_c\big) & N_t>0 \text{ e contatto registrato},\\
+    \max\!\big(0,\; 1 - \Delta_t/\tau_c\big) & t_{\text{ultimo contatto}} \neq -\infty,\\
     0 & \text{altrimenti.}
   \end{cases}
   \label{eq:acab-con}
@@ -107,23 +107,23 @@ nodo isolato o a lungo silenzioso produce $0$ (e trasmette pi\`u di frequente).
 
 \paragraph{Componente di mobilit\`a.} Un nodo in rapido movimento invalida in
 breve tempo l'informazione di posizione annunciata e deve pertanto aggiornarla
-con maggiore frequenza. Con velocit\`a $v=\lVert\mathbf{v}\rVert$ e velocit\`a
+con maggiore frequenza. Con l'intensit\`a di velocit\`a $v$ e velocit\`a
 di riferimento $v_{\text{ref}}$ (la velocit\`a di default, pari a
-\SI{15}m/s):
+\SI{15}{m/s} negli esperimenti):
 \begin{equation}
   s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
   \label{eq:acab-mob}
 \end{equation}
 
 \paragraph{Combinazione e calcolo dell'intervallo.} I tre punteggi sono
-combinati mediante pesi definiti nella configurazione,
+combinati mediante i pesi definiti nella configurazione,
 $(w_d,w_c,w_m)=(0.4,0.3,0.3)$, che ne determinano il contributo relativo. La
 mobilit\`a riduce il backoff, da cui il termine $1-s_{\mathrm{mob}}$:
 \begin{equation}
   s = w_d\,s_{\mathrm{den}} + w_c\,s_{\mathrm{con}} + w_m\,(1 - s_{\mathrm{mob}}).
   \label{eq:acab-blend}
 \end{equation}
-Il punteggio $s$ sostituisce $f_t$ nell'espressione dell'intervallo di ADAB
+Il punteggio $s$ ottenuto sostituisce $f_t$ nell'espressione dell'intervallo di ADAB
 (Eq.~\ref{eq:adab}): 
 \begin{equation}
   BI_{t+1} = \Big[\,\bimin + s^{2}\,(\bimax-\bimin)\,\Big]\,(1+\delta).
@@ -133,70 +133,60 @@ ACAB rallenta una boa densa, contattata di recente e
 ferma, e mantiene pi\`u frequente una boa isolata, silenziosa o in movimento.
 Rispetto ad ADAB, ACAB costruisce il punteggio di
 backoff a partire da  un numero maggiore di variabili di stato; 
-l'overhead computazionale resta comunquetrascurabile per i dispositivi considerati.
+l'overhead computazionale resta comunque trascurabile per i dispositivi considerati.
 
 % =====================================================================
 %  4.1 OBIETTIVI DELLA VALUTAZIONE
 % =====================================================================
 \section{Obiettivi della valutazione}
 \label{sec:eval-goals}
-Lo scopo della valutazione sperimentale \`e confrontare le tre modalit\`a con
-cui una boa pu\`o gestire la conoscenza della rete e misurarne il comportamento
-al variare delle condizioni operative. Questa sezione ne fissa i termini,
-richiamando le definizioni gi\`a introdotte nei capitoli precedenti: da un lato
-le \emph{modalit\`a di inoltro} poste a confronto, dall'altro le \emph{dimensioni
-di valutazione} lungo le quali se ne osserva il compromesso.
+Lo scopo della valutazione sperimentale è confrontare le tre modalità 
+con cui una boa gestisce le trasmissioni nella rete, 
+misurandone il comportamento al variare delle condizioni operative.
+Questa sezione ne richiama le definizioni essenziali, già introdotte nei capitoli precedenti, 
+per poi condurne il confronto.
 
 \paragraph{Modalit\`a di inoltro a confronto.} Il confronto riguarda tre
 modalit\`a, richiamate qui nella sola definizione essenziale e descritte in
 dettaglio nel Capitolo~\ref{ch:contributo} (progettazione) e nel
 Capitolo~\ref{ch:simulatore} (implementazione).
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item \textbf{Single-hop (baseline).} Beaconing a singolo hop, privo di
-  qualunque inoltro: la conoscenza di ciascuna boa si limita ai vicini in
-  portata radio diretta, gli unici da cui riceve beacon
-  (Sezione~\ref{sec:multihop}). Funge da termine di paragone rispetto al quale
-  si misura il guadagno introdotto dalle modalit\`a multi-hop.
-  \item \textbf{Forwarding singolo.} La boa rilancia i beacon altrui fino a un
-  numero massimo di hop, affidandosi ai controlli che arginano il broadcast
+  \item \textbf{Single-hop.} Beaconing a singolo hop, privo di
+  qualunque inoltro: la conoscenza di ciascuna boa si limita ai vicini entro la propria portata radio, 
+  gli unici dai quali riceve beacon (Sezione~\ref{sec:multihop}). 
+  Funge da termine di paragone rispetto al quale
+  si misurano le prestazioni delle modalit\`a multi-hop.
+  \item \textbf{Forwarding singolo.} La boa inoltra i beacon altrui fino a un
+  numero massimo di hop, affidandosi ai controlli che prevengono il broadcast
   storm --- unicit\`a dell'origine, TTL e coda a capacit\`a limitata --- come
   dettagliato nella Sezione~\ref{sec:forward} e realizzato nella
-  Sezione~\ref{sec:forward-impl}. Amplia il raggio della conoscenza pagando in
-  trasmissioni aggiuntive.
-  \item \textbf{Forwarding aggregato.} Anzich\'e generare nuovi frame, la boa
-  accoda a ciascun beacon l'elenco dei nodi che ha finora appreso
-  (Sezione~\ref{sec:append}, realizzata nella Sezione~\ref{sec:append-impl}).
-  La diffusione sfrutta cos\`i le trasmissioni gi\`a previste dal protocollo, e
-  il solo costo \`e l'allungamento del frame al crescere dei nodi annunciati
-  (Eq.~\ref{eq:beacon-size}).
+  Sezione~\ref{sec:forward-impl}. Amplia il raggio della conoscenza pagando in trasmissioni aggiuntive.
+  \item \textbf{Forwarding aggregato.} La boa accoda a ciascun beacon 
+  l'elenco dei nodi che ha finora appreso, sia in maniera diretta che indiretta (Sezione~\ref{sec:append}, realizzata nella Sezione~\ref{sec:append-impl}).
+  La diffusione della conoscenza sfrutta le trasmissioni che la boa schedula di norma, ma
+  paga in airtime l'estensione del frame al crescere dei nodi annunciati (Eq.~\ref{eq:beacon-size}).
 \end{itemize}
-Le due modalit\`a multi-hop rappresentano due scelte opposte nel compromesso tra
-copertura e costo di canale, come anticipato nella
-Sezione~\ref{sec:tradeoff}; la valutazione ne quantifica il compromesso.
+Le due modalit\`a multi-hop rappresentano due scelte diverse per mediare il compromesso tra
+copertura e costo di canale, come accennato nella Sezione~\ref{sec:tradeoff}. 
+La valutazione ha il compito di quantificare questo compromesso in termini numerici.
 
-\paragraph{Dimensioni di valutazione.} Il confronto tra le modalit\`a \`e
-condotto lungo tre dimensioni, gi\`a individuate come nodo del problema nella
-Sezione~\ref{sec:intro-problema}.
+\paragraph{Assi di valutazione.} Il confronto tra le modalità è condotto lungo tre assi:
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{Copertura della rete.} La quota di rete che ciascun nodo arriva
-  a conoscere, ossia fin dove si propaga la consapevolezza oltre il singolo hop
-  radio (Sezione~\ref{sec:intro-problema}). \`E la grandezza che le modalit\`a
-  multi-hop mirano a massimizzare ed \`e misurata dalla percentuale media di
-  rete scoperta (Sezione~\ref{sec:eval-metrics}).
+  a conoscere, ossia fin dove si propaga la conoscenza grazie alle trasmissioni effettuate. 
+  \`E la grandezza che le modalit\`a multi-hop mirano a massimizzare ed \`e 
+  misurata dalla percentuale media di rete scoperta (Sezione~\ref{sec:eval-metrics}).
   \item \textbf{Delivery ratio.} L'affidabilit\`a della consegna dei beacon,
   cio\`e la probabilit\`a che un frame trasmesso raggiunga integro i nodi in
-  ascolto. \`E la risorsa messa sotto pressione dal broadcast privo di conferme
-  (Sezione~\ref{sec:intro-problema}) ed \`e misurata dal B-PDR e dalle metriche
-  di perdita correlate (Sezione~\ref{sec:eval-metrics}).
+  ascolto. \`E misurata dal B-PDR, la metrica complementare a quella relativa alle perdite (Sezione~\ref{sec:eval-metrics}).
   \item \textbf{Scalabilit\`a.} Il modo in cui copertura e delivery ratio
-  evolvono al crescere della densit\`a della rete, e quindi della contesa sul
-  canale condiviso (Sezione~\ref{sec:intro-problema}). \`E osservata facendo
-  variare il numero di boe nell'area di simulazione (Sezione~\ref{sec:eval-setup}).
+  evolvono al crescere della densit\`a della rete. \`E osservata incrementando sequenzialmente
+  il numero di boe nell'area di simulazione (Sezione~\ref{sec:eval-setup}).
 \end{itemize}
-L'obiettivo della valutazione \`e quindi comprendere il compromesso tra queste
-tre dimensioni: quanta copertura aggiuntiva ciascuna modalit\`a di inoltro
-produce, quale prezzo in delivery ratio ne consegue e come tale compromesso si
-comporti all'aumentare della densit\`a.
+L'obiettivo della valutazione \`e quindi quello di analizzare le prestazioni osservando questi
+tre criteri: quanta copertura aggiuntiva introduce ciascuna modalit\`a di inoltro, 
+quale prezzo in termini di delivery ratio ne consegue e come questi due fattori si
+evolvono all'aumentare della densit\`a dei nodi.
 
 % =====================================================================
 %  4.2 SCENARI DI SIMULAZIONE
@@ -204,12 +194,12 @@ comporti all'aumentare della densit\`a.
 \section{Scenari di simulazione}
 \label{sec:eval-setup}
 Tutti gli esperimenti sono stati condotti con il simulatore descritto nel
-Capitolo~\ref{ch:simulatore}. La campagna esplora il prodotto cartesiano di
+Capitolo~\ref{ch:simulatore}. La campagna di simulazione esplora le possibili combinazioni di
 modalit\`a di inoltro, protocollo di beaconing, intervallo di beaconing,
-condizione del canale e densit\`a della rete; ogni combinazione \`e ripetuta
-su pi\`u repliche indipendenti (Sezione~\ref{sec:eval-stats}). Questa sezione
-descrive dapprima la dinamicit\`a della popolazione, poi i parametri comuni a
-tutte le simulazioni e infine gli scenari concreti posti a confronto.
+condizione del canale e densit\`a della rete; ciascuna combinazione \`e ripetuta
+su pi\`u simulazioni indipendenti (Sezione~\ref{sec:eval-stats}). 
+Questa sezione descrive dapprima la dinamicit\`a della popolazione, poi i parametri comuni a
+tutte le simulazioni e infine gli scenari di confronto.
 
 \subsection{Dinamicit\`a della rete}
 \label{sec:scenario}
@@ -219,111 +209,127 @@ l'evoluzione del numero di nodi nel corso della simulazione --- meccanismo
 descritto nella Sezione~\ref{sec:dynamics} del
 Capitolo~\ref{ch:simulatore}. Ai fini della valutazione sperimentale \`e stato
 adottato lo scenario random: la popolazione di nodi cresce e decresce
-periodicamente di una frazione percentuale definita dalla configurazione, cos\`i
-da riprodurre il comportamento di una rete reale, in cui i nodi entrano ed
-escono di continuo dal raggio di copertura radio. A ogni aggiornamento periodico
-la popolazione attiva cresce o decresce di una frazione casuale fino al 30\% del
-totale (\texttt{random\_variability} = 0.3). Le metriche sono calcolate
-sull'insieme dei nodi attivi, cosicch\'e i risultati riflettono una rete in
-continuo rimescolamento anzich\'e una topologia statica.
+periodicamente cos\`i da riprodurre il comportamento di una rete reale, in cui i nodi entrano ed
+escono di continuo dal raggio di copertura radio. A ogni aggiornamento periodico la quantit\`a di
+popolazione attiva varia di una frazione casuale, fino ad un massimo del 30\% del
+totale (\texttt{random\_variability} = 0.3).
 
 \subsection{Parametri di simulazione}
 \label{sec:eval-params}
+Di seguito vi sono i parametri di configurazione con annessi i 
+valori usati per le simulazioni effettuate, gi\`a visti nella sezione~\ref{sec:config}. 
+Sono riportati secondo categorie di appartenenza. 
 
 \paragraph{Configurazione di rete.}
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item area di simulazione: $800 \times 800$ metri;
+  \item area di simulazione: $600 \times 600$ \si{m} (\texttt{width} $\times$ \texttt{height});
   \item durata: \SI{200}{\second} di tempo simulato;
-  \item bit rate: \SI{1}{Mbps};
-  \item dimensione del beacon: variabile con la lunghezza della lista di
-  vicini annunciata (Eq.~\ref{eq:beacon-size}).
+  \item bit rate: \SI{1e6}{bit/s} (\SI{1}{Mbps}).
 \end{itemize}
 
 \paragraph{Modello di canale.}
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item portata ad alta probabilit\`a: 0--\SI{70}{\metre} ($P_{\mathrm{rx}} = 0.9$);
   \item portata a bassa probabilit\`a: 70--\SI{120}{\metre} ($P_{\mathrm{rx}} = 0.15$);
-  \item oltre la portata massima: $P_{\mathrm{rx}} = 0$;
-  \item due regimi a confronto: \emph{canale ideale}
-  (\texttt{ideal\_channel = true}: ogni frame in portata \`e consegnato salvo
-  collisione, quindi $PL = CR$) e \emph{canale non ideale}
-  (\texttt{ideal\_channel = false}: consegna probabilistica secondo le soglie
-  precedenti, Eq.~\ref{eq:delivery-prob}).
+  \item tipo di canale: 
+  \emph{ideale} --- ogni frame in portata viene ricevuto integro salvo
+  collisione (quindi $PL = CR$, Sezione~\ref{sec:eval-metrics});
+  \emph{non ideale} --- la riuscita della consegna \`e probabilistica, in funzione delle soglie
+  sopra descritte (Eq.~\ref{eq:delivery-prob}).
 \end{itemize}
 
 \paragraph{Parametri MAC (CSMA/CA).}
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item DIFS: \SI{50}{\micro\second};
   \item slot time: \SI{20}{\micro\second};
-  \item finestra di contesa: $CW = 16$, fissa (nessun backoff esponenziale);
-  \item nessun RTS/CTS n\'e ACK (trasmissioni broadcast).
+  \item finestra di contesa: 16 slot.
 \end{itemize}
 
 \paragraph{Parametri dei protocolli di beaconing.}
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item SBP: $BI_{\text{static}} \in \{1.0, 0.5, 0.25\}\,\si{\second}$
-  (una campagna per valore);
-  \item ADAB: $\bimin$ pari all'intervallo di campagna,
+  \item SBP: $BI_{\text{static}} \in \{1.0, 0.5, 0.25\}\,\si{\second}$;
+  \item ADAB: $\bimin$ = \SI{0.25}{\second},
   $\bimax = \SI{5.0}{\second}$, $\nthr = 15$;
   \item ACAB: $\nthr^{\mathrm{ACAB}} = 10$, $\tau_c = \SI{20}{\second}$,
   pesi $(0.4, 0.3, 0.3)$;
-  \item timeout dei vicini: \SI{7.0}{\second}; jitter: $\pm 5\%$.
+  \item timeout dei vicini: \SI{7.0}{\second}; jitter: $\pm 0.05$.
 \end{itemize}
 
 \paragraph{Parametri delle modalit\`a multi-hop.}
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item modalit\`a: single-hop (nessun inoltro), forwarding aggregato
   (append), forwarding singolo (forward);
-  \item limite di hop per il forwarding singolo: 7;
-  \item coda dei beacon in attesa di inoltro: al massimo 50 elementi.
+  \item limite di hop per il forwarding singolo (TTL): 5;
+  \item limite dei beacon in coda di inoltro: 50 elementi.
 \end{itemize}
 
 \subsection{Definizione degli scenari}
 \label{sec:eval-scenarios}
-La valutazione si articola in due scenari principali, distinti dalla condizione
-del canale; in ciascuno la densit\`a della rete \`e fatta variare come parametro
-di scala, cos\`i da osservare il comportamento dei protocolli in condizioni di
-connettivit\`a molto diverse.
+La valutazione si articola in due scenari principali, distinti dalla tipologia
+di canale; in ciascuno la densit\`a dei nodi \`e fatta variare come parametro
+di scala, cos\`i da osservare il comportamento dei protocolli in topologie di rete diverse.
 
 \paragraph{Scala di densit\`a.} In entrambi gli scenari il numero totale di boe
-varia da 20 a 120 a passi di 20, generando sei livelli di densit\`a. Per ogni
-livello le boe sono posizionate casualmente nell'area di simulazione;
-l'intervallo esplorato spazia da uno scenario molto sparso (20 boe su
-\SI{640000}{\metre\squared}, circa un vicino medio per nodo) a uno moderatamente
-denso (120 boe, circa sei vicini medi per nodo).
+varia da 20 a 100, a passi incrementali di 20, generando quindi 5 gruppi di densit\`a. 
+Ad ogni passo, la topologia iniziale del nuovo gruppo si origina partendo da quella del gruppo precedente, 
+generata casualmente, e vi si aggiungono, in posizioni arbitrarie, le nuove boe.
+Si evita cos\`i il rischio di inquinare i risultati con la generazione completamente casuale
+di un nuovo gruppo di densit\`a che non ha niente in comune con la topologia precedente.
+L'incremento del numero di boe al crescere della densit\`a \`e illustrato nella Figura~\ref{fig:initial-positions}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/initial_positions.pdf}
+  \caption[Posizioni iniziali delle boe ai cinque livelli di densità]{Posizioni
+  iniziali delle boe ai cinque livelli di densità (20, 40, 60, 80 e 100 boe).
+  In ciascun gruppo le boe fisse (in blu, 70\%) e mobili (in arancione, 30\%)
+  sono disposte casualmente nell'area di simulazione; la topologia di ogni
+  livello estende quella del livello precedente con l'aggiunta delle nuove boe.}
+  \label{fig:initial-positions}
+\end{figure}
 
 \paragraph{Mobilit\`a.} In entrambi gli scenari il 30\% delle boe \`e mobile
-secondo il modello random waypoint (Sezione~\ref{sec:rwp}; velocit\`a
-5--\SI{20}{\metre\per\second}, pause 0--\SI{10}{\second}), mentre il restante
-70\% \`e fisso. La popolazione \`e inoltre soggetta al churn dello scenario
-random (Sezione~\ref{sec:scenario}), che ne rimescola di continuo la
-composizione.
+e segue il modello random waypoint (Sezione~\ref{sec:rwp}; velocit\`a
+5--\SI{20}{m/s}, pausa 0--\SI{10}{\second}), mentre il restante
+70\% \`e fisso. La popolazione \`e inoltre soggetta a variazione periodica 
+(Sezione~\ref{sec:scenario}; scenario random).
 
 \paragraph{Scenario 1 --- densit\`a crescente, canale ideale.} Il canale \`e
 ideale (\texttt{ideal\_channel = true}): ogni frame in portata \`e consegnato
 salvo collisione, quindi le perdite coincidono con le collisioni ($PL = CR$).
-Lo scenario isola l'effetto della contesa MAC dagli effetti del livello fisico.
+Lo scenario isola l'effetto della contesa del livello di collegamento dagli errori di quello fisico.
 
 \paragraph{Scenario 2 --- densit\`a crescente, canale non ideale.} Il canale
-adotta il modello probabilistico a due soglie (Eq.~\ref{eq:delivery-prob}): alle
-collisioni si sommano le perdite dipendenti dalla distanza, e un beacon che
+adotta il modello probabilistico (Eq.~\ref{eq:delivery-prob}): alle
+collisioni si sommano le perdite dipendenti dalla distanza di trasmissione, quindi un beacon che
 sopravvive alla contesa pu\`o comunque andare perso. Lo scenario riproduce
 condizioni realistiche di propagazione.
 
-\paragraph{Variazione dell'intervallo.} Ciascuno dei due scenari \`e ripetuto
-per tre intervalli di beaconing, $BI \in \{1.0, 0.5, 0.25\}\,\si{\second}$, che
-per SBP dimezzano e quadruplicano il traffico offerto, mentre per i protocolli
-adattivi abbassano soltanto il limite inferiore $\bimin$ dell'intervallo. Salvo
-diversa indicazione, le figure si riferiscono all'intervallo di riferimento
-$BI = \SI{1.0}{\second}$.
+\paragraph{Variazione dell'intervallo e della modalit\`a multihop.} Ciascuno dei due scenari, $C := \{\texttt{ideal}, \texttt{non-ideal}\}$, \`e ripetuto
+per tre intervalli di beaconing, $B_{intervals}:=\{1.0, 0.5, 0.25\}$, e su ognuno di essi 
+vengono valutate le tre modalit\`a di multihop, $MH_{modes}:=\{\texttt{none}, \texttt{append}, \texttt{forward}\}$.
+Le combinazioni di simulazione $S$ sono dunque:
+\begin{equation}
+    S = C \times B_{intervals} \times MH_{modes};
+\label{eq:sim-combinations}
+\end{equation}
+per un totale di $|S|=18$. L'intervallo di beaconing agisce sul solo SBP
+($BI_{\text{static}}$); per ADAB e ACAB i limiti $\bimin$ e $\bimax$ restano
+fissi (Sezione~\ref{sec:eval-params}), sicch\'e le loro ripetizioni ai tre
+intervalli fungono da controllo della variabilit\`a tra repliche.
 
 \subsection{Analisi statistica}
 \label{sec:eval-stats}
-Ogni configurazione \`e simulata 10 volte con semi casuali diversi, producendo
-10 campioni indipendenti di ciascuna metrica. I risultati sono riportati come
-media delle repliche; nei grafici temporali le bande ombreggiate indicano
-$\pm 1$ deviazione standard, e la separazione tra le bande \`e usata come
-indicatore qualitativo della significativit\`a delle differenze osservate.
+Ogni configurazione \`e simulata 20 volte --- quindi un totale di $20 \cdot |S| = 360$ simulazioni totali, Eq.~\ref{eq:sim-combinations} ---
+con semi casuali diversi producendo ognuna un campione indipendente di ciascuna metrica. 
+I risultati finali sono riportati come media delle repliche. Nei grafici temporali la linea
+mostra la media tra le repliche e la banda ombreggiata attorno ad essa copre
+$\pm 1$ deviazione standard, calcolata tra le repliche in ciascun istante: banda
+stretta significa repliche concordi, banda larga significa alta variabilit\`a tra
+le simulazioni. Due curve la cui separazione supera l'ampiezza delle rispettive
+bande mostrano una differenza che si pu\`o considerare significativa; se le bande
+si sovrappongono, la differenza osservata rientra nella normale variabilit\`a tra
+repliche e non \`e da considerarsi conclusiva.
 
 % =====================================================================
 %  4.3 METRICHE DI VALUTAZIONE  (invariata)
@@ -394,23 +400,399 @@ di vicini per nodo, ottenuto dalle scansioni periodiche della topologia
 (Sezione~\ref{sec:metrics}): al crescere del numero medio di vicini crescono i
 potenziali trasmettitori simultanei e, con essi, contesa e rischio di
 collisione. Nello scenario adottato tale valore cresce in modo pressoch\'e
-lineare da circa 1 (20 boe) a circa 6 (120 boe).
+lineare da circa 2 (20 boe) a circa 9 (100 boe).
 
 % =====================================================================
 %  4.4 CONFRONTO TRA FORWARDING SINGOLO E FORWARDING AGGREGATO
 % =====================================================================
 \section{Confronto tra forwarding singolo e forwarding aggregato}
 \label{sec:confronto}
-% TODO (da redigere): presentare i grafici delle metriche
-% (Sezione~\ref{sec:eval-metrics}) per i due scenari
-% (Sezione~\ref{sec:eval-scenarios}) e commentare il confronto tra forwarding
-% singolo e forwarding aggregato (con il single-hop come baseline) lungo le
-% dimensioni di copertura, delivery ratio e scalabilit\`a
-% (Sezione~\ref{sec:eval-goals}).
-%
-% Il materiale della stesura precedente (risultati canale ideale / non ideale,
-% effetto dell'intervallo, discussione, sintesi) \`e conservato piu' in basso
-% come riferimento, disattivato con \iffalse...\fi.
+Questa sezione presenta i risultati della campagna sperimentale lungo i tre
+assi definiti nella Sezione~\ref{sec:eval-goals}: copertura, delivery ratio e
+scalabilit\`a. I risultati sono esposti dapprima per lo scenario a canale
+ideale, che isola l'effetto della contesa MAC, quindi per lo scenario a canale
+non ideale, che aggiunge le perdite dipendenti dalla distanza. Salvo diversa
+indicazione, figure e tabelle si riferiscono all'intervallo di beaconing
+$BI=\SI{1.0}{\second}$; l'effetto degli altri intervalli \`e analizzato nella
+Sezione~\ref{sec:res-interval}. In tutti i grafici il single-hop funge da
+termine di paragone rispetto al quale si misurano guadagni e costi delle due
+modalit\`a multi-hop.
+
+% ---------------------------------------------------------------------
+\subsection{Risultati con canale ideale}
+\label{sec:res-ideal}
+
+\paragraph{Scoperta della rete.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}
+  \caption[Percentuale di rete scoperta, canale ideale]{Percentuale media di
+  rete scoperta al variare della densit\`a, per modalit\`a di inoltro e
+  protocollo di beaconing (canale ideale, $BI=\SI{1.0}{\second}$). Le barre di
+  errore indicano $\pm 1$ deviazione standard tra le repliche.}
+  \label{fig:ideal-discovery}
+\end{figure}
+La Figura~\ref{fig:ideal-discovery} mostra la percentuale media di rete
+scoperta ($D_{\%}$, Eq.~\ref{eq:netdisc}). Nell'area adottata la portata radio
+copre una frazione minima del mondo e il ricambio della popolazione rinnova di
+continuo l'insieme dei nodi da scoprire: il beaconing single-hop \`e cos\`i
+strutturalmente incapace di costruire una visione completa della rete e si
+ferma tra il 63\% e il 77\% a seconda di protocollo e densit\`a. Le modalit\`a
+multi-hop cambiano qualitativamente il quadro: gi\`a a 20 boe --- dove il
+grafo \`e in gran parte partizionato, con meno di due vicini medi --- superano
+l'87\%, a 40 boe oltrepassano il 97\% e dai 60 nodi in su completano di fatto
+la scoperta (99.7--100\%) con ogni protocollo di beaconing. Sul piano della
+sola copertura, dunque, forwarding singolo e forwarding aggregato sono
+sostanzialmente equivalenti: il compromesso tra le due modalit\`a va cercato
+nel costo, non nel beneficio.
+
+\paragraph{Dinamica temporale.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_discovery_growth_interval-1_0.pdf}
+  \caption[Crescita della scoperta nel tempo, canale ideale]{Evoluzione
+  temporale della percentuale di rete scoperta nella configurazione a 100 boe
+  (canale ideale, $BI=\SI{1.0}{\second}$); le bande indicano $\pm 1$
+  deviazione standard tra le repliche.}
+  \label{fig:ideal-growth}
+\end{figure}
+La dinamica temporale nella configurazione pi\`u densa
+(Figura~\ref{fig:ideal-growth}) evidenzia la diversa natura delle due
+modalit\`a: il forwarding aggregato completa la scoperta entro pochi secondi
+con tutti i protocolli --- bastano pochi cicli di beaconing perch\'e le liste
+annunciate propaghino l'intera topologia --- mentre il forwarding singolo
+raggiunge il 99\% in circa 10--25 secondi, poich\'e ogni ritrasmissione
+veicola un solo beacon di origine. Il single-hop cresce lentamente e non
+converge: a fine simulazione si ferma al 74--77\%, con bande di deviazione
+standard ampie che ne rivelano la dipendenza dagli incontri casuali dovuti
+alla mobilit\`a.
+
+\paragraph{B-PDR.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_pdr_interval-1_0.pdf}
+  \caption[B-PDR, canale ideale]{B-PDR al variare della densit\`a, per
+  modalit\`a di inoltro e protocollo di beaconing (canale ideale,
+  $BI=\SI{1.0}{\second}$).}
+  \label{fig:ideal-pdr}
+\end{figure}
+La conoscenza aggiuntiva ha un costo in affidabilit\`a, che dipende per\`o in
+modo determinante dal protocollo di beaconing (Figura~\ref{fig:ideal-pdr}).
+In single-hop il B-PDR resta sopra 0.97 per ogni protocollo e densit\`a: il
+traffico periodico, da solo, non satura il canale nemmeno a 100 boe. Con il
+forwarding aggregato il degrado \`e contenuto e fortemente mitigato
+dall'adattivit\`a: a 100 boe il B-PDR vale 0.837 con SBP, 0.949 con ADAB e
+0.965 con ACAB. Il forwarding singolo \`e la modalit\`a pi\`u onerosa: a 100
+boe il B-PDR scende a 0.447 con SBP, mentre i protocolli adattivi lo
+mantengono a 0.603 (ADAB) e 0.579 (ACAB). A parit\`a di modalit\`a i
+protocolli adattivi superano sistematicamente SBP a ogni densit\`a.
+
+\paragraph{Collision rate.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_collision_rate_interval-1_0.pdf}
+  \caption[Collision rate, canale ideale]{Collision rate al variare della
+  densit\`a, per modalit\`a di inoltro e protocollo di beaconing (canale
+  ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:ideal-collision}
+\end{figure}
+Il collision rate (Figura~\ref{fig:ideal-collision}) spiega direttamente i
+valori di B-PDR: nel canale ideale $PL = CR$ e in ogni configurazione risulta
+$\text{B-PDR} + CR \approx 1$, verifica di coerenza dei dati. In single-hop
+le collisioni sono trascurabili ($CR \le 0.031$). Nel forwarding aggregato la
+contesa nasce dai frame pi\`u lunghi, che estendono la finestra di
+vulnerabilit\`a: con SBP il collision rate sale fino a 0.163 a 100 boe, ma
+ADAB lo riduce a 0.051 e ACAB a 0.035 --- una riduzione di quasi cinque volte
+rispetto al protocollo statico. Nel forwarding singolo la contesa nasce dal
+moltiplicarsi delle trasmissioni: ogni beacon ricevuto pu\`o generare un
+inoltro e il collision rate cresce con la densit\`a fino a 0.553 (SBP); anche
+qui l'adattivit\`a ne riduce sensibilmente il costo (0.397 con ADAB, 0.421
+con ACAB), pur senza eliminare la natura intrinsecamente pi\`u rumorosa della
+modalit\`a. La Tabella~\ref{tab:ideal-summary} riepiloga i valori numerici.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Riepilogo dei risultati con canale ideale]{Riepilogo dei risultati
+  con canale ideale ($BI=\SI{1.0}{\second}$): percentuale media di rete
+  scoperta e B-PDR a 20, 60 e 100 boe, collision rate a 100 boe. Medie su 20
+  repliche.}
+  \label{tab:ideal-summary}
+  \small
+  \begin{tabular}{llccccccc}
+    \toprule
+    & & \multicolumn{3}{c}{$D_{\%}$} & \multicolumn{3}{c}{B-PDR} & $CR$ \\
+    \cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-9}
+    Modalit\`a & Protocollo & 20 & 60 & 100 & 20 & 60 & 100 & 100 \\
+    \midrule
+    \multirow{3}{*}{Single-hop}
+      & SBP  & 68.8 & 72.0 & 76.6 & 0.999 & 0.986 & 0.969 & 0.031 \\
+      & ADAB & 66.3 & 68.5 & 74.2 & 0.998 & 0.996 & 0.993 & 0.007 \\
+      & ACAB & 63.4 & 69.2 & 73.7 & 0.999 & 0.998 & 0.993 & 0.007 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ aggregato}
+      & SBP  & 93.5 & 100.0 & 100.0 & 0.996 & 0.939 & 0.837 & 0.163 \\
+      & ADAB & 94.0 & 100.0 & 100.0 & 0.992 & 0.969 & 0.949 & 0.051 \\
+      & ACAB & 89.9 & 99.9  & 100.0 & 0.998 & 0.988 & 0.965 & 0.035 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ singolo}
+      & SBP  & 91.3 & 99.8 & 99.7  & 0.962 & 0.675 & 0.447 & 0.553 \\
+      & ADAB & 87.0 & 99.8 & 99.9  & 0.968 & 0.794 & 0.603 & 0.397 \\
+      & ACAB & 87.6 & 99.9 & 100.0 & 0.975 & 0.802 & 0.579 & 0.421 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Risultati con canale non ideale}
+\label{sec:res-error}
+Per valutare le prestazioni in condizioni realistiche, gli esperimenti sono
+ripetuti con il modello di canale probabilistico a due soglie
+(Sezione~\ref{sec:eval-setup}): ai fenomeni di contesa si sommano le perdite
+dipendenti dalla distanza, e un beacon che sopravvive alle collisioni pu\`o
+comunque andare perso.
+
+\paragraph{Scoperta della rete.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}
+  \caption[Percentuale di rete scoperta, canale non ideale]{Percentuale media
+  di rete scoperta al variare della densit\`a (canale non ideale,
+  $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-discovery}
+\end{figure}
+Le perdite del canale colpiscono soprattutto il single-hop, la cui scoperta
+scende al 50--68\% (Figura~\ref{fig:error-discovery}): ogni beacon perso \`e
+un'occasione di scoperta persa, senza meccanismi che la recuperino. Il
+forwarding aggregato conferma invece la propria robustezza alle densit\`a
+medio-alte: dai 60 nodi in su supera il 99.8\% con SBP e ADAB e mantiene il
+99.5\% a 100 boe con ACAB, sostanzialmente i valori del canale ideale,
+poich\'e la ridondanza dei percorsi compensa la perdita dei singoli frame.
+Alle basse densit\`a emergono per\`o differenze marcate tra i protocolli: a
+20 boe ADAB--append raggiunge l'84.2\% contro il 72.4\% di SBP--append,
+mentre ACAB--append si ferma al 58.9\% (e al 78.1\% a 40 boe). Il backoff
+pi\`u conservativo di ACAB --- soglia di densit\`a inferiore e componente di
+contatto recente --- riduce proprio le trasmissioni da cui il canale con
+perdite trae la ridondanza necessaria. Il forwarding singolo si colloca in
+mezzo: 62--69\% a 20 boe e circa il 97\% a 100 boe, dove il limite di hop e
+la perdita dei beacon ritrasmessi ne frenano la diffusione rispetto
+all'aggregato.
+
+\paragraph{Dinamica temporale.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_discovery_growth_interval-1_0.pdf}
+  \caption[Crescita della scoperta nel tempo, canale non ideale]{Evoluzione
+  temporale della percentuale di rete scoperta nella configurazione a 100 boe
+  (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-growth}
+\end{figure}
+La dinamica temporale (Figura~\ref{fig:error-growth}) mostra la coda
+allungata della scoperta rispetto al canale ideale: il forwarding aggregato
+con SBP e ADAB supera il 99\% entro una ventina di secondi, mentre con ACAB
+la crescita \`e pi\`u graduale e con bande pi\`u ampie, pur convergendo
+anch'essa verso il 99\% entro fine simulazione. Il forwarding singolo sale
+pi\`u lentamente --- circa il 90\% dopo 25 secondi --- e si assesta attorno
+al 97\%; il single-hop resta sotto il 70\% con crescita ancora in corso a
+fine simulazione.
+
+\paragraph{B-PDR.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_pdr_interval-1_0.pdf}
+  \caption[B-PDR, canale non ideale]{B-PDR al variare della densit\`a
+  (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-pdr}
+\end{figure}
+Il canale probabilistico impone un tetto all'affidabilit\`a indipendente da
+modalit\`a e protocollo: gi\`a a 20 boe, dove la contesa \`e trascurabile, il
+B-PDR di tutte le configurazioni si colloca tra 0.36 e 0.45
+(Figura~\ref{fig:error-pdr}), riflesso della geometria delle opportunit\`a
+di ricezione --- la maggior parte dei riceventi in portata cade nella corona
+esterna, dove $P_{\mathrm{rx}} = 0.15$. Su questa base il comportamento con
+la densit\`a distingue le modalit\`a. Il single-hop resta piatto
+($\text{B-PDR} \approx 0.41$ a 100 boe): le sue perdite sono interamente
+dominate dal canale, non dalla contesa. Il forwarding aggregato con
+protocolli adattivi \`e quasi indistinguibile dal single-hop (0.383 con ADAB
+e 0.404 con ACAB a 100 boe), mentre con SBP la contesa riemerge e lo abbassa
+a 0.367. Il forwarding singolo somma al tetto del canale la propria contesa:
+a 100 boe scende a 0.272 con SBP, mentre i protocolli adattivi lo mantengono
+attorno a 0.33 (0.334 con ADAB, 0.320 con ACAB). Alle basse densit\`a \`e
+invece la modalit\`a forward a esibire il B-PDR pi\`u alto (0.450 con SBP a
+20 boe): le ritrasmissioni moltiplicano le ricezioni riuscite prima che la
+contesa diventi rilevante.
+
+\paragraph{Collision rate.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_collision_rate_interval-1_0.pdf}
+  \caption[Collision rate, canale non ideale]{Collision rate al variare della
+  densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-collision}
+\end{figure}
+Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
+\`e sistematicamente inferiore a quello del canale ideale a parit\`a di
+configurazione: per il forwarding singolo con SBP a 100 boe vale 0.354 contro
+0.553 (Sezione~\ref{sec:res-ideal}). La ragione \`e indiretta ma sistematica:
+i beacon persi dal canale non vengono ricevuti n\'e rilanciati, e l'errore di
+canale agisce cos\`i da regolatore del traffico di inoltro, riducendo il
+numero di trasmissioni in contesa. In single-hop le collisioni restano
+trascurabili ($CR \le 0.015$). Nel forwarding aggregato la contesa cresce con
+la densit\`a ma resta contenuta dall'adattivit\`a: a 100 boe il collision
+rate vale 0.108 con SBP, 0.052 con ADAB e appena 0.019 con ACAB. Il
+forwarding singolo \`e di nuovo la modalit\`a pi\`u onerosa (0.354 con SBP a
+100 boe), con i protocolli adattivi che ne riducono sensibilmente il costo
+(0.191 con ADAB, 0.221 con ACAB). L'ordinamento
+$\text{ACAB} < \text{ADAB} < \text{SBP}$ del forwarding aggregato si
+conferma anche in presenza di errori di canale.
+
+\paragraph{Packet loss.}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_loss_rate_interval-1_0.pdf}
+  \caption[Packet loss, canale non ideale]{Packet loss complessivo al variare
+  della densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  \label{fig:error-loss}
+\end{figure}
+Il packet loss (Eq.~\ref{eq:packetloss}) somma alle collisioni le perdite
+dovute al canale e ne fornisce quindi la misura complessiva di
+inaffidabilit\`a (Figura~\ref{fig:error-loss}). A differenza del canale
+ideale, dove $PL = CR$, qui il packet loss parte da una base elevata anche in
+assenza di contesa: gi\`a a 20 boe si colloca tra 0.55 e 0.64, riflesso
+diretto della probabilit\`a di consegna nella corona esterna. Il single-hop
+si mantiene su questa base per ogni densit\`a ($\approx 0.59$ a 100 boe, con
+$CR \le 0.015$): quasi tutta la perdita \`e imputabile al canale. Nel
+forwarding aggregato la contesa aggiunge un contributo modesto --- a 100 boe
+il packet loss vale 0.633 con SBP, 0.617 con ADAB e 0.596 con ACAB ---
+mentre nel forwarding singolo il contributo della contesa \`e ben visibile:
+con SBP il packet loss raggiunge 0.728 a 100 boe, contro 0.666 (ADAB) e
+0.680 (ACAB). La differenza $PL - CR$ isola in ogni caso il peso del canale
+rispetto a quello della contesa: per il forwarding singolo con SBP a 100 boe
+le collisioni pesano per 0.354 e il canale per i restanti $\approx 0.37$, a
+conferma che, nelle condizioni realistiche, la perdita \`e dominata dal
+livello fisico e solo accentuata dall'inoltro. La
+Tabella~\ref{tab:error-summary} riepiloga i valori numerici.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Riepilogo dei risultati con canale non ideale]{Riepilogo dei
+  risultati con canale non ideale ($BI=\SI{1.0}{\second}$): percentuale media
+  di rete scoperta e B-PDR a 20, 60 e 100 boe, collision rate e packet loss a
+  100 boe. Medie su 20 repliche.}
+  \label{tab:error-summary}
+  \small
+  \begin{tabular}{llcccccccc}
+    \toprule
+    & & \multicolumn{3}{c}{$D_{\%}$} & \multicolumn{3}{c}{B-PDR} & $CR$ & $PL$ \\
+    \cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-9}\cmidrule(lr){10-10}
+    Modalit\`a & Protocollo & 20 & 60 & 100 & 20 & 60 & 100 & 100 & 100 \\
+    \midrule
+    \multirow{3}{*}{Single-hop}
+      & SBP  & 53.9 & 64.6 & 67.6 & 0.402 & 0.420 & 0.410 & 0.015 & 0.590 \\
+      & ADAB & 56.0 & 58.3 & 57.4 & 0.400 & 0.409 & 0.407 & 0.005 & 0.593 \\
+      & ACAB & 49.6 & 57.3 & 55.0 & 0.371 & 0.409 & 0.409 & 0.002 & 0.591 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ aggregato}
+      & SBP  & 72.4 & 99.8 & 100.0 & 0.401 & 0.402 & 0.367 & 0.108 & 0.633 \\
+      & ADAB & 84.2 & 99.9 & 100.0 & 0.389 & 0.396 & 0.383 & 0.052 & 0.617 \\
+      & ACAB & 58.9 & 95.6 & 99.5  & 0.363 & 0.404 & 0.404 & 0.019 & 0.596 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ singolo}
+      & SBP  & 66.7 & 94.5 & 97.2 & 0.450 & 0.367 & 0.272 & 0.354 & 0.728 \\
+      & ADAB & 68.7 & 93.4 & 97.3 & 0.431 & 0.402 & 0.334 & 0.191 & 0.666 \\
+      & ACAB & 61.8 & 91.8 & 97.8 & 0.427 & 0.396 & 0.320 & 0.221 & 0.680 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Effetto dell'intervallo di beaconing}
+\label{sec:res-interval}
+Le sezioni precedenti hanno fissato $BI=\SI{1.0}{\second}$; la campagna \`e
+stata ripetuta con $BI=\SI{0.5}{\second}$ e $BI=\SI{0.25}{\second}$, valori
+che raddoppiano e quadruplicano il traffico offerto da SBP. Il parametro
+riguarda il solo protocollo statico: ADAB e ACAB operano in ogni
+configurazione con $\bimin=\SI{0.25}{\second}$ e $\bimax=\SI{5.0}{\second}$
+(Sezione~\ref{sec:eval-params}), e le loro colonne nella
+Tabella~\ref{tab:interval-summary} fungono quindi da controllo, con
+variazioni residue che riflettono la sola variabilit\`a tra repliche. Questa
+asimmetria \`e la chiave di lettura dei risultati, riassunti per la modalit\`a
+di forwarding aggregato nella configurazione pi\`u densa.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Sensibilit\`a all'intervallo di beaconing (forwarding aggregato,
+  100 boe)]{B-PDR e collision rate a 100 boe in modalit\`a forwarding
+  aggregato, al variare dell'intervallo di beaconing e del protocollo, nei
+  due scenari di canale. Medie su 20 repliche.}
+  \label{tab:interval-summary}
+  \begin{tabular}{llcccccc}
+    \toprule
+    & & \multicolumn{2}{c}{\textbf{SBP}} & \multicolumn{2}{c}{\textbf{ADAB}} & \multicolumn{2}{c}{\textbf{ACAB}} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+    Canale & $BI$ (\si{\second}) & B-PDR & $CR$ & B-PDR & $CR$ & B-PDR & $CR$ \\
+    \midrule
+    \multirow{3}{*}{ideale}
+      & 1.0  & 0.837 & 0.163 & 0.949 & 0.051 & 0.965 & 0.035 \\
+      & 0.5  & 0.667 & 0.333 & 0.950 & 0.050 & 0.964 & 0.036 \\
+      & 0.25 & 0.396 & 0.604 & 0.950 & 0.050 & 0.965 & 0.035 \\
+    \midrule
+    \multirow{3}{*}{non ideale}
+      & 1.0  & 0.367 & 0.108 & 0.383 & 0.052 & 0.404 & 0.019 \\
+      & 0.5  & 0.316 & 0.227 & 0.384 & 0.052 & 0.402 & 0.018 \\
+      & 0.25 & 0.212 & 0.469 & 0.383 & 0.052 & 0.402 & 0.018 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Per SBP l'intervallo \`e il fattore dominante: passando da 1.0 a
+\SI{0.25}{\second} il collision rate a 100 boe quasi quadruplica (da 0.163 a
+0.604) e il B-PDR crolla da 0.837 a 0.396; nel canale non ideale l'effetto
+\`e analogo ($CR$ da 0.108 a 0.469, B-PDR da 0.367 a 0.212). Lo stesso vale,
+in forma attenuata, per il forwarding singolo (B-PDR da 0.447 a 0.314 nel
+canale ideale). Il confronto con i protocolli adattivi \`e reso pi\`u eloquente
+proprio dalla loro configurazione: ADAB e ACAB operano gi\`a, a ogni riga
+della tabella, con il limite inferiore pi\`u aggressivo
+($\bimin=\SI{0.25}{\second}$, lo stesso valore che con SBP porta il collision
+rate a 0.604), eppure mantengono $CR \le 0.052$ e B-PDR stabili al secondo
+decimale: il backoff adattivo riespande l'intervallo effettivo non appena la
+contesa locale cresce, neutralizzando l'aggressivit\`a del limite inferiore.
+L'intervallo breve conserva
+un'utilit\`a alle basse densit\`a: nello scenario sparso a 20 boe con canale
+non ideale la scoperta di SBP--append sale dal 72.4\% ($BI=\SI{1.0}{\second}$)
+al 90.3\% ($BI=\SI{0.25}{\second}$), poich\'e le trasmissioni pi\`u frequenti
+moltiplicano le occasioni di superare i collegamenti a bassa probabilit\`a
+dove la contesa \`e assente. Il protocollo statico \`e per\`o costretto a
+scegliere tra reattivit\`a in scarsit\`a e stabilit\`a in densit\`a, mentre i
+protocolli adattivi ottengono entrambe senza riconfigurazione.
+
+% ---------------------------------------------------------------------
+\subsection{Sintesi del confronto}
+\label{sec:confronto-sintesi}
+I risultati delineano un quadro coerente lungo i tre assi della valutazione.
+Sul piano della \emph{copertura} l'inoltro multi-hop \`e una necessit\`a, non
+un'ottimizzazione: nello scenario adottato il single-hop si ferma al 63--77\%
+nel canale ideale e al 50--68\% in quello non ideale, mentre entrambe le
+modalit\`a multi-hop completano di fatto la scoperta dalle densit\`a medie in
+su. Sul piano del \emph{delivery ratio} il forwarding aggregato domina
+sistematicamente quello singolo: a parit\`a di copertura ne paga una frazione
+del costo in contesa (a 100 boe nel canale ideale, $CR$ 0.163 contro 0.553
+con SBP e 0.035 contro 0.421 con ACAB), perch\'e affida la diffusione
+dell'informazione all'allungamento dei frame anzich\'e a trasmissioni
+aggiuntive. Il forwarding singolo conserva il pregio della semplicit\`a e un
+B-PDR migliore nei soli scenari sparsi con canale con perdite, ma sul piano
+della \emph{scalabilit\`a} il suo traffico cresce con la densit\`a fino a
+erodere l'affidabilit\`a, mentre l'aggregato scala con degrado contenuto.
+Trasversale alle modalit\`a \`e il ruolo del beaconing adattivo, che rende
+l'inoltro sostenibile: ADAB e ACAB assorbono quasi interamente la contesa
+aggiuntiva dell'aggregato e rendono le prestazioni insensibili all'intervallo
+configurato, l\`a dove SBP degrada rapidamente con densit\`a e frequenza di
+trasmissione. Nelle condizioni di canale realistiche la combinazione
+ADAB--append emerge come il compromesso migliore --- scoperta pressoch\'e
+completa a ogni densit\`a e affidabilit\`a al livello del single-hop ---
+mentre ACAB--append massimizza l'affidabilit\`a dove il canale \`e buono, al
+prezzo di una scoperta pi\`u lenta negli scenari sparsi con perdite. Le
+implicazioni di questi risultati e i possibili sviluppi sono discussi nel
+capitolo conclusivo.
 
 
 % =====================================================================
@@ -691,113 +1073,6 @@ nella configurazione pi\`u densa.
 \end{table}
 
 Per SBP l'intervallo \`e il fattore dominante: passando da 1.0 a
-\SI{0.25}{\second} il collision rate a 120 boe pi\`u che triplica (da 0.147 a
-0.517) e il B-PDR crolla da 0.853 a 0.483; nel canale non ideale l'effetto \`e
-analogo ($CR$ da 0.081 a 0.415, B-PDR da 0.383 a 0.233). Lo stesso vale, in
-forma attenuata, per il forwarding singolo (B-PDR da 0.554 a 0.448 nel canale
-ideale). Per ADAB e ACAB, al contrario, le prestazioni sono pressoch\'e
-insensibili all'intervallo: i valori di B-PDR e collision rate restano
-invariati al terzo decimale, perch\'e il backoff adattivo riespande
-l'intervallo effettivo non appena la contesa locale cresce, neutralizzando
-l'aggressivit\`a del limite inferiore. L'intervallo breve conserva
-un'utilit\`a alle basse densit\`a: nello scenario sparso a 20 boe con canale
-non ideale la scoperta di SBP--append sale dal 41.5\% ($BI=\SI{1.0}{\second}$)
-al 59.8\% ($BI=\SI{0.25}{\second}$), poich\'e le trasmissioni pi\`u frequenti
-moltiplicano le occasioni di superare i collegamenti a bassa probabilit\`a
-dove la contesa \`e assente. Il protocollo statico \`e per\`o costretto a
-scegliere tra reattivit\`a in scarsit\`a e stabilit\`a in densit\`a, mentre i
-protocolli adattivi ottengono entrambe senza riconfigurazione.
-
-% ---------------------------------------------------------------------
-\section{Discussione}
-\label{sec:discussione}
-I risultati sperimentali offrono alcune indicazioni generali
-sull'interazione tra inoltro multi-hop e beaconing adattivo e sul ruolo della
-simulazione nella valutazione dei protocolli.
-
-\subsection{Necessit\`a dell'inoltro e compromesso con l'affidabilit\`a}
-\label{sec:disc-tradeoff}
-Nello scenario considerato --- area ampia rispetto alla portata radio e
-popolazione in continuo ricambio --- il beaconing single-hop non \`e
-sufficiente a costruire la conoscenza della rete: la scoperta si ferma
-attorno alla met\`a dei nodi anche nel canale ideale. L'inoltro multi-hop \`e
-dunque una necessit\`a, non un'ottimizzazione. Tra le due modalit\`a, il
-forwarding aggregato domina sistematicamente quello singolo: a parit\`a di
-scoperta (98--100\% alle densit\`a medio-alte) ne paga una frazione del costo
-in contesa, perch\'e affida la diffusione dell'informazione all'allungamento
-dei frame anzich\'e a trasmissioni aggiuntive. Il forwarding singolo
-conserva un pregio nella semplicit\`a del meccanismo e una velocit\`a di
-prima diffusione comparabile, ma il suo traffico cresce con la densit\`a fino
-a erodere l'affidabilit\`a (B-PDR 0.554 con SBP a 120 boe nel canale ideale).
-
-\subsection{Sufficienza dell'informazione locale}
-\label{sec:disc-local}
-Il risultato pi\`u netto della campagna \`e l'efficacia del backoff adattivo
-nel rendere sostenibile l'inoltro: con il forwarding aggregato, ADAB riduce il
-collision rate di SBP di oltre la met\`a e ACAB di quasi sei volte,
-mantenendo il B-PDR sopra 0.94 fino a 120 boe e rendendo le prestazioni
-indipendenti dall'intervallo configurato (Sezione~\ref{sec:res-interval}).
-Ci\`o conferma, in linea con la letteratura sul beaconing adattivo, che
-segnali puramente locali --- il conteggio dei vicini per ADAB; densit\`a,
-recenza di contatto e mobilit\`a per ACAB --- sono sufficienti a regolare il
-traffico senza alcun coordinamento centralizzato, anche quando il carico \`e
-amplificato dall'inoltro multi-hop. La maggiore prudenza di ACAB ha per\`o un
-rovescio: nel canale con perdite il suo minor numero di trasmissioni riduce la
-ridondanza da cui il forwarding aggregato trae robustezza, rallentando la
-scoperta (92.3\% a 120 boe contro il 99.5\% di ADAB). ADAB, pi\`u semplice,
-offre nel complesso il miglior equilibrio tra scoperta e affidabilit\`a nelle
-condizioni realistiche; ACAB massimizza l'affidabilit\`a dove il canale \`e
-buono o il traffico \`e la risorsa critica.
-
-\subsection{Limiti di scalabilit\`a}
-\label{sec:disc-scal}
-L'intervallo di densit\`a esplorato (fino a 120 boe, circa sei vicini medi)
-\`e rappresentativo di scenari costieri realistici, ma le tendenze osservate
-indicano i limiti oltre i quali le combinazioni degradano: il forwarding
-singolo con SBP \`e gi\`a prossimo alla saturazione a 120 boe, e la crescita
-monotona del collision rate suggerisce che nessuna combinazione statica
-reggerebbe densit\`a molto superiori. Per il forwarding aggregato il fattore
-limitante di lungo periodo \`e la dimensione del beacon, che cresce con il
-numero di nodi annunciati e allunga i tempi di occupazione del canale; a
-densit\`a estreme anche il backoff adattivo potrebbe soltanto rinviare la
-saturazione dell'airtime complessivo. L'esplorazione di questi regimi
-estremi resta possibile in simulazione, variando pochi parametri di
-configurazione.
-
-\subsection{Il ruolo della simulazione}
-\label{sec:disc-sim}
-La campagna presentata --- 2 condizioni di canale $\times$ 3 intervalli
-$\times$ 3 modalit\`a $\times$ 3 protocolli $\times$ 6 densit\`a, per un
-totale di 324 configurazioni ripetute su 10 semi --- sarebbe impraticabile in
-mare con dispositivi reali, sia per i costi sia per l'impossibilit\`a di
-riprodurre condizioni identiche tra un esperimento e l'altro. Il simulatore
-funge qui da strumento scientifico: fornisce una piattaforma controllata e
-riproducibile per confrontare i protocolli nelle stesse identiche condizioni
-di mobilit\`a, churn e canale, isolando l'effetto di ogni singolo parametro.
-
-% ---------------------------------------------------------------------
-\section{Sintesi del capitolo}
-\label{sec:risultati-sintesi}
-Il capitolo ha valutato le modalit\`a di inoltro multi-hop in combinazione
-con i tre protocolli di beaconing, su sei livelli di densit\`a, tre
-intervalli di beaconing e due condizioni di canale. I risultati mostrano che
-nello scenario adottato l'inoltro \`e indispensabile alla scoperta della rete
-(il single-hop si ferma attorno al 50\%), che il forwarding aggregato
-eguaglia la scoperta del forwarding singolo a una frazione del suo costo in
-collisioni e che il beaconing adattivo \`e il complemento che rende
-l'inoltro sostenibile: ADAB e ACAB assorbono quasi interamente la contesa
-aggiuntiva e rendono le prestazioni insensibili all'intervallo configurato,
-l\`a dove SBP degrada rapidamente con densit\`a e frequenza di trasmissione.
-La combinazione ADAB--append emerge come il compromesso migliore nelle
-condizioni di canale realistiche, con scoperta pressoch\'e completa e
-affidabilit\`a al livello del semplice beaconing single-hop. Le implicazioni
-di questi risultati e i possibili sviluppi sono discussi nel capitolo
-conclusivo.
-
-\fi
-% =====================================================================
-%  FINE MATERIALE PER LA SEZIONE 4.4
-% =====================================================================ssando da 1.0 a
 \SI{0.25}{\second} il collision rate a 120 boe pi\`u che triplica (da 0.147 a
 0.517) e il B-PDR crolla da 0.853 a 0.483; nel canale non ideale l'effetto \`e
 analogo ($CR$ da 0.081 a 0.415, B-PDR da 0.383 a 0.233). Lo stesso vale, in
