@@ -101,7 +101,7 @@ class BeaconScheduler:
             case "dynamic_acab":
                 density_score = min(1.0, n_neighbors / self.acab_neighbors_threshold)
 
-                if n_neighbors > 0 and last_contact_ts is not None:
+                if last_contact_ts is not None:
                     delta = current_time - last_contact_ts
                     contact_score = max(0.0, 1.0 - (delta / self.acab_contact_threshold))
                 else:

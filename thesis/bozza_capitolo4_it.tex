@@ -20,11 +20,13 @@ introdotte nel Capitolo~\ref{ch:contributo}. Poich\'e ogni configurazione
 di simulazione combina una delle modalit\`a di inoltro con uno dei protocolli di
 beaconing che regolano gli intervalli di trasmissione, il capitolo si apre con
 la descrizione dei tre protocolli --- SBP, ADAB e ACAB --- gi\`a esistenti nel
-simulatore. Seguono gli obiettivi della valutazione
-(Sezione~\ref{sec:eval-goals}), gli scenari di simulazione adottati negli
-esperimenti (Sezione~\ref{sec:eval-setup}), le metriche impiegate nella
-valutazione (Sezione~\ref{sec:eval-metrics}) e il confronto sperimentale tra le
-modalit\`a di inoltro (Sezione~\ref{sec:confronto}).
+simulatore. Seguono:
+\begin{enumerate}
+    \item \hyperref[sec:eval-goals]{Obiettivi della valutazione}
+    \item \hyperref[sec:eval-setup]{scenari di simulazione adottati negli esperiment}
+    \item \hyperref[sec:eval-metrics]{Metriche impiegate nella valutazione}
+    \item \hyperref[sec:confronto]{Confronto sperimentale tra le modalit\`a di inoltro}
+\end{enumerate}
 
 % ---------------------------------------------------------------------
 \section{Protocolli di beaconing}
@@ -32,15 +34,14 @@ modalit\`a di inoltro (Sezione~\ref{sec:confronto}).
 I tre protocolli agiscono esclusivamente sull'istante di generazione del
 beacon: una volta generato, il frame attraversa la pipeline di trasmissione
 CSMA/CA descritta nel Capitolo~\ref{ch:simulatore}. Ciascun protocollo pu\`o
-essere combinato con una qualunque delle modalit\`a multi-hop del
+essere combinato con qualsiasi modalit\`a multi-hop del
 Capitolo~\ref{ch:contributo}.
 
 \subsection{Static Beaconing Protocol (SBP)}
 \label{sec:sbp}
-Lo SBP costituisce il protocollo di riferimento: ogni boa trasmette un beacon a
+SBP costituisce il protocollo standard: ogni boa trasmette un beacon a
 intervallo fisso $BI_{\text{static}}$, indipendentemente dalle condizioni della
-rete. La semplicit\`a e la prevedibilit\`a del comportamento ne fanno la base di
-confronto naturale; tuttavia, negli scenari densi l'assenza di adattamento
+rete. Tuttavia, negli scenari densi, l'assenza di adattamento
 accresce la probabilit\`a di collisione e degrada l'affidabilit\`a, mentre negli
 scenari sparsi l'intervallo fisso produce trasmissioni pi\`u frequenti del
 necessario. Tali limiti motivano l'adozione di protocolli adattivi.
@@ -48,15 +49,15 @@ necessario. Tali limiti motivano l'adozione di protocolli adattivi.
 \subsection{Adaptive Density-Aware Beaconing (ADAB)}
 \label{sec:adab}
 ADAB regola l'intervallo sulla base di un'unica grandezza locale: il numero di
-vicini presenti in tabella. A ogni decisione di scheduling il nodo rileva il
+vicini presenti in tabella. A ogni decisione di scheduling, il nodo rileva il
 numero di vicini correnti $N_t$ e ne deriva un fattore di densit\`a normalizzato
 \begin{equation}
-  f_t = \min\!\left(1,\; \frac{N_t}{\nthr}\right),
-  \qquad \nthr = 15,
+  f_t = \min\!\left(1,\; \frac{N_t}{N_{thr}}\right),
+  \qquad N_{thr} = 15,
   \label{eq:adab-density}
 \end{equation}
-dove $\nthr$ \`e la soglia oltre la quale la congestione \`e considerata
-rilevante. L'intervallo successivo \`e ottenuto da una funzione quadratica del
+dove $N_{thr}$ \`e la soglia oltre la quale la congestione \`e considerata
+\emph{rilevante}. L'intervallo successivo \`e ottenuto da una funzione quadratica del
 fattore di densit\`a, interpolata fra un minimo e un massimo, con un jitter
 moltiplicativo $\delta$ che desincronizza le trasmissioni dei nodi:
 \begin{equation}
@@ -64,23 +65,24 @@ moltiplicativo $\delta$ che desincronizza le trasmissioni dei nodi:
   \qquad \delta \sim \mathcal{U}[-\eta,\eta],\;\; \eta=0.05,
   \label{eq:adab}
 \end{equation}
-con $BI_{t+1}$ vincolato all'intervallo $[\bimin,\bimax]$. Con pochi vicini
+con $BI_{t+1} \in [\bimin,\bimax]$. Con pochi vicini
 $f_t\approx 0$ e la boa trasmette a intervalli prossimi a $\bimin$, favorendo
-una scoperta rapida; man mano che $N_t$ si avvicina a $\nthr$, il termine
-quadratico spinge l'intervallo verso $\bimax$, riducendo le trasmissioni dove la
-contesa \`e maggiore. La dipendenza quadratica mantiene quindi il nodo reattivo
-alle basse densit\`a e ne accentua il rallentamento all'aumentare della
-congestione. I valori adottati sono $\bimax = \SI{5.0}{\second}$ e $\bimin$
-configurabile (negli esperimenti $\bimin \in \{0.25, 0.5, 1.0\}\,\si{\second}$).
+una scoperta rapida; man mano che $N_t$ si avvicina a $\nthr$, $f_t$ fa convergere l'intervallo verso $\bimax$:
+\begin{equation}
+    N_t \gtrsim N_{thr} \implies f_t \simeq 1 \implies BI_{t+1} \to \bimax;
+\end{equation}
+riducendo le trasmissioni dove la contesa \`e maggiore. 
+
+L'adattamento in funzione del numero di vicini mantiene quindi il nodo reattivo
+alle basse densit\`a e ne rallenta le trasmissioni all'aumentare della
+congestione. I valori adottati negli esperimenti sono $\bimax = \SI{5.0}{\second}$ e $\bimin\in \{0.25, 0.5, 1.0\}\,\si{\second}$.
 
 \subsection{Adaptive Context-Aware Beaconing (ACAB)}
 \label{sec:acab}
-La densit\`a non \`e l'unico segnale locale utile a stabilire l'opportunit\`a di
-una trasmissione. ACAB combina tre segnali: la densit\`a dei vicini, il tempo
+ACAB regola l'intervallo combinando tre segnali: la densit\`a dei vicini, il tempo
 trascorso dall'ultimo contatto e la mobilit\`a del nodo.
 
-\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un conteggio
-normalizzato dei vicini, con una soglia pi\`u bassa:
+\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un fattore di densit\`a normalizzato in funzione del numero dei vicini; stavolta con una soglia pi\`u bassa:
 \begin{equation}
   s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
   \qquad \nthr^{\mathrm{ACAB}} = 10 .
@@ -107,7 +109,7 @@ nodo isolato o a lungo silenzioso produce $0$ (e trasmette pi\`u di frequente).
 breve tempo l'informazione di posizione annunciata e deve pertanto aggiornarla
 con maggiore frequenza. Con velocit\`a $v=\lVert\mathbf{v}\rVert$ e velocit\`a
 di riferimento $v_{\text{ref}}$ (la velocit\`a di default, pari a
-\SI{15}{\metre\per\second}):
+\SI{15}m/s):
 \begin{equation}
   s_{\mathrm{mob}} = \min\!\left(1,\;\frac{v}{v_{\text{ref}}}\right).
   \label{eq:acab-mob}
@@ -122,12 +124,16 @@ mobilit\`a riduce il backoff, da cui il termine $1-s_{\mathrm{mob}}$:
   \label{eq:acab-blend}
 \end{equation}
 Il punteggio $s$ sostituisce $f_t$ nell'espressione dell'intervallo di ADAB
-(Eq.~\ref{eq:adab}): ACAB rallenta cos\`i una boa densa, contattata di recente e
+(Eq.~\ref{eq:adab}): 
+\begin{equation}
+  BI_{t+1} = \Big[\,\bimin + s^{2}\,(\bimax-\bimin)\,\Big]\,(1+\delta).
+  \label{eq:acab}
+\end{equation}
+ACAB rallenta una boa densa, contattata di recente e
 ferma, e mantiene pi\`u frequente una boa isolata, silenziosa o in movimento.
-Rispetto ad ADAB, che impiega la sola densit\`a, ACAB costruisce il punteggio di
-backoff a partire da tre segnali e richiede quindi il mantenimento di un numero
-maggiore di variabili di stato; l'overhead computazionale resta comunque
-trascurabile per i dispositivi considerati.
+Rispetto ad ADAB, ACAB costruisce il punteggio di
+backoff a partire da  un numero maggiore di variabili di stato; 
+l'overhead computazionale resta comunquetrascurabile per i dispositivi considerati.
 
 % =====================================================================
 %  4.1 OBIETTIVI DELLA VALUTAZIONE
@@ -146,21 +152,22 @@ modalit\`a, richiamate qui nella sola definizione essenziale e descritte in
 dettaglio nel Capitolo~\ref{ch:contributo} (progettazione) e nel
 Capitolo~\ref{ch:simulatore} (implementazione).
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item \textbf{Single-hop (baseline).} Beaconing a singolo hop senza alcun
-  inoltro: ogni boa apprende l'esistenza dei soli vicini diretti, ovvero i nodi
-  dai quali riceve un beacon (Sezione~\ref{sec:multihop}). Costituisce il
-  termine di paragone rispetto al quale si misura il guadagno delle modalit\`a
-  multi-hop.
-  \item \textbf{Forwarding singolo.} La boa ritrasmette i beacon ricevuti entro
-  un limite di hop, con i meccanismi di contenimento del broadcast storm
-  (deduplicazione per origine, TTL, coda limitata) descritti nella
-  Sezione~\ref{sec:forward} e implementati nella Sezione~\ref{sec:forward-impl}.
-  Estende la portata della conoscenza al prezzo di trasmissioni aggiuntive.
-  \item \textbf{Forwarding aggregato.} La boa allega a ogni beacon la lista dei
-  nodi che conosce, senza generare frame supplementari
-  (Sezione~\ref{sec:append}, implementazione nella
-  Sezione~\ref{sec:append-impl}). L'informazione viaggia sui beacon che il nodo
-  trasmetterebbe comunque, al prezzo di un frame pi\`u lungo
+  \item \textbf{Single-hop (baseline).} Beaconing a singolo hop, privo di
+  qualunque inoltro: la conoscenza di ciascuna boa si limita ai vicini in
+  portata radio diretta, gli unici da cui riceve beacon
+  (Sezione~\ref{sec:multihop}). Funge da termine di paragone rispetto al quale
+  si misura il guadagno introdotto dalle modalit\`a multi-hop.
+  \item \textbf{Forwarding singolo.} La boa rilancia i beacon altrui fino a un
+  numero massimo di hop, affidandosi ai controlli che arginano il broadcast
+  storm --- unicit\`a dell'origine, TTL e coda a capacit\`a limitata --- come
+  dettagliato nella Sezione~\ref{sec:forward} e realizzato nella
+  Sezione~\ref{sec:forward-impl}. Amplia il raggio della conoscenza pagando in
+  trasmissioni aggiuntive.
+  \item \textbf{Forwarding aggregato.} Anzich\'e generare nuovi frame, la boa
+  accoda a ciascun beacon l'elenco dei nodi che ha finora appreso
+  (Sezione~\ref{sec:append}, realizzata nella Sezione~\ref{sec:append-impl}).
+  La diffusione sfrutta cos\`i le trasmissioni gi\`a previste dal protocollo, e
+  il solo costo \`e l'allungamento del frame al crescere dei nodi annunciati
   (Eq.~\ref{eq:beacon-size}).
 \end{itemize}
 Le due modalit\`a multi-hop rappresentano due scelte opposte nel compromesso tra
