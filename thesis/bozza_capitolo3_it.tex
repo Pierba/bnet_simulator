@@ -109,7 +109,7 @@ la gestione della coda degli eventi e della popolazione di boe, il mezzo trasmis
 struttura del frame, i protocolli di beaconing, la lettura centralizzata della
 configurazione e la raccolta delle metriche.
 
-Le componenti appartenenti a livelli di gerarchia diveresi comunicano a vicenda tramite \emph{callback}, assegnate in
+Le componenti appartenenti a livelli di gerarchia diversi comunicano a vicenda tramite \emph{callback}, assegnate in
 fase di inizializzazione. Ogni boa riceve dal simulatore una callback --- che funge da metodo di interfaccia comune per tutte le classi --- con cui accodare i
 propri eventi futuri, e dal canale due callback con cui rispettivamente ascoltare il
 mezzo e trasmettere. Analogamente, canale e boe riportano i dati alle metriche per mezzo dello stesso sistema.
@@ -179,7 +179,7 @@ La logica di queste variazioni dipende dallo scenario configurato:
   $50\%$ e quando \`e possibile farlo in base al numero minimo di boe che devono essere presenti ---
   un numero casuale di boe fino a un massimo di $\max(1, \lfloor \rho\,N \rfloor)$,
   con $N$ il totale delle boe e $\rho$ la percentuale di variabilit\`a configurata; 
-  vi \`e anche un vincolo inferiore sul numero minino di boe che devono rimanere attive, pari a $\max(3,\, 0.2\,N)$.
+  vi \`e anche un vincolo inferiore sul numero minimo di boe che devono rimanere attive, pari a $\max(3,\, 0.2\,N)$.
 \end{itemize}
 
 L'attivazione di una boa ne rischedula gli eventi ricorrenti (verifica dello scheduler,
@@ -285,7 +285,7 @@ modalit\`a multihop attiva \`e descritto nella Sezione~\ref{sec:multihop-impl}.
 % ---------------------------------------------------------------------
 \subsection{Modello di mobilit\`a Random Waypoint}
 \label{sec:rwp}
-Una frazione configurabile delle boe (il $40\%$ negli
+Una frazione configurabile delle boe (il $30\%$ negli
 esperimenti) \`e mobile e si muove secondo il modello \emph{Random Waypoint} (RWP),
 gestito dall'evento \texttt{BUOY\_MOVEMENT}. Il modello genera
 traiettorie che alternano tratte rettilinee e soste; ogni boa si muove in modo
@@ -443,7 +443,7 @@ deduplicazione vengono inoltre svuotate per intero, per il motivo spiegato nella
 \section{Funzionamento del canale}
 \label{sec:channel}
 Il canale \`e il mezzo condiviso attraverso cui viaggiano tutti i beacon. Mantiene la
-lista delle \emph{trasmissioni attive} --- contentente le triple $(\text{beacon},\, t_{\text{inizio}},\,
+lista delle \emph{trasmissioni attive} --- contenente le triple $(\text{beacon},\, t_{\text{inizio}},\,
 t_{\text{fine}})$ ---, con la quale gestisce sia il carrier sensing delle boe sia il rilevamento delle collisioni.
 
 % ---------------------------------------------------------------------
@@ -560,11 +560,11 @@ configurazione con i valori impiegati negli esperimenti.
     \midrule
     \multicolumn{2}{@{}l}{\emph{Simulazione}}\\
     Protocolli di beaconing simulati & SBP, ADAB, ACAB \\
-    Densit\`a di boe (minima--massima, passo) & $20$--$120$, passo $20$ \\
+    Densit\`a di boe (minima--massima, passo) & $20$--$100$, passo $20$ \\
     Intervalli di beaconing $BI_{\text{static}}$ [s] & $1.0$, $0.5$, $0.25$ \\
     Durata di ogni simulazione [s] & $200$ \\
     Simulazioni eseguite in parallelo & $10$ \\
-    Canale ideale & attivo \\
+    Canale & ideale e non ideale (due scenari) \\
     Scenario & \emph{random} \\
     Percentuale di variabilit\`a $\rho$ dello scenario \emph{random} & $0.30$ \\
     Modalit\`a multihop simulate & nessuna, aggregato, singolo \\
@@ -574,10 +574,10 @@ configurazione con i valori impiegati negli esperimenti.
     Baseline $n_0$ del gate di forwarding (non attivo, Sez.~\ref{sec:fwdgate}) & $5$ \\
     \midrule
     \multicolumn{2}{@{}l}{\emph{Piano di simulazione}}\\
-    Dimensioni del piano [m] & $500 \times 500$ \\
+    Dimensioni del piano [m] & $600 \times 600$ \\
     \midrule
     \multicolumn{2}{@{}l}{\emph{Boe}}\\
-    Percentuale di boe mobili & $40\%$ \\
+    Percentuale di boe mobili & $30\%$ \\
     Velocit\`a di riferimento $v_{\text{ref}}$ di ACAB [m/s] & $15$ \\
     RWP: velocit\`a per tratta $[v_{\min},\, v_{\max}]$ [m/s] & $[5, 20]$ \\
     RWP: pausa al waypoint $[\tau_{\min},\, \tau_{\max}]$ [s] & $[0, 10]$ \\
@@ -596,8 +596,7 @@ configurazione con i valori impiegati negli esperimenti.
     Contention window $CW$ & $16$ \\
     \midrule
     \multicolumn{2}{@{}l}{\emph{Protocolli di beaconing}}\\
-    Intervallo fisso dello SBP [s] & $1.0$ \\
-    $BI_{\min}$ dei protocolli adattivi [s] & $1.0$ \\
+    $BI_{\min}$ dei protocolli adattivi [s] & $0.25$ \\
     $BI_{\max}$ dei protocolli adattivi [s] & $5.0$ \\
     Scadenza delle voci nelle tabelle [s] & $7.0$ \\
     $N_{\text{thr}}$ di ADAB (Eq.~\ref{eq:adab-density}) & $15$ \\

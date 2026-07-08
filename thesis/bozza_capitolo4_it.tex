@@ -705,6 +705,73 @@ Tabella~\ref{tab:error-summary} riepiloga i valori numerici.
 \end{table}
 
 % ---------------------------------------------------------------------
+\subsection{Latenze}
+\label{sec:res-latency}
+Le metriche temporali (Sezione~\ref{sec:eval-metrics}) completano il
+confronto misurando la rapidit\`a, oltre che l'ampiezza, della diffusione
+della conoscenza. La Tabella~\ref{tab:latency-summary} riporta latenza di
+consegna, latenza di reazione e latenza di scheduler nella configurazione
+pi\`u densa, per entrambi gli scenari di canale.
+
+\begin{table}[htbp]
+  \centering
+  \caption[Latenze medie a 100 boe]{Latenze medie a 100 boe
+  ($BI=\SI{1.0}{\second}$): latenza di consegna ($L_{\text{cons}}$), di
+  reazione ($L_{\text{reaz}}$) e di scheduler ($L_{\text{sched}}$) nei due
+  scenari di canale. Valori in millisecondi; medie su 20 repliche.}
+  \label{tab:latency-summary}
+  \small
+  \begin{tabular}{llcccccc}
+    \toprule
+    & & \multicolumn{3}{c}{\textbf{Canale ideale}} & \multicolumn{3}{c}{\textbf{Canale non ideale}} \\
+    \cmidrule(lr){3-5}\cmidrule(lr){6-8}
+    Modalit\`a & Protocollo & $L_{\text{cons}}$ & $L_{\text{reaz}}$ & $L_{\text{sched}}$
+                            & $L_{\text{cons}}$ & $L_{\text{reaz}}$ & $L_{\text{sched}}$ \\
+    \midrule
+    \multirow{3}{*}{Single-hop}
+      & SBP  & 2.9 & 3.3 & 0.3 & 2.3 & 2.5 & 0.3 \\
+      & ADAB & 2.1 & 3.0 & 0.2 & 1.4 & 1.9 & 0.2 \\
+      & ACAB & 2.7 & 3.0 & 0.2 & 1.4 & 1.7 & 0.2 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ aggregato}
+      & SBP  & 20.6 & 15.9 & 2.7 & 19.3 & 16.9 & 2.5 \\
+      & ADAB & 20.6 & 16.5 & 0.8 & 18.8 & 16.5 & 1.2 \\
+      & ACAB & 18.4 & 15.6 & 0.6 & 12.9 & 13.2 & 0.5 \\
+    \midrule
+    \multirow{3}{*}{Forw.\ singolo}
+      & SBP  & 18.9 & 115.4 & 12.2 & 12.3 & 105.9 & 7.7 \\
+      & ADAB & 21.8 & 89.1  & 5.9  & 14.1 & 93.8  & 2.5 \\
+      & ACAB & 33.6 & 93.3  & 6.5  & 23.4 & 94.1  & 3.1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La \emph{latenza di consegna} resta in ogni caso dell'ordine dei millisecondi:
+1--3~\si{ms} nel single-hop, dove pesa la sola contesa CSMA/CA, e
+13--21~\si{ms} nel forwarding aggregato, dove il frame allungato dalla lista
+dei nodi annunciati occupa il canale pi\`u a lungo; nel forwarding singolo i
+valori sono comparabili o superiori (12--34~\si{ms}), per effetto
+dell'accodamento degli inoltri. \`E per\`o la \emph{latenza di reazione} a
+distinguere le due modalit\`a multi-hop: nel forwarding aggregato essa resta
+allineata alla latenza di consegna (13--17~\si{ms} a 100 boe), perch\'e la
+conoscenza viaggia in blocco con i beacon periodici, mentre nel forwarding
+singolo la scoperta di un'origine lontana richiede il completamento della
+catena di ritrasmissioni hop per hop e sale a 89--115~\si{ms}, quasi un
+ordine di grandezza in pi\`u. Il valore contenuto del single-hop
+(2--3~\si{ms}) va letto con cautela: la media \`e calcolata sulle sole
+origini effettivamente scoperte, che per questa modalit\`a sono i soli vicini
+diretti. La \emph{latenza di scheduler}, infine, conferma quanto osservato
+sul collision rate: dal valore di base di circa \SI{0.2}{ms} essa cresce con
+la contesa fino a \SI{12.2}{ms} per il forwarding singolo con SBP nel canale
+ideale, mentre i protocolli adattivi la mantengono sotto i 7~\si{ms} e il
+forwarding aggregato adattivo sotto il millisecondo. Nel canale non ideale
+tutti i valori risultano leggermente inferiori, coerentemente con il minor
+traffico rilanciato osservato nella Sezione~\ref{sec:res-error}. Anche sul
+piano temporale, dunque, il forwarding aggregato diffonde la conoscenza
+pi\`u rapidamente e a un costo di scheduling inferiore rispetto al
+forwarding singolo.
+
+% ---------------------------------------------------------------------
 \subsection{Effetto dell'intervallo di beaconing}
 \label{sec:res-interval}
 Le sezioni precedenti hanno fissato $BI=\SI{1.0}{\second}$; la campagna \`e
@@ -778,7 +845,9 @@ sistematicamente quello singolo: a parit\`a di copertura ne paga una frazione
 del costo in contesa (a 100 boe nel canale ideale, $CR$ 0.163 contro 0.553
 con SBP e 0.035 contro 0.421 con ACAB), perch\'e affida la diffusione
 dell'informazione all'allungamento dei frame anzich\'e a trasmissioni
-aggiuntive. Il forwarding singolo conserva il pregio della semplicit\`a e un
+aggiuntive; la diffonde inoltre pi\`u rapidamente, con una latenza di
+reazione di circa \SI{16}{ms} contro i 89--115~\si{ms} del forwarding
+singolo (Sezione~\ref{sec:res-latency}). Il forwarding singolo conserva il pregio della semplicit\`a e un
 B-PDR migliore nei soli scenari sparsi con canale con perdite, ma sul piano
 della \emph{scalabilit\`a} il suo traffico cresce con la densit\`a fino a
 erodere l'affidabilit\`a, mentre l'aggregato scala con degrado contenuto.

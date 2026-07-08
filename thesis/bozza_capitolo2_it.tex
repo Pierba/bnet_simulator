@@ -9,8 +9,8 @@
 \chapter{Conoscenza multi-hop della rete}
 \label{ch:contributo}
 
-Nel protocollo ProSafe le boe inviano beacon Wi-Fi per notificare la loro presenza alle imbarcazioni nelle vicinanze. 
-Questa soluzione permette alle imbarcazioni di acquisire conoscenza riguardo le boe limitrofe (entro circa 120 m).
+Nel protocollo ProSafe~\cite{prosafe} le boe inviano beacon Wi-Fi per notificare la loro presenza alle imbarcazioni nelle vicinanze.
+Questa soluzione permette alle imbarcazioni di acquisire conoscenza riguardo alle boe limitrofe (entro circa 120 m).
 Tuttavia, estendere la conoscenza della presenza di boe oltre tale distanza aiuterebbe molto le imbarcazioni ad essere in allerta tempestivamente.
 
 Per superare questo limite, in questo capitolo vengono proposti protocolli di beaconing multi-hop, 
@@ -106,7 +106,7 @@ la modalit\`a adotta quindi tre meccanismi di contenimento:
   valorizzato in funzione del lato maggiore del piano di simulazione $l$ e del raggio massimo di trasmissione $r_{max}$
   \begin{equation}
     \ell \simeq \left\lceil\frac{l}{r_{max}}\right\rceil.
-    \label{eq:ttl}
+    \label{eq:ttl-value}
   \end{equation}
   \item \textbf{Coda limitata.} I beacon in attesa di inoltro risiedono in una coda di
   dimensione massima prefissata. A coda piena i nuovi beacon vengono
@@ -197,7 +197,7 @@ dell'ultimo punteggio di backoff calcolato dagli scheduler adattivi
 inoltri nelle zone dense, cosicch\'e in media soltanto $\approx n_0$ degli $N$ candidati
 inoltrino. Il fattore $\max(0.3,\,1-f_q)$ riutilizza il segnale di congestione locale
 gi\`a impiegato per il calcolo dell'intervallo dinamico dei beacon propri: una boa che sta gi\`a
-attenuando le proprie trasmissioni riduce anche la problabilit\`a di inoltro, fino a un minimo di $30\%$.
+attenuando le proprie trasmissioni riduce anche la probabilit\`a di inoltro, fino a un minimo di $30\%$.
 
 Il gate non \`e stato attivato negli esperimenti. La valutazione del suo impatto su inoltro,
 collisioni, latenza e copertura --- insieme alla taratura di $n_0$ --- \`e demandata ai lavori
