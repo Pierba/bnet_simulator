@@ -122,11 +122,11 @@ costituiscono i contributi di questa tesi.
   estensione senza comprometterne il determinismo e la riproducibilit\`a.
   \item \textbf{Progettazione e implementazione di due modalit\`a di
   conoscenza multi-hop} (contributo centrale). La modalit\`a di
+  \emph{forwarding singolo} inoltra attivamente i beacon ricevuti entro un
+  limite di hop, con meccanismi di contenimento del broadcast storm
+  (deduplicazione per origine, TTL, coda limitata); la modalit\`a di
   \emph{forwarding aggregato} allega a ogni beacon la lista dei nodi
-  conosciuti senza inviare frame in pi\`u; la modalit\`a di \emph{forwarding
-  singolo} rilancia attivamente i beacon ricevuti entro un limite di hop, con
-  meccanismi di contenimento del broadcast storm (deduplicazione per origine,
-  TTL, coda limitata). Le due modalit\`a rappresentano scelte opposte nel
+  conosciuti senza inviare frame in pi\`u. Le due modalit\`a rappresentano scelte opposte nel
   compromesso fra copertura e costo di canale e si combinano liberamente con
   ciascuno dei tre protocolli di beaconing, cos\`i da valutare insieme la
   decisione su \emph{quando} trasmettere e quella su \emph{che cosa}
@@ -202,14 +202,14 @@ esclusivamente a livello MAC.
 \paragraph{Consapevolezza oltre un hop.}
 Estendere la consapevolezza oltre i vicini diretti si ottiene di solito in due
 modi: con il \emph{piggyback}, che allega ai normali beacon informazione
-condensata sui vicini, oppure con il \emph{flooding}, cio\`e il rilancio dei
+condensata sui vicini, oppure con il \emph{flooding}, cio\`e l'inoltro dei
 frame ricevuti entro un limite di hop. Il flooding massimizza la portata ma
-\`e noto per il \emph{broadcast storm}~\cite{broadcaststorm}: in reti dense i
-rilanci ridondanti collidono e congestionano il mezzo. Il piggyback \`e pi\`u
-economico, ma limitato quanto a distanza e freschezza dell'informazione che
-pu\`o trasportare. Le modalit\`a di forwarding aggregato e di forwarding
-singolo progettate in questo lavoro realizzano rispettivamente il primo e il
-secondo approccio.
+\`e noto per il \emph{broadcast storm}~\cite{broadcaststorm}: in reti dense
+gli inoltri ridondanti collidono e congestionano il mezzo. Il piggyback \`e
+pi\`u economico, ma limitato quanto a distanza e freschezza dell'informazione
+che pu\`o trasportare. Le modalit\`a di forwarding singolo e di forwarding
+aggregato progettate in questo lavoro realizzano rispettivamente il secondo e
+il primo approccio.
 
 \paragraph{Il ruolo della simulazione.}
 Gli esperimenti fisici con molti nodi sono costosi e difficili da riprodurre,

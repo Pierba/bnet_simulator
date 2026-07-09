@@ -15,7 +15,7 @@ dal punto di vista funzionale e implementativo.
 Si apre con una breve descrizione delle sue funzionalit\`a e della sua composizione (Sezione~\ref{sec:composizione}). 
 Vengono poi mostrate le relazioni tra le classi per mezzo di un
 diagramma UML. Inoltre vi \`e anche una sezione dedicata all'implementazione vera e propria delle 
-modalit\`a multihop \emph{forwarding aggregato} e \emph{forwarding singolo} --- il contributo principale di questa tesi, esposto nel
+modalit\`a multihop \emph{forwarding singolo} e \emph{forwarding aggregato} --- il contributo principale di questa tesi, esposto nel
 Capitolo~\ref{ch:contributo} ---, che ne descrive le strutture dati, il funzionamento della pipeline di trasmissione
 e i meccanismi di contenimento.
 Di seguito vi \`e l'elenco delle sezioni inerenti a tutte le componenti sulle quali si sviluppa il capitolo:
@@ -192,7 +192,7 @@ estratto dalla coda, la boa lo scarta se \`e inattiva o se la generazione dell'e
 coincide pi\`u con la sua attuale: gli eventi ``vecchi'' vengono cos\`i ignorati, senza costi
 di rimozione. Alla disattivazione vengono inoltre svuotate la coda di inoltro
 e la relativa memoria di deduplicazione (Sezione~\ref{sec:forward-impl}), cos\`i una boa che
-rientra in rete non rilancia informazioni obsolete.
+rientra in rete non inoltra informazioni obsolete.
 
 % ---------------------------------------------------------------------
 \section{Modellazione della boa}
@@ -239,7 +239,7 @@ La contesa segue i principi della DCF richiamati nel Capitolo~\ref{ch:contributo
   procede alla trasmissione;
   \item \texttt{TRANSMISSION\_START}: la boa invia \emph{un solo frame} per ogni contesa
   vinta. I beacon propri hanno la precedenza: se la boa ha un beacon proprio in attesa viene
-  creato e trasmesso un beacon nuovo, altrimenti viene rilanciato il primo beacon della
+  creato e trasmesso un beacon nuovo, altrimenti viene inoltrato il primo beacon della
   coda di inoltro con il TTL decrementato (Eq.~\ref{eq:ttl},
   Sezione~\ref{sec:forward}). Se dopo l'invio la coda di
   inoltro contiene ancora qualcosa, la boa rientra immediatamente in contesa dal punto 1; in caso
@@ -333,11 +333,11 @@ ACAB (Eq.~\ref{eq:acab-mob}), che percepisce il nodo come fermo e ne rallenta la
 % ---------------------------------------------------------------------
 \section{Implementazione delle modalit\`a multihop}
 \label{sec:multihop-impl}
-Questa sezione descrive la realizzazione delle due modalit\`a multihop \emph{forwarding aggregato} e
-\emph{forwarding singolo} --- il contributo principale di questa tesi --- la cui logica
-\`e stata definita nel Capitolo~\ref{ch:contributo} (Sezioni~\ref{sec:append}
-e~\ref{sec:forward}). Entrambe sono gestite nella classe \texttt{Buoy} e, a seconda della modalit\`a attivata
-(nessun multihop, forwarding aggregato o forwarding singolo),
+Questa sezione descrive la realizzazione delle due modalit\`a multihop \emph{forwarding singolo} e
+\emph{forwarding aggregato} --- il contributo principale di questa tesi --- la cui logica
+\`e stata definita nel Capitolo~\ref{ch:contributo} (Sezioni~\ref{sec:forward}
+e~\ref{sec:append}). Entrambe sono gestite nella classe \texttt{Buoy} e, a seconda della modalit\`a attivata
+(nessun multihop, forwarding singolo o forwarding aggregato),
 si alterano due comportamenti del nodo: la creazione del beacon
 e la sua ricezione. La contesa CSMA/CA
 (Sezione~\ref{sec:txpipeline}), il canale e la raccolta delle metriche restano
@@ -354,16 +354,16 @@ posizione), ogni boa mantiene tre strutture specifiche per i multihop:
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item la \emph{memoria di deduplicazione} (forwarding singolo), che previene il \emph{broadcast storm}: per
   ogni origin id si conserva il timestamp pi\`u recente del pacchetto gi\`a accettato per l'inoltro (Eq.~\ref{eq:dedup});
-  \item la \emph{tabella dei nodi scoperti} (forwarding aggregato), introdotta nella
-  Sezione~\ref{sec:append}: associa a ogni nodo appreso
-  indirettamente la tripla (timestamp, posizione, distanza in hop);
   \item la \emph{coda di inoltro} (forwarding singolo),
   indicizzata per \emph{origin id}: si comporta da coda
   FIFO, con la differenza che per ogni origine pu\`o esistere al massimo una
   copia in attesa. Quando arriva un beacon pi\`u fresco di uno gi\`a accodato dalla
   stessa origine, la voce viene sovrascritta sul posto conservando la posizione in
   coda: \`e ci\`o che garantisce la politica di sostituzione descritta nella
-  Sezione~\ref{sec:forward}.
+  Sezione~\ref{sec:forward};
+  \item la \emph{tabella dei nodi scoperti} (forwarding aggregato), introdotta nella
+  Sezione~\ref{sec:append}: associa a ogni nodo appreso
+  indirettamente la tripla (timestamp, posizione, distanza in hop).
 \end{itemize}
 
 % ---------------------------------------------------------------------
@@ -434,8 +434,8 @@ annunciata.
 \label{sec:multihop-cleanup}
 Le strutture accumulate dalle due modalit\`a non crescono senza controllo. L'evento
 periodico \texttt{NEIGHBOR\_CLEANUP} rimuove da ogni struttura dati ogni voce pi\`u vecchia della scadenza configurata:
-nel forwarding aggregato le voci della tabella dei nodi scoperti, nel forwarding singolo sia le decisioni di
-inoltro ormai stantie nella memoria di deduplicazione, sia i beacon rimasti troppo a lungo nella coda di inoltro.
+nel forwarding singolo sia le decisioni di inoltro ormai stantie nella memoria di deduplicazione,
+sia i beacon rimasti troppo a lungo nella coda di inoltro; nel forwarding aggregato le voci della tabella dei nodi scoperti.
 Alla disattivazione di una boa negli scenari dinamici, coda di inoltro e memoria di
 deduplicazione vengono inoltre svuotate per intero, per il motivo spiegato nella Sezione~\ref{sec:dynamics}.
 

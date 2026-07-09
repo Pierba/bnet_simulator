@@ -28,10 +28,10 @@ sperimentale sistematica (Sezione~\ref{sec:intro-obiettivi}).
 
 Tutti e tre gli obiettivi assegnati sono stati raggiunti. Sono state
 progettate due modalit\`a di disseminazione multi-hop dagli approcci opposti:
-il \emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi
-conosciuti senza generare frame aggiuntivi, e il \emph{forwarding singolo},
-che rilancia i beacon ricevuti entro un limite di hop con meccanismi di
-contenimento del broadcast storm (Capitolo~\ref{ch:contributo}). Entrambe
+il \emph{forwarding singolo}, che inoltra i beacon ricevuti entro un limite
+di hop con meccanismi di contenimento del broadcast storm, e il
+\emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi
+conosciuti senza generare frame aggiuntivi (Capitolo~\ref{ch:contributo}). Entrambe
 sono state implementate nel simulatore a eventi discreti del progetto,
 integrandole nella pipeline di trasmissione CSMA/CA esistente senza alterare
 il comportamento delle componenti preesistenti, e affiancandovi le metriche

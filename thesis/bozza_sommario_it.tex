@@ -10,21 +10,21 @@
 Nuotatori, snorkeler, sub e kayaker sono poco visibili alle imbarcazioni che
 condividono le acque costiere. Le tecnologie di sicurezza pensate per le grandi
 navi, come l'AIS, i beacon satellitari di emergenza e il tracciamento cellulare,
-sono troppo costose, troppo lente o legate a un'infrastruttura che al largo non
+sono troppo costose, troppo lente o legate a un'infrastruttura che nei contesti marittimi non
 esiste. Il progetto ProSafe affronta il problema con boe intelligenti che
 trasmettono periodicamente brevi frame broadcast Wi-Fi con la propria
 posizione, che le imbarcazioni vicine ascoltano senza bisogno di alcuna
 infrastruttura.
 
-Questa tesi documenta il progetto svolto durante un tirocinio interno presso
-il gruppo di ricerca che sviluppa ProSafe. Nel protocollo di partenza la
-conoscenza di ogni nodo si ferma ai vicini entro la portata radio; il lavoro
-di tirocinio ha esteso il simulatore a eventi discreti del progetto con due
-meccanismi che propagano la consapevolezza oltre il singolo hop: il
+Questa tesi documenta il progetto ProSafe ed il lavoro dietro, svoltosi durante 
+l'attivit\`a di tirocinio interno. Nel protocollo di partenza la
+conoscenza di ogni nodo si ferma ai vicini entro la portata radio; il contributo apportato da questo tirocinio 
+consiste nell'estensione le funzionalit\`a del simulatore a eventi discreti del progetto con due
+meccanismi che propagano la conoscenza oltre il singolo hop: il
+\emph{forwarding singolo}, che inoltra i beacon ricevuti entro un limite di
+hop con meccanismi di contenimento del broadcast storm, e il
 \emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi gi\`a
-conosciuti senza inviare frame in pi\`u, e il \emph{forwarding singolo}, che
-rilancia i beacon ricevuti entro un limite di hop con meccanismi di
-contenimento del broadcast storm. Le due modalit\`a si combinano con i
+conosciuti senza inviare frame in pi\`u. Le due modalit\`a si combinano con i
 protocolli che decidono \emph{quando} una boa trasmette: il beaconing statico
 a intervallo fisso (SBP), l'adattamento basato sulla densit\`a (ADAB) e lo
 scheduler context-aware ACAB.

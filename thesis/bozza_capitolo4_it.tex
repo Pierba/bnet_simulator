@@ -257,8 +257,8 @@ Sono riportati secondo categorie di appartenenza.
 
 \paragraph{Parametri delle modalit\`a multi-hop.}
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item modalit\`a: single-hop (nessun inoltro), forwarding aggregato
-  (append), forwarding singolo (forward);
+  \item modalit\`a: single-hop (nessun inoltro), forwarding singolo
+  (forward), forwarding aggregato (append);
   \item limite di hop per il forwarding singolo (TTL): 5;
   \item limite dei beacon in coda di inoltro: 50 elementi.
 \end{itemize}
@@ -635,7 +635,7 @@ Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
 \`e sistematicamente inferiore a quello del canale ideale a parit\`a di
 configurazione: per il forwarding singolo con SBP a 100 boe vale 0.349 contro
 0.557 (Sezione~\ref{sec:res-ideal}). La ragione \`e indiretta ma sistematica:
-i beacon persi dal canale non vengono ricevuti n\'e rilanciati, e l'errore di
+i beacon persi dal canale non vengono ricevuti n\'e inoltrati, e l'errore di
 canale agisce cos\`i da regolatore del traffico di inoltro, riducendo il
 numero di trasmissioni in contesa. In single-hop le collisioni restano
 trascurabili ($CR \le 0.016$). Nel forwarding aggregato la contesa cresce con
@@ -768,7 +768,7 @@ la contesa fino a \SI{12.4}{ms} per il forwarding singolo con SBP nel canale
 ideale, mentre i protocolli adattivi la mantengono sotto i 7~\si{ms} e il
 forwarding aggregato adattivo sotto il millisecondo. Nel canale non ideale
 tutti i valori risultano leggermente inferiori, coerentemente con il minor
-traffico rilanciato osservato nella Sezione~\ref{sec:res-error}. Anche sul
+traffico inoltrato osservato nella Sezione~\ref{sec:res-error}. Anche sul
 piano temporale, dunque, il forwarding aggregato diffonde la conoscenza
 pi\`u rapidamente e a un costo di scheduling inferiore rispetto al
 forwarding singolo.
@@ -1072,7 +1072,7 @@ Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
 \`e sistematicamente inferiore a quello del canale ideale a parit\`a di
 configurazione: per il forwarding singolo con SBP a 120 boe vale 0.225 contro
 0.446 (Sezione~\ref{sec:res-ideal-cr}). La ragione \`e indiretta ma
-sistematica: i beacon persi dal canale non vengono ricevuti n\'e rilanciati, e
+sistematica: i beacon persi dal canale non vengono ricevuti n\'e inoltrati, e
 l'errore di canale agisce cos\`i da regolatore del traffico di inoltro,
 riducendo il numero di trasmissioni in contesa. In single-hop le collisioni
 restano trascurabili ($CR \le 0.010$ a 120 boe). In append la contesa cresce
