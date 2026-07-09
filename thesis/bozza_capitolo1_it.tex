@@ -1,8 +1,3 @@
-% =====================================================================
-%  BOZZA - Capitolo 1 (italiano)
-%  Introduzione: progetto di tirocinio, obiettivi, attivita' svolte,
-%  accenno allo stato dell'arte e struttura della tesi.
-% =====================================================================
 \chapter{Introduzione}
 \label{ch:introduzione}
 
@@ -34,7 +29,7 @@ centinaia di metri dalla costa.
 
 Il progetto ProSafe~\cite{prosafe} riscolve questa problematica con l'adozione di 
 una tecnologia economica, a basso consumo, a corto raggio e priva di
-infrastruttura fissa: il Wi-Fi (IEEE~802.11). L'economia di scala dei chipset
+infrastruttura fissa: il Wi-Fi (IEEE~802.11)~\cite{ieee80211}. L'economia di scala dei chipset
 di largo consumo ne abbatte il costo, e la rilevazione di prossimit\`a basata
 su Wi-Fi \`e gi\`a stata sperimentata con successo in altri
 ambiti di ricerca~\cite{vanhyfte-proximity}. In ProSafe delle boe intelligenti dotate di
@@ -106,8 +101,8 @@ Il lavoro si \`e articolato in tre attivit\`a principali:
   senza comprometterne il determinismo e il funzionamento.
   \item \textbf{Progettazione e implementazione di due modalit\`a di multi-hop}. La modalit\`a di
   \emph{forwarding singolo} inoltra attivamente i beacon ricevuti entro un
-  limite di hop, con meccanismi di contenimento del broadcast storm
-  (deduplicazione per origine, TTL, coda limitata); la modalit\`a di
+  limite di hop, con meccanismi di contenimento del broadcast
+  storm~\cite{broadcaststorm} (deduplicazione per origine, TTL, coda limitata); la modalit\`a di
   \emph{forwarding aggregato} allega a ogni beacon la lista dei nodi
   conosciuti senza inviare frame in pi\`u. Le due modalit\`a rappresentano
   approcci diversi per mediare il compromesso fra copertura e costo di canale. 
@@ -175,7 +170,7 @@ Gli esperimenti fisici con molti nodi sono costosi e difficili da riprodurre.
 I simulatori generalisti come ns-3~\cite{nsnam} e OMNeT++~\cite{omnetpp} offrono stack di funzionalit\`a
 completi, ma introducono un overhead notevole quando lo studio mira a un singolo
 meccanismo. Per i fini di questo progetto, un simulatore dedicato \`e preferibile, purch\`e presenti parametri validi; 
-nel simulatore di ProSafe essi sono stati calibrati secondo misure ottenute sul campo.
+nel simulatore di ProSafe essi sono stati calibrati secondo misure ottenute sul campo~\cite{prosafe}.
 
 % ---------------------------------------------------------------------
 \section{Struttura della tesi}
@@ -191,4 +186,4 @@ Il Capitolo~\ref{ch:risultati} richiama i tre
 protocolli di beaconing gi\`a esistenti, le definizioni e le formule delle metriche raccolte, e riporta la
 valutazione sperimentale condotta. 
 Il Capitolo~\ref{ch:conclusioni} riassume infine il lavoro svolto durante il tirocinio, 
-ne discute i limiti e indica gli sviluppi futuri.
+ne discute i limiti e indica

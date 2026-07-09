@@ -33,28 +33,21 @@
 \usepackage{multirow}   % tabelle riepilogo del Cap. 4 (Sez. 4.4)
 \usepackage{siunitx}
 \usepackage[hidelinks]{hyperref}
-\hypersetup{
-  pdftitle={Multi-Hop Awareness of Smart Buoys\\
-            for Infrastructure-Free Maritime Proximity Detection},
-  pdfauthor={Filippo Pierbattisti},
-}
 
 % ---------------------------------------------------------------------
-% Frontespizio (dati richiesti dalla classe sapthesis).
-% TODO: sostituire i segnaposto: nome, matricola, corso di laurea,
-%       facolta', relatore, email.
+% Frontespizio (dati richiesti dalla classe sapthesis)
 % ---------------------------------------------------------------------
-\title{Context-Aware Adaptive Beaconing and Multi-Hop Awareness\\
+\title{Multi-Hop Awareness of Smart Buoys\\
        for Infrastructure-Free Maritime Proximity Detection}
-\author{Filippo Pierbattisti}                       % TODO: nome e cognome del candidato
-\IDnumber{2114213}                          % TODO: matricola
-\course{Corso di Laurea in Informatica}     % TODO: denominazione esatta del corso
+\author{Filippo Pierbattisti}
+\IDnumber{2114213}
+\course{Corso di Laurea in Informatica}
 \courseorganizer{Facolt\`a di Ingegneria dell'Informazione,
-                 Informatica e Statistica}  % TODO: verificare la facolta'
+                 Informatica e Statistica}
 \AcademicYear{2025/2026}
-\advisor{Prof. Gaia Maselli}                % TODO: relatore
+\advisor{Prof. Gaia Maselli}
 % \coadvisor{Dr. Nome Cognome}              % correlatore, se presente
-\authoremail{pierbattisti.2114213@studenti.uniroma1.it} % TODO: email istituzionale
+\authoremail{pierbattisti.2114213@studenti.uniroma1.it}
 \copyyear{2026}
 \thesistype{Tesi di Laurea}
 
@@ -95,73 +88,13 @@
 \input{bozza_capitolo5_it}
 
 % ---------------------------------------------------------------------
-% Bibliografia: sottoinsieme delle voci citate nell'accenno allo stato
-% dell'arte del Cap. 1, qui solo per risolvere i \cite in anteprima.
-% Non e' la bibliografia finale della tesi.
+% Bibliografia
 % ---------------------------------------------------------------------
 \backmatter
 \cleardoublepage
 \phantomsection
 \addcontentsline{toc}{chapter}{\bibname}
-\begin{thebibliography}{99}
-
-\bibitem{prosafe} C.~Corsi, G.~Maselli, and F.~Mingardi. ProSafe: Wi-Fi
-beaconing for Proximity-based Safety in coastal environments. In
-\emph{European Wireless 2025; 30th European Wireless Conference}, Sophia
-Antipolis, France, pages 9--14, 2025.
-
-\bibitem{vanhyfte-proximity} Z.~Van~Hyfte and A.~Zakhor. Immediate proximity
-detection using Wi-Fi--enabled smartphones. In \emph{2021 International
-Conference on Indoor Positioning and Indoor Navigation (IPIN)}, Lloret de
-Mar, Spain, 2021.
-
-\bibitem{imo-ais} International Maritime Organization. \emph{AIS Transponders}.
-\url{https://www.imo.org/en/OurWork/Safety/Pages/AIS.aspx}, accessed 2025.
-
-\bibitem{noaa-beacons} NOAA SARSAT. \emph{406\,MHz Emergency Distress Beacons}.
-\url{https://www.sarsat.noaa.gov/emergency-406-beacons/}, accessed 2025.
-
-\bibitem{sharetechnote-dcf} ShareTechnote. \emph{WLAN DCF}.
-\url{https://www.sharetechnote.com/html/WLAN_DCF.html}, accessed 2025.
-
-\bibitem{csma-ca} Network Academy. \emph{Collision Avoidance (CSMA/CA)}.
-\url{https://www.networkacademy.io/ccna/wireless/collision-avoidance-csma-ca},
-accessed 2025.
-
-\bibitem{tobagi-hidden} F.~Tobagi and L.~Kleinrock. Packet switching in radio
-channels: Part II --- the hidden terminal problem in carrier sense
-multiple-access and the busy-tone solution. \emph{IEEE Transactions on
-Communications}, 23(12):1417--1433, 1975.
-
-\bibitem{ipcisco-ibss} IpCisco. \emph{Wireless Principles: BSS, ESS, IBSS}.
-\url{https://ipcisco.com/lesson/wireless-principles/}, accessed 2025.
-
-\bibitem{schmidt-adaptive} R.~K.~Schmidt, T.~Leinm\"uller, E.~Schoch,
-F.~Kargl, and G.~Sch\"afer. Exploration of adaptive beaconing for efficient
-intervehicle safety communication. \emph{IEEE Network}, 24(1):14--19, 2010.
-
-\bibitem{alotaibi-adaptive} M.~M.~Alotaibi and H.~T.~Mouftah. Adaptive
-expiration time for dynamic beacon scheduling in vehicular ad-hoc networks. In
-\emph{IEEE VTC2015-Fall}, pages 1--6, 2015.
-
-\bibitem{sommer-adaptive} C.~Sommer, O.~K.~Tonguz, and F.~Dressler. Adaptive
-beaconing for delay-sensitive and congestion-aware traffic information systems.
-In \emph{IEEE Vehicular Networking Conference}, pages 1--8, 2010.
-
-\bibitem{shah-survey} S.~A.~A.~Shah, E.~Ahmed, F.~Xia, A.~Karim, M.~Shiraz,
-and R.~M.~Noor. Adaptive beaconing approaches for vehicular ad hoc networks:
-a survey. \emph{IEEE Systems Journal}, 12(2):1263--1277, 2018.
-
-\bibitem{broadcaststorm} S.-Y.~Ni, Y.-C.~Tseng, Y.-S.~Chen, and J.-P.~Sheu. The
-broadcast storm problem in a mobile ad hoc network. In \emph{Proc. ACM
-MobiCom}, pages 151--162, 1999.
-
-\bibitem{nsnam} nsnam.org. \emph{ns-3 Network Simulator}.
-\url{https://www.nsnam.org/}, accessed 2025.
-
-\bibitem{omnetpp} omnetpp.org. \emph{OMNeT++ Discrete Event Simulator}.
-\url{https://omnetpp.org/}, accessed 2025.
-
-\end{thebibliography}
+\bibliographystyle{unsrt}
+\bibliography{bibliografia}
 
 \end{document}

@@ -1,13 +1,3 @@
-% =====================================================================
-%  BOZZA - Capitolo 3 (italiano)
-%  Parte implementativa: il simulatore
-%
-%  Richiede i pacchetti gia' presenti nel preambolo del wrapper:
-%  amsmath, amssymb, siunitx, enumitem, listings, booktabs.
-%  Include la figura della pipeline (thesis/tx_pipeline.pdf, esportata
-%  in PDF da draw.io) e la figura UML (thesis/figures/classes_uml.pdf,
-%  da renderizzare a partire da src/classes_BNet_Simulator.plantuml).
-% =====================================================================
 \chapter{Implementazione del simulatore e delle sue componenti}
 \label{ch:simulatore}
 Questo capitolo descrive la struttura del simulatore e di tutte le sue componenti
@@ -286,7 +276,7 @@ modalit\`a multihop attiva \`e descritto nella Sezione~\ref{sec:multihop-impl}.
 \subsection{Modello di mobilit\`a Random Waypoint}
 \label{sec:rwp}
 Una frazione configurabile delle boe (il $30\%$ negli
-esperimenti) \`e mobile e si muove secondo il modello \emph{Random Waypoint} (RWP),
+esperimenti) \`e mobile e si muove secondo il modello \emph{Random Waypoint} (RWP)~\cite{rwp},
 gestito dall'evento \texttt{BUOY\_MOVEMENT}. Il modello genera
 traiettorie che alternano tratte rettilinee e soste; ogni boa si muove in modo
 indipendente dalle altre e ci\`o \`e una buona approssimazione
@@ -515,7 +505,7 @@ messa alla prova da una probabilit\`a dipendente dalla distanza:
   \end{cases}
   \label{eq:delivery-prob}
 \end{equation}
-Queste probabilit\`a derivano da misurazioni effettuate sul campo: entro i \SI{70}{\metre} la consegna
+Queste probabilit\`a derivano da misurazioni effettuate sul campo~\cite{prosafe}: entro i \SI{70}{\metre} la consegna
 \`e affidabile, oltre questo raggio il segnale \`e fortemente ridotto e la maggior parte dei
 frame va persa, oltre la portata massima (\SI{120}{\metre}) non arriva pi\`u nulla. I frame respinti da questo errore probabilistico
 sono conteggiati come perdite di canale, distinte dalle perdite per collisione.
@@ -614,7 +604,7 @@ La classe \texttt{Metrics} accumula i dati della simulazione provenienti dalle a
 il canale registra gli esiti di ogni trasmissione (destinatari potenziali, consegne, collisioni, perdite) e le boe riportano le ricezioni e
 i nodi scoperti tramite le callback assegnate all'avvio. A questi flussi si aggiunge il
 campionamento periodico schedulato con l'evento \texttt{AVG\_NEIGHBORS\_CALCULATION}: il simulatore calcola il
-numero medio di vicini costruendo un \emph{k-d tree} sulle posizioni delle boe
+numero medio di vicini costruendo un \emph{k-d tree}~\cite{kdtree} sulle posizioni delle boe
 attive e contando le coppie entro la portata massima, con costo $O(n \log n)$. 
 Se $P$ \`e l'insieme delle coppie in portata e $n$ le boe attive, la media \`e
 $2\,|P| / n$, poich\'e ogni coppia rappresenta due distinte relazioni di vicinato.
