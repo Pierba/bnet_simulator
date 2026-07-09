@@ -19,24 +19,22 @@ infrastruttura.
 Questa tesi documenta il progetto ProSafe ed il lavoro dietro, svoltosi durante 
 l'attivit\`a di tirocinio interno. Nel protocollo di partenza la
 conoscenza di ogni nodo si ferma ai vicini entro la portata radio; il contributo apportato da questo tirocinio 
-consiste nell'estensione le funzionalit\`a del simulatore a eventi discreti del progetto con due
+consiste nell'estensione delle funzionalit\`a del simulatore a eventi discreti del progetto con due
 meccanismi che propagano la conoscenza oltre il singolo hop: il
 \emph{forwarding singolo}, che inoltra i beacon ricevuti entro un limite di
-hop con meccanismi di contenimento del broadcast storm, e il
-\emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi gi\`a
-conosciuti senza inviare frame in pi\`u. Le due modalit\`a si combinano con i
+hop, e il \emph{forwarding aggregato}, che in ogni beacon aggrega la lista dei nodi diretti
+con quella dei nodi appresi indirettamente, senza inviare frame in pi\`u. Le due modalit\`a si combinano con i
 protocolli che decidono \emph{quando} una boa trasmette: il beaconing statico
-a intervallo fisso (SBP), l'adattamento basato sulla densit\`a (ADAB) e lo
-scheduler context-aware ACAB.
+a intervallo fisso (SBP) e i beaconing dinamici che si adattano alla densit\`a (ADAB) e a pi\`u fattori di contesto (ACAB).
 
-Il modello di canale \`e calibrato su misure sul campo, la mobilit\`a segue
+Il modello di canale \`e calibrato su misure stimate sul campo, la mobilit\`a segue
 il modello Random Waypoint e la popolazione di boe varia nel tempo per
 imitare gli utenti che entrano ed escono dall'acqua. La campagna sperimentale
 --- due condizioni di canale, tre intervalli di beaconing, tre protocolli e
 cinque livelli di densit\`a, con 30 repliche per configurazione --- mostra
-che l'inoltro multi-hop \`e indispensabile alla scoperta della rete e che il
+che il forwarding singolo contribuisce notevolmente alla scoperta della rete e che il
 forwarding aggregato ne eguaglia la copertura a una frazione del costo in
 collisioni del forwarding singolo, diffondendo inoltre la conoscenza pi\`u
-rapidamente; il beaconing adattivo assorbe quasi interamente la contesa
+rapidamente. Il beaconing adattivo assorbe quasi interamente la contesa
 aggiuntiva introdotta dall'inoltro, rendendo la combinazione ADAB--forwarding
 aggregato il compromesso migliore nelle condizioni realistiche.

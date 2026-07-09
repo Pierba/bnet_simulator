@@ -14,7 +14,7 @@ Questo capitolo descrive la struttura del simulatore e di tutte le sue component
 dal punto di vista funzionale e implementativo.
 Si apre con una breve descrizione delle sue funzionalit\`a e della sua composizione (Sezione~\ref{sec:composizione}). 
 Vengono poi mostrate le relazioni tra le classi per mezzo di un
-diagramma UML. Inoltre vi \`e anche una sezione dedicata all'implementazione vera e propria delle 
+diagramma UML. Inoltre vi \`e anche una sezione dedicata all'implementazione effettiva delle 
 modalit\`a multihop \emph{forwarding singolo} e \emph{forwarding aggregato} --- il contributo principale di questa tesi, esposto nel
 Capitolo~\ref{ch:contributo} ---, che ne descrive le strutture dati, il funzionamento della pipeline di trasmissione
 e i meccanismi di contenimento.
@@ -253,7 +253,7 @@ trasmissione, ossia il costo della contesa CSMA/CA.
 
 \begin{figure}[p]
   \centering
-  \includegraphics[height=0.86\textheight,keepaspectratio]{images/tx_pipeline.pdf}
+  \includegraphics[height=0.86\textheight,keepaspectratio]{main/images/tx_pipeline.pdf}
   \caption[Pipeline di trasmissione della boa]{%
     Pipeline di trasmissione di una boa (CSMA/CA). La pipeline ha due punti d'ingresso: la decisione
     periodica dello scheduler (\texttt{SCHEDULER\_CHECK}) e l'accodamento di
@@ -630,7 +630,7 @@ Questo capitolo ha presentato il simulatore a eventi discreti: la coda di priori
 con ordinamento deterministico; la macchina a stati DCF della boa con la sua pipeline
 di trasmissione; l'implementazione delle due modalit\`a multihop che
 costituiscono il contributo della tesi; il modello di canale calibrato
-sul campo, con propagazione, collisioni dirette e da terminale nascosto e perdita per errore del mezzo; 
+sul campo, con propagazione, collisioni dirette e da terminale nascosto, e perdita per errore del mezzo; 
 il modello di mobilit\`a Random Waypoint; la gestione della popolazione
 dinamica; la configurazione centralizzata e la raccolta delle metriche.
 Il simulatore offre una piattaforma controllata e riproducibile per valutare i

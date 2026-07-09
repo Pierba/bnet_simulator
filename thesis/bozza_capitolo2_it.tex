@@ -64,16 +64,14 @@ dettagliata \`e riportata nel Capitolo~\ref{ch:risultati}.
 % ---------------------------------------------------------------------
 \section{Contributo sulla conoscenza dei nodi}
 \label{sec:multihop}
-Con il protocollo di beaconing a singolo hop descritto nella sezione precedente, la tabella
-locale di ogni boa contiene i soli vicini diretti, ovvero i nodi dai quali riceve beacon.
+Con il protocollo di beaconing a singolo hop, la tabella locale di ogni boa 
+contiene i soli vicini diretti, ovvero i nodi dai quali riceve beacon.
 Va precisato che anche in questa modalit\`a il beacon trasporta la lista dei nodi noti al
 mittente (Sezione~\ref{sec:commodel}): alla ricezione la boa apprende quindi anche
 l'esistenza dei nodi annunciati --- i vicini del mittente, fino a due hop di distanza ---
 e tale informazione concorre alla metrica di scoperta della rete (Eq.~\ref{eq:netdisc}).
-Senza un meccanismo di inoltro, per\`o, essa non viene memorizzata nello stato del nodo
-n\'e ridiffusa: la conoscenza resta confinata alla finestra dei vicini dei vicini e
-decade con la mobilit\`a. Il
-contributo di questa tesi estende questa conoscenza oltre tale finestra, in modo tale
+Senza un meccanismo di inoltro, per\`o, l'informazione non viene salvata nella memoria del nodo, n\'e ridiffusa. 
+Il contributo di questa tesi estende questa conoscenza superando tale limite, facendo s\`i
 che un nodo apprenda anche l'esistenza di boe pi\`u distanti, o schermate da altri nodi, e che diffonda in modo pi\`u efficiente le informazioni in
 suo possesso. A tal fine vengono proposte due modalit\`a di trasmissione multihop descritte nelle
 sezioni successive; esse si basano su due meccanismi diversi che operano sugli stessi piani di trasmissione e ricezione pacchetto.
@@ -81,9 +79,9 @@ sezioni successive; esse si basano su due meccanismi diversi che operano sugli s
 \subsection{Forwarding singolo}
 \label{sec:forward}
 In modalit\`a forwarding singolo una boa ritrasmette i beacon ricevuti. Ogni beacon trasporta un
-\emph{origin id} (il mittente originale) e un \emph{hop limit} $\ell$, un contatore con
-funzione di TTL (\emph{Time To Live}). Quando una boa riceve un beacon non originato da
-s\'e stessa e con $\ell > 0$, ne accoda una copia nella coda di inoltro. All'inoltro il contatore viene decrementato,
+\emph{origin id} (il mittente originale) e un \emph{hop limit} $\ell$, un contatore che funge da TTL (\emph{Time To Live}). 
+Quando una boa riceve un beacon non originato da s\'e stessa e con $\ell > 0$, 
+ne accoda una copia nella coda di inoltro. All'inoltro il contatore viene decrementato,
 \begin{equation}
   \ell' = \ell - 1,
   \label{eq:ttl}
@@ -197,14 +195,17 @@ probabilit\`a:
   \end{cases}
   \label{eq:fwdgate}
 \end{equation}
-dove $N$ \`e il numero di vicini del nodo inoltrante, $n_0$ il numero base atteso di
-inoltranti per cascata (parametro configurabile, pari a $5$ nel progetto) e $f_q$ il quadrato
+dove $N$ \`e il numero di vicini del nodo inoltrante, $n_0$ il numero atteso di
+inoltranti per cascata (parametro configurabile) e $f_q \in [0,1]$ il quadrato
 dell'ultimo punteggio di backoff calcolato dagli scheduler adattivi
-(Eq.~\ref{eq:adab-density}, Capitolo~\ref{ch:risultati}). Il fattore $n_0/N$ dirada gli
-inoltri nelle zone dense, cosicch\'e in media soltanto $\approx n_0$ degli $N$ candidati
-inoltrino. Il fattore $\max(0.3,\,1-f_q)$ riutilizza il segnale di congestione locale
-gi\`a impiegato per il calcolo dell'intervallo dinamico dei beacon propri: una boa che sta gi\`a
-attenuando le proprie trasmissioni riduce anche la probabilit\`a di inoltro, fino a un minimo di $30\%$.
+(Eq.~\ref{eq:adab-density}, Capitolo~\ref{ch:risultati}). I due fattori rispondono a
+domande diverse. Il primo, $n_0/N$, considera quante altre boe hanno ricevuto lo stesso
+beacon: se ciascuna delle $N$ candidate procede con probabilit\`a $n_0/N$, in media
+soltanto $\approx n_0$ copie vengono ritrasmesse, qualunque sia la densit\`a della zona.
+Il secondo, $\max(0.3,\,1-f_q)$, considera invece quanto \`e affollato il canale
+intorno alla boa: $f_q$ \`e lo stesso punteggio con cui essa sta gi\`a dilatando
+l'intervallo dei beacon propri, quindi il fattore vale $\approx 1$ a canale tranquillo e
+scende al crescere della congestione, senza mai andare sotto il minimo di $0.3$.
 
 Il gate non \`e stato attivato negli esperimenti. La valutazione del suo impatto su inoltro,
 collisioni, latenza e copertura --- insieme alla taratura di $n_0$ --- \`e demandata ai lavori
