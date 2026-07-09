@@ -52,24 +52,19 @@ def save(fig,c,fn):
     plt.close(fig); print("wrote",sub,fn)
 def bar_figure(c,metric,ylabel,fn,ylim=None,legend_loc="lower left"):
     fig,axes=plt.subplots(1,3,figsize=(13.5,4.4),sharey=True)
-    width=0.26; x=np.arange(len(DENS)); neigh=avg_neighbors(c); nmax=neigh.max()*1.25
+    width=0.26; x=np.arange(len(DENS)); neigh=avg_neighbors(c)
     ymax=0; handles=labels=None
     for j,(ax,s) in enumerate(zip(axes,SCHED)):
         for k,m in enumerate(MODES):
             ys,es=series(c,m,s,metric); ymax=max(ymax,(ys+es).max())
             ax.bar(x+(k-1)*width,ys,width,yerr=es,capsize=2.5,
                    error_kw={"lw":0.9,"alpha":0.8},label=MODE_LABEL[m],color=MODE_COLOR[m])
-        ax.set_title(SCHED_TITLE[s]); ax.set_xticks(x); ax.set_xticklabels(DENS)
-        ax.set_xlabel("Numero di boe"); ax.set_axisbelow(True)
-        ax2=ax.twinx()
-        ln=ax2.plot(x,neigh,color="black",marker="o",markersize=4.5,lw=1.2,label="Vicini medi",zorder=5)
-        ax2.set_ylim(0,nmax); ax2.grid(False)
-        for xi,ni in zip(x,neigh):
-            ax2.annotate(f"{ni:.1f}",(xi,ni),textcoords="offset points",xytext=(0,6),ha="center",fontsize=8.5)
-        if j<2: ax2.set_yticklabels([])
-        else: ax2.set_ylabel("Vicini medi")
+        ax.set_title(SCHED_TITLE[s]); ax.set_xticks(x)
+        ax.set_xticklabels([f"{d}\n({n:.1f})" for d,n in zip(DENS,neigh)])
+        ax.set_xlabel("Numero di boe\n(tra parentesi: vicini medi)")
+        ax.set_axisbelow(True)
         if j==0:
-            h1,l1=ax.get_legend_handles_labels(); handles,labels=h1+ln,l1+["Vicini medi"]
+            handles,labels=ax.get_legend_handles_labels()
     axes[0].set_ylabel(ylabel)
     if ylim is None: ylim=(0,min(1.0,ymax*1.12))
     axes[0].set_ylim(*ylim)
