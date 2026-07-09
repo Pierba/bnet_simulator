@@ -386,7 +386,9 @@ di vicini per nodo, ottenuto dalle scansioni periodiche della topologia
 (Sezione~\ref{sec:metrics}): al crescere del numero medio di vicini crescono i
 potenziali trasmettitori simultanei e, con essi, contesa e rischio di
 collisione. Nello scenario adottato tale valore cresce in modo pressoch\'e
-lineare da circa 2 (20 boe) a circa 9 (100 boe).
+lineare da circa 1.7 (20 boe) a circa 9 (100 boe), ed \`e sovrapposto come
+linea con marcatori (asse destro) in tutti i grafici a barre della
+Sezione~\ref{sec:confronto}.
 
 % =====================================================================
 %  4.4 CONFRONTO TRA FORWARDING SINGOLO E FORWARDING AGGREGATO
@@ -397,9 +399,10 @@ Questa sezione presenta i risultati della campagna sperimentale lungo i tre
 assi definiti nella Sezione~\ref{sec:eval-goals}: copertura, delivery ratio e
 scalabilit\`a. I risultati sono esposti dapprima per lo scenario a canale
 ideale, che isola l'effetto della contesa MAC, quindi per lo scenario a canale
-non ideale, che aggiunge le perdite dipendenti dalla distanza. Salvo diversa
-indicazione, figure e tabelle si riferiscono all'intervallo di beaconing
-$BI=\SI{1.0}{\second}$; l'effetto degli altri intervalli \`e analizzato nella
+non ideale, che aggiunge le perdite dipendenti dalla distanza. Tutti i
+grafici che mettono a confronto le modalit\`a si riferiscono all'intervallo
+di beaconing $BI=\SI{1.0}{\second}$; l'effetto degli altri intervalli ---
+che riguarda il solo SBP --- \`e quantificato nella
 Sezione~\ref{sec:res-interval}. In tutti i grafici il single-hop funge da
 termine di paragone rispetto al quale si misurano guadagni e costi delle due
 modalit\`a multi-hop.
@@ -415,7 +418,9 @@ modalit\`a multi-hop.
   \caption[Percentuale di rete scoperta, canale ideale]{Percentuale media di
   rete scoperta al variare della densit\`a, per modalit\`a di inoltro e
   protocollo di beaconing (canale ideale, $BI=\SI{1.0}{\second}$). Le barre di
-  errore indicano $\pm 1$ deviazione standard tra le repliche.}
+  errore indicano $\pm 1$ deviazione standard tra le repliche; la linea nera
+  con i marcatori riporta il numero medio di vicini di ciascuna densit\`a
+  (asse destro).}
   \label{fig:ideal-discovery}
 \end{figure}
 La Figura~\ref{fig:ideal-discovery} mostra la percentuale media di rete
@@ -462,7 +467,8 @@ alla mobilit\`a.
   \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_pdr_interval-1_0.pdf}
   \caption[B-PDR, canale ideale]{B-PDR al variare della densit\`a, per
   modalit\`a di inoltro e protocollo di beaconing (canale ideale,
-  $BI=\SI{1.0}{\second}$).}
+  $BI=\SI{1.0}{\second}$; la linea nera indica il numero medio di vicini,
+  asse destro).}
   \label{fig:ideal-pdr}
 \end{figure}
 La conoscenza aggiuntiva ha un costo in affidabilit\`a, che dipende per\`o in
@@ -482,7 +488,8 @@ protocolli adattivi superano sistematicamente SBP a ogni densit\`a.
   \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_collision_rate_interval-1_0.pdf}
   \caption[Collision rate, canale ideale]{Collision rate al variare della
   densit\`a, per modalit\`a di inoltro e protocollo di beaconing (canale
-  ideale, $BI=\SI{1.0}{\second}$).}
+  ideale, $BI=\SI{1.0}{\second}$; la linea nera indica il numero medio di
+  vicini, asse destro).}
   \label{fig:ideal-collision}
 \end{figure}
 Il collision rate (Figura~\ref{fig:ideal-collision}) spiega direttamente i
@@ -546,7 +553,8 @@ comunque andare perso.
   \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}
   \caption[Percentuale di rete scoperta, canale non ideale]{Percentuale media
   di rete scoperta al variare della densit\`a (canale non ideale,
-  $BI=\SI{1.0}{\second}$).}
+  $BI=\SI{1.0}{\second}$; la linea nera indica il numero medio di vicini,
+  asse destro).}
   \label{fig:error-discovery}
 \end{figure}
 Le perdite del canale colpiscono soprattutto il single-hop, la cui scoperta
@@ -590,7 +598,8 @@ fine simulazione.
   \centering
   \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_pdr_interval-1_0.pdf}
   \caption[B-PDR, canale non ideale]{B-PDR al variare della densit\`a
-  (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  (canale non ideale, $BI=\SI{1.0}{\second}$; la linea nera indica il numero
+  medio di vicini, asse destro).}
   \label{fig:error-pdr}
 \end{figure}
 Il canale probabilistico impone un tetto all'affidabilit\`a indipendente da
@@ -616,7 +625,8 @@ riuscite prima che la contesa diventi rilevante.
   \centering
   \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_collision_rate_interval-1_0.pdf}
   \caption[Collision rate, canale non ideale]{Collision rate al variare della
-  densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$; la linea nera indica
+  il numero medio di vicini, asse destro).}
   \label{fig:error-collision}
 \end{figure}
 Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
@@ -640,7 +650,8 @@ conferma anche in presenza di errori di canale.
   \centering
   \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_loss_rate_interval-1_0.pdf}
   \caption[Packet loss, canale non ideale]{Packet loss complessivo al variare
-  della densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$).}
+  della densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$; la linea nera
+  indica il numero medio di vicini, asse destro).}
   \label{fig:error-loss}
 \end{figure}
 Il packet loss (Eq.~\ref{eq:packetloss}) somma alle collisioni le perdite
