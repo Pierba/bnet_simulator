@@ -414,7 +414,8 @@ modalit\`a multi-hop.
 \paragraph{Scoperta della rete.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/senza_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}}
   \caption[Percentuale di rete scoperta, canale ideale]{Percentuale media di
   rete scoperta al variare della densit\`a, per modalit\`a di inoltro e
   protocollo di beaconing (canale ideale, $BI=\SI{1.0}{\second}$). Le barre di
@@ -443,7 +444,8 @@ dunque nel costo.
 \paragraph{Dinamica temporale.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_discovery_growth_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/senza_errore/mode_comparison_discovery_growth_interval-1_0.pdf}}
   \caption[Crescita della scoperta nel tempo, canale ideale]{Evoluzione
   temporale della percentuale di rete scoperta nella configurazione a 100 boe
   (canale ideale, $BI=\SI{1.0}{\second}$); le bande indicano $\pm 1$
@@ -464,7 +466,8 @@ alla mobilit\`a.
 \paragraph{B-PDR.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_pdr_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/senza_errore/mode_comparison_pdr_interval-1_0.pdf}}
   \caption[B-PDR, canale ideale]{B-PDR al variare della densit\`a, per
   modalit\`a di inoltro e protocollo di beaconing (canale ideale,
   $BI=\SI{1.0}{\second}$; tra parentesi il numero medio di vicini).}
@@ -484,7 +487,8 @@ protocolli adattivi superano sistematicamente SBP a ogni densit\`a.
 \paragraph{Collision rate.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/senza_errore/mode_comparison_collision_rate_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/senza_errore/mode_comparison_collision_rate_interval-1_0.pdf}}
   \caption[Collision rate, canale ideale]{Collision rate al variare della
   densit\`a, per modalit\`a di inoltro e protocollo di beaconing (canale
   ideale, $BI=\SI{1.0}{\second}$; tra parentesi il numero medio di vicini).}
@@ -548,7 +552,8 @@ comunque andare perso.
 \paragraph{Scoperta della rete.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/con_errore/mode_comparison_avg_percentage_network_discovered_interval-1_0.pdf}}
   \caption[Percentuale di rete scoperta, canale non ideale]{Percentuale media
   di rete scoperta al variare della densit\`a (canale non ideale,
   $BI=\SI{1.0}{\second}$; tra parentesi il numero medio di vicini).}
@@ -575,7 +580,8 @@ all'aggregato.
 \paragraph{Dinamica temporale.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_discovery_growth_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/con_errore/mode_comparison_discovery_growth_interval-1_0.pdf}}
   \caption[Crescita della scoperta nel tempo, canale non ideale]{Evoluzione
   temporale della percentuale di rete scoperta nella configurazione a 100 boe
   (canale non ideale, $BI=\SI{1.0}{\second}$).}
@@ -587,13 +593,13 @@ con SBP e ADAB supera il 99\% entro una ventina di secondi, mentre con ACAB
 la crescita \`e pi\`u graduale e con bande pi\`u ampie, pur convergendo
 anch'essa verso il 99\% entro fine simulazione. Il forwarding singolo sale
 pi\`u lentamente --- circa il 90\% dopo 25 secondi --- e si assesta attorno
-al 97\%; il single-hop resta sotto il 70\% con crescita ancora in corso a
-fine simulazione.
+al 97\%; il single-hop resta sotto il 70\%.
 
 \paragraph{B-PDR.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_pdr_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/con_errore/mode_comparison_pdr_interval-1_0.pdf}}
   \caption[B-PDR, canale non ideale]{B-PDR al variare della densit\`a
   (canale non ideale, $BI=\SI{1.0}{\second}$; tra parentesi il numero medio
   di vicini).}
@@ -620,7 +626,8 @@ riuscite prima che la contesa diventi rilevante.
 \paragraph{Collision rate.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_collision_rate_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/con_errore/mode_comparison_collision_rate_interval-1_0.pdf}}
   \caption[Collision rate, canale non ideale]{Collision rate al variare della
   densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$; tra parentesi il
   numero medio di vicini).}
@@ -629,7 +636,7 @@ riuscite prima che la contesa diventi rilevante.
 Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
 \`e sistematicamente inferiore a quello del canale ideale a parit\`a di
 configurazione: per il forwarding singolo con SBP a 100 boe vale 0.349 contro
-0.557 (Sezione~\ref{sec:res-ideal}). La ragione \`e indiretta ma sistematica:
+0.557 (Sezione~\ref{sec:res-ideal}). La ragione risiede nel fatto che
 i beacon persi dal canale non vengono ricevuti n\'e inoltrati, e l'errore di
 canale agisce cos\`i da regolatore del traffico di inoltro, riducendo il
 numero di trasmissioni in contesa. In single-hop le collisioni restano
@@ -645,7 +652,8 @@ conferma anche in presenza di errori di canale.
 \paragraph{Packet loss.}
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{main/images/con_errore/mode_comparison_loss_rate_interval-1_0.pdf}
+  \makebox[\textwidth][c]{%
+    \includegraphics[width=1.15\textwidth]{main/images/con_errore/mode_comparison_loss_rate_interval-1_0.pdf}}
   \caption[Packet loss, canale non ideale]{Packet loss complessivo al variare
   della densit\`a (canale non ideale, $BI=\SI{1.0}{\second}$; tra parentesi
   il numero medio di vicini).}
