@@ -25,7 +25,7 @@ sperimentale sistematica (Sezione~\ref{sec:intro-obiettivi}).
 Tutti e tre gli obiettivi assegnati sono stati raggiunti. Sono state
 progettate due modalit\`a di disseminazione multi-hop dagli approcci opposti:
 il \emph{forwarding singolo}, che inoltra i beacon ricevuti entro un limite
-di hop con meccanismi di contenimento del broadcast storm, e il
+di hop con meccanismi di contenimento del broadcast storm~\cite{broadcaststorm}, e il
 \emph{forwarding aggregato}, che allega a ogni beacon la lista dei nodi
 conosciuti senza generare frame aggiuntivi (Capitolo~\ref{ch:contributo}). Entrambe
 sono state implementate nel simulatore a eventi discreti del progetto,
@@ -91,7 +91,7 @@ superiori; per il forwarding aggregato il fattore limitante di lungo periodo
 \`e la dimensione del beacon, che cresce con il numero di nodi annunciati e
 allunga i tempi di occupazione del canale. Il modello di canale, pur
 calibrato su misure sul campo, resta una semplificazione a due soglie della
-propagazione reale, e il modello di mobilit\`a Random Waypoint approssima ma
+propagazione reale, e il modello di mobilit\`a Random Waypoint~\cite{rwp} approssima ma
 non riproduce il comportamento di nuotatori e piccoli mezzi. Infine, la
 valutazione \`e interamente simulativa: i risultati quantificano i rapporti
 tra le alternative progettuali nelle stesse identiche condizioni, ma i valori

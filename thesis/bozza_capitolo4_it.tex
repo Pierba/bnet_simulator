@@ -6,7 +6,7 @@ introdotte nel Capitolo~\ref{ch:contributo}. Poich\'e ogni configurazione
 di simulazione combina una delle modalit\`a di inoltro con uno dei protocolli di
 beaconing che regolano gli intervalli di trasmissione, il capitolo si apre con
 la descrizione dettagliata dei tre protocolli --- SBP, ADAB e ACAB --- gi\`a esistenti nel
-simulatore. Seguono:
+simulatore~\cite{prosafe}. Seguono:
 \begin{enumerate}
     \item \hyperref[sec:eval-goals]{\textbf{Obiettivi della valutazione}}
     \item \hyperref[sec:eval-setup]{\textbf{Scenari di simulazione adottati negli esperimenti}}
@@ -145,8 +145,7 @@ Capitolo~\ref{ch:simulatore} (implementazione).
   Funge da termine di paragone rispetto al quale
   si misurano le prestazioni delle modalit\`a multi-hop.
   \item \textbf{Forwarding singolo.} La boa inoltra i beacon altrui fino a un
-  numero massimo di hop, affidandosi ai controlli che prevengono il broadcast
-  storm --- unicit\`a dell'origine, TTL e coda a capacit\`a limitata --- come
+  numero massimo di hop, affidandosi ai controlli che prevengono il broadcast storm~\cite{broadcaststorm} --- unicit\`a dell'origine, TTL e coda a capacit\`a limitata --- come
   dettagliato nella Sezione~\ref{sec:forward} e realizzato nella
   Sezione~\ref{sec:forward-impl}. Amplia il raggio della conoscenza pagando in trasmissioni aggiuntive.
   \item \textbf{Forwarding aggregato.} La boa accoda a ciascun beacon 
@@ -277,7 +276,7 @@ L'incremento del numero di boe al crescere della densit\`a \`e illustrato nella 
 \end{figure}
 
 \paragraph{Mobilit\`a.} In entrambi gli scenari il 30\% delle boe \`e mobile
-e segue il modello random waypoint (Sezione~\ref{sec:rwp}; velocit\`a
+e segue il modello random waypoint~\cite{rwp} (Sezione~\ref{sec:rwp}; velocit\`a
 5--\SI{20}{m/s}, pausa 0--\SI{10}{\second}), mentre il restante
 70\% \`e fisso. La popolazione \`e inoltre soggetta a variazione periodica 
 (Sezione~\ref{sec:scenario}; scenario random).
@@ -364,7 +363,7 @@ ricezione $R_{\text{opp}}$ perse per collisione:
   CR = \frac{C}{R_{\text{opp}}},
   \label{eq:collrate}
 \end{equation}
-con $C$ il totale delle collisioni avvenute, sia dirette che provocate da un terminale nascosto (Sezione~\ref{sec:broadcast-impl}).
+con $C$ il totale delle collisioni avvenute, sia dirette che provocate da un terminale nascosto~\cite{tobagi-hidden} (Sezione~\ref{sec:broadcast-impl}).
 
 \paragraph{Packet loss.} Esprime la frazione complessiva delle opportunit\`a
 di ricezione $R_{\text{opp}}$ perse a causa di collisioni ed errori del canale non ideale (Eq.~\ref{eq:delivery-prob}):

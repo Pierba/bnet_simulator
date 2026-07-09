@@ -19,7 +19,7 @@ L'obiettivo è valutare il compromesso tra estensione della copertura, affidabil
 % ---------------------------------------------------------------------
 \section{Struttura e funzionamento del beacon}
 \label{sec:commodel}
-ProSafe effettua la scoperta di prossimit\`a a livello MAC IEEE~802.11, senza associazione
+ProSafe effettua la scoperta di prossimit\`a a livello MAC IEEE~802.11~\cite{ieee80211}, senza associazione
 ad access point n\'e ricorso a servizi di livello IP. I beacon sono frame di dimensione
 variabile trasmessi in broadcast. Il payload del beacon comprende i campi seguenti:
 \begin{itemize}[leftmargin=1.4em,nosep]
@@ -42,7 +42,7 @@ Indicato con $k$ il numero di nodi annunciati nella lista, la dimensione del fra
 Il frame base occupa quindi $28$ byte e cresce di $28$ byte per ogni nodo annunciato: la
 dimensione del beacon \`e proporzionale al numero di nodi noti alla boa.
 
-L'accesso al canale, per la trasmissione di questi, segue i principi della DCF (\emph{Distributed Coordination Function}):
+L'accesso al canale, per la trasmissione di questi, segue i principi della DCF (\emph{Distributed Coordination Function})~\cite{sharetechnote-dcf,csma-ca}:
 il nodo attende che il canale si liberi, osserva un DIFS, estrae un tempo di backoff
 casuale e infine trasmette, senza ricorrere allo scambio RTS/CTS n\'e a riscontri (ACK)
 sull'esito della ricezione.
@@ -86,7 +86,7 @@ propri, dopo un jitter casuale $\delta \sim \mathcal{U}[0, \SI{0.05}{\second}]$ 
 desincronizza i molteplici ricevitori dello stesso frame; i quali altrimenti
 contenderebbero il canale simultaneamente. 
 
-In assenza di controlli il forwarding pu\`o degenerare in un \emph{broadcast storm};
+In assenza di controlli il forwarding pu\`o degenerare in un \emph{broadcast storm}~\cite{broadcaststorm};
 la modalit\`a adotta quindi tre meccanismi di contenimento:
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{Unicit\`a dell'origine.} Ogni boa memorizza, per ciascun origin id

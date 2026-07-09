@@ -209,7 +209,7 @@ c'\`e gi\`a una contesa in corso, parte la pipeline CSMA/CA. Un apposito indicat
 di contesa in corso, che agisce da \emph{lock}, garantisce che ogni boa gestisca al pi\`u una
 pipeline alla volta, a prescindere dal numero di beacon propri o di inoltri in attesa.
 
-La contesa segue i principi della DCF richiamati nel Capitolo~\ref{ch:contributo}:
+La contesa segue i principi della DCF~\cite{sharetechnote-dcf,csma-ca} richiamati nel Capitolo~\ref{ch:contributo}:
 \begin{enumerate}[leftmargin=1.6em,nosep]
   \item \texttt{CHANNEL\_SENSE}: la boa sonda il canale tramite la callback
   di carrier sensing (Sezione~\ref{sec:files}); se \`e occupato, il canale stesso restituisce l'istante in
@@ -264,7 +264,7 @@ trasmissione, ossia il costo della contesa CSMA/CA.
 \subsection{Ricezione di un beacon}
 \label{sec:rx}
 L'handler dell'evento \texttt{RECEPTION} scarta anzitutto i beacon la cui consegna \`e stata
-revocata da una collisione sopravvenuta da un terminale nascosto (il meccanismo \`e descritto nella
+revocata da una collisione sopravvenuta da un terminale nascosto~\cite{tobagi-hidden} (il meccanismo \`e descritto nella
 Sezione~\ref{sec:broadcast-impl}). Per i beacon ancora validi aggiorna la tabella dei vicini
 diretti con il mittente e il timestamp dell'ultimo contatto, usato poi per i calcoli di ACAB (Eq.~\ref{eq:acab-con}). 
 Ogni ricezione popola l'insieme dei nodi unici conosciuti dalla boa --- il mittente, l'eventuale origine (per i pacchetti del forwarding singolo) e tutti i nodi
@@ -342,7 +342,7 @@ Oltre alla tabella dei vicini diretti --- comune a tutte le
 modalit\`a ---, che associa a ogni vicino la coppia (timestamp dell'ultimo contatto,
 posizione), ogni boa mantiene tre strutture specifiche per i multihop:
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item la \emph{memoria di deduplicazione} (forwarding singolo), che previene il \emph{broadcast storm}: per
+  \item la \emph{memoria di deduplicazione} (forwarding singolo), che previene il \emph{broadcast storm}~\cite{broadcaststorm}: per
   ogni origin id si conserva il timestamp pi\`u recente del pacchetto gi\`a accettato per l'inoltro (Eq.~\ref{eq:dedup});
   \item la \emph{coda di inoltro} (forwarding singolo),
   indicizzata per \emph{origin id}: si comporta da coda
