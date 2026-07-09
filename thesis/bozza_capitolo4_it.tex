@@ -320,7 +320,7 @@ intervalli fungono da controllo della variabilit\`a tra repliche.
 
 \subsection{Analisi statistica}
 \label{sec:eval-stats}
-Ogni configurazione \`e simulata 20 volte --- quindi un totale di $20 \cdot |S| = 360$ simulazioni totali, Eq.~\ref{eq:sim-combinations} ---
+Ogni configurazione \`e simulata 30 volte --- quindi un totale di $30 \cdot |S| = 540$ simulazioni totali, Eq.~\ref{eq:sim-combinations} ---
 con semi casuali diversi producendo ognuna un campione indipendente di ciascuna metrica. 
 I risultati finali sono riportati come media delle repliche. Nei grafici temporali la linea
 mostra la media tra le repliche e la banda ombreggiata attorno ad essa copre
@@ -437,11 +437,12 @@ scoperta ($D_{\%}$, Eq.~\ref{eq:netdisc}). Nell'area adottata la portata radio
 copre una frazione minima del mondo e il ricambio della popolazione rinnova di
 continuo l'insieme dei nodi da scoprire: il beaconing single-hop \`e cos\`i
 strutturalmente incapace di costruire una visione completa della rete e si
-ferma tra il 63\% e il 77\% a seconda di protocollo e densit\`a. Le modalit\`a
+ferma tra il 60\% e il 76\% a seconda di protocollo e densit\`a. Le modalit\`a
 multi-hop cambiano qualitativamente il quadro: gi\`a a 20 boe --- dove il
-grafo \`e in gran parte partizionato, con meno di due vicini medi --- superano
-l'87\%, a 40 boe oltrepassano il 97\% e dai 60 nodi in su completano di fatto
-la scoperta (99.7--100\%) con ogni protocollo di beaconing. Sul piano della
+grafo \`e in gran parte partizionato, con meno di due vicini medi --- si
+collocano tra l'80\% e il 90\%, a 40 boe oltrepassano il 98\% e dai 60 nodi
+in su completano di fatto la scoperta (99.7--100\%) con ogni protocollo di
+beaconing. Sul piano della
 sola copertura, dunque, forwarding singolo e forwarding aggregato sono
 sostanzialmente equivalenti: il compromesso tra le due modalit\`a va cercato
 nel costo, non nel beneficio.
@@ -463,7 +464,7 @@ con tutti i protocolli --- bastano pochi cicli di beaconing perch\'e le liste
 annunciate propaghino l'intera topologia --- mentre il forwarding singolo
 raggiunge il 99\% in circa 10--25 secondi, poich\'e ogni ritrasmissione
 veicola un solo beacon di origine. Il single-hop cresce lentamente e non
-converge: a fine simulazione si ferma al 74--77\%, con bande di deviazione
+converge: a fine simulazione si ferma al 70--76\%, con bande di deviazione
 standard ampie che ne rivelano la dipendenza dagli incontri casuali dovuti
 alla mobilit\`a.
 
@@ -481,10 +482,10 @@ modo determinante dal protocollo di beaconing (Figura~\ref{fig:ideal-pdr}).
 In single-hop il B-PDR resta sopra 0.97 per ogni protocollo e densit\`a: il
 traffico periodico, da solo, non satura il canale nemmeno a 100 boe. Con il
 forwarding aggregato il degrado \`e contenuto e fortemente mitigato
-dall'adattivit\`a: a 100 boe il B-PDR vale 0.837 con SBP, 0.949 con ADAB e
-0.965 con ACAB. Il forwarding singolo \`e la modalit\`a pi\`u onerosa: a 100
-boe il B-PDR scende a 0.447 con SBP, mentre i protocolli adattivi lo
-mantengono a 0.603 (ADAB) e 0.579 (ACAB). A parit\`a di modalit\`a i
+dall'adattivit\`a: a 100 boe il B-PDR vale 0.843 con SBP, 0.952 con ADAB e
+0.967 con ACAB. Il forwarding singolo \`e la modalit\`a pi\`u onerosa: a 100
+boe il B-PDR scende a 0.443 con SBP, mentre i protocolli adattivi lo
+mantengono a 0.623 (ADAB) e 0.600 (ACAB). A parit\`a di modalit\`a i
 protocolli adattivi superano sistematicamente SBP a ogni densit\`a.
 
 \paragraph{Collision rate.}
@@ -499,14 +500,14 @@ protocolli adattivi superano sistematicamente SBP a ogni densit\`a.
 Il collision rate (Figura~\ref{fig:ideal-collision}) spiega direttamente i
 valori di B-PDR: nel canale ideale $PL = CR$ e in ogni configurazione risulta
 $\text{B-PDR} + CR \approx 1$, verifica di coerenza dei dati. In single-hop
-le collisioni sono trascurabili ($CR \le 0.031$). Nel forwarding aggregato la
+le collisioni sono trascurabili ($CR \le 0.025$). Nel forwarding aggregato la
 contesa nasce dai frame pi\`u lunghi, che estendono la finestra di
-vulnerabilit\`a: con SBP il collision rate sale fino a 0.163 a 100 boe, ma
-ADAB lo riduce a 0.051 e ACAB a 0.035 --- una riduzione di quasi cinque volte
+vulnerabilit\`a: con SBP il collision rate sale fino a 0.157 a 100 boe, ma
+ADAB lo riduce a 0.048 e ACAB a 0.033 --- una riduzione di quasi cinque volte
 rispetto al protocollo statico. Nel forwarding singolo la contesa nasce dal
 moltiplicarsi delle trasmissioni: ogni beacon ricevuto pu\`o generare un
-inoltro e il collision rate cresce con la densit\`a fino a 0.553 (SBP); anche
-qui l'adattivit\`a ne riduce sensibilmente il costo (0.397 con ADAB, 0.421
+inoltro e il collision rate cresce con la densit\`a fino a 0.557 (SBP); anche
+qui l'adattivit\`a ne riduce sensibilmente il costo (0.377 con ADAB, 0.400
 con ACAB), pur senza eliminare la natura intrinsecamente pi\`u rumorosa della
 modalit\`a. La Tabella~\ref{tab:ideal-summary} riepiloga i valori numerici.
 
@@ -514,7 +515,7 @@ modalit\`a. La Tabella~\ref{tab:ideal-summary} riepiloga i valori numerici.
   \centering
   \caption[Riepilogo dei risultati con canale ideale]{Riepilogo dei risultati
   con canale ideale ($BI=\SI{1.0}{\second}$): percentuale media di rete
-  scoperta e B-PDR a 20, 60 e 100 boe, collision rate a 100 boe. Medie su 20
+  scoperta e B-PDR a 20, 60 e 100 boe, collision rate a 100 boe. Medie su 30
   repliche.}
   \label{tab:ideal-summary}
   \small
@@ -525,19 +526,19 @@ modalit\`a. La Tabella~\ref{tab:ideal-summary} riepiloga i valori numerici.
     Modalit\`a & Protocollo & 20 & 60 & 100 & 20 & 60 & 100 & 100 \\
     \midrule
     \multirow{3}{*}{Single-hop}
-      & SBP  & 68.8 & 72.0 & 76.6 & 0.999 & 0.986 & 0.969 & 0.031 \\
-      & ADAB & 66.3 & 68.5 & 74.2 & 0.998 & 0.996 & 0.993 & 0.007 \\
-      & ACAB & 63.4 & 69.2 & 73.7 & 0.999 & 0.998 & 0.993 & 0.007 \\
+      & SBP  & 62.3 & 75.3 & 76.3 & 0.999 & 0.989 & 0.975 & 0.025 \\
+      & ADAB & 61.8 & 69.3 & 70.8 & 0.998 & 0.996 & 0.993 & 0.007 \\
+      & ACAB & 60.0 & 66.9 & 71.1 & 1.000 & 0.998 & 0.994 & 0.006 \\
     \midrule
     \multirow{3}{*}{Forw.\ aggregato}
-      & SBP  & 93.5 & 100.0 & 100.0 & 0.996 & 0.939 & 0.837 & 0.163 \\
-      & ADAB & 94.0 & 100.0 & 100.0 & 0.992 & 0.969 & 0.949 & 0.051 \\
-      & ACAB & 89.9 & 99.9  & 100.0 & 0.998 & 0.988 & 0.965 & 0.035 \\
+      & SBP  & 86.1 & 99.9  & 100.0 & 0.997 & 0.939 & 0.843 & 0.157 \\
+      & ADAB & 90.1 & 100.0 & 100.0 & 0.994 & 0.968 & 0.952 & 0.048 \\
+      & ACAB & 84.9 & 99.9  & 100.0 & 0.999 & 0.988 & 0.967 & 0.033 \\
     \midrule
     \multirow{3}{*}{Forw.\ singolo}
-      & SBP  & 91.3 & 99.8 & 99.7  & 0.962 & 0.675 & 0.447 & 0.553 \\
-      & ADAB & 87.0 & 99.8 & 99.9  & 0.968 & 0.794 & 0.603 & 0.397 \\
-      & ACAB & 87.6 & 99.9 & 100.0 & 0.975 & 0.802 & 0.579 & 0.421 \\
+      & SBP  & 81.8 & 99.7 & 99.7 & 0.972 & 0.682 & 0.443 & 0.557 \\
+      & ADAB & 85.4 & 99.7 & 99.9 & 0.974 & 0.800 & 0.623 & 0.377 \\
+      & ACAB & 79.5 & 99.8 & 99.9 & 0.981 & 0.817 & 0.600 & 0.400 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -561,19 +562,20 @@ comunque andare perso.
   \label{fig:error-discovery}
 \end{figure}
 Le perdite del canale colpiscono soprattutto il single-hop, la cui scoperta
-scende al 50--68\% (Figura~\ref{fig:error-discovery}): ogni beacon perso \`e
+scende al 49--66\% (Figura~\ref{fig:error-discovery}): ogni beacon perso \`e
 un'occasione di scoperta persa, senza meccanismi che la recuperino. Il
 forwarding aggregato conferma invece la propria robustezza alle densit\`a
-medio-alte: dai 60 nodi in su supera il 99.8\% con SBP e ADAB e mantiene il
-99.5\% a 100 boe con ACAB, sostanzialmente i valori del canale ideale,
+medio-alte: dai 60 nodi in su supera il 99.5\% con SBP e ADAB e raggiunge il
+99.8\% a 100 boe con ACAB, sostanzialmente i valori del canale ideale,
 poich\'e la ridondanza dei percorsi compensa la perdita dei singoli frame.
 Alle basse densit\`a emergono per\`o differenze marcate tra i protocolli: a
-20 boe ADAB--append raggiunge l'84.2\% contro il 72.4\% di SBP--append,
-mentre ACAB--append si ferma al 58.9\% (e al 78.1\% a 40 boe). Il backoff
+20 boe ADAB--append raggiunge l'80.6\% contro il 70.0\% di SBP--append,
+mentre ACAB--append si ferma al 60.8\% (e all'84.4\% a 40 boe, contro il
+95.9--98.0\% degli altri due). Il backoff
 pi\`u conservativo di ACAB --- soglia di densit\`a inferiore e componente di
 contatto recente --- riduce proprio le trasmissioni da cui il canale con
 perdite trae la ridondanza necessaria. Il forwarding singolo si colloca in
-mezzo: 62--69\% a 20 boe e circa il 97\% a 100 boe, dove il limite di hop e
+mezzo: 61--69\% a 20 boe e circa il 97\% a 100 boe, dove il limite di hop e
 la perdita dei beacon ritrasmessi ne frenano la diffusione rispetto
 all'aggregato.
 
@@ -605,21 +607,21 @@ fine simulazione.
 \end{figure}
 Il canale probabilistico impone un tetto all'affidabilit\`a indipendente da
 modalit\`a e protocollo: gi\`a a 20 boe, dove la contesa \`e trascurabile, il
-B-PDR di tutte le configurazioni si colloca tra 0.36 e 0.45
+B-PDR di tutte le configurazioni si colloca tra 0.39 e 0.46
 (Figura~\ref{fig:error-pdr}), riflesso della geometria delle opportunit\`a
 di ricezione --- la maggior parte dei riceventi in portata cade nella corona
 esterna, dove $P_{\mathrm{rx}} = 0.15$. Su questa base il comportamento con
 la densit\`a distingue le modalit\`a. Il single-hop resta piatto
 ($\text{B-PDR} \approx 0.41$ a 100 boe): le sue perdite sono interamente
 dominate dal canale, non dalla contesa. Il forwarding aggregato con
-protocolli adattivi \`e quasi indistinguibile dal single-hop (0.383 con ADAB
-e 0.404 con ACAB a 100 boe), mentre con SBP la contesa riemerge e lo abbassa
-a 0.367. Il forwarding singolo somma al tetto del canale la propria contesa:
-a 100 boe scende a 0.272 con SBP, mentre i protocolli adattivi lo mantengono
-attorno a 0.33 (0.334 con ADAB, 0.320 con ACAB). Alle basse densit\`a \`e
-invece la modalit\`a forward a esibire il B-PDR pi\`u alto (0.450 con SBP a
-20 boe): le ritrasmissioni moltiplicano le ricezioni riuscite prima che la
-contesa diventi rilevante.
+protocolli adattivi \`e quasi indistinguibile dal single-hop (0.393 con ADAB
+e 0.409 con ACAB a 100 boe), mentre con SBP la contesa riemerge e lo abbassa
+a 0.375. Il forwarding singolo somma al tetto del canale la propria contesa:
+a 100 boe scende a 0.279 con SBP, mentre i protocolli adattivi lo mantengono
+attorno a 0.33 (0.339 con ADAB, 0.328 con ACAB). Alle basse densit\`a \`e
+invece la modalit\`a forward a esibire il B-PDR pi\`u alto (fino a 0.46 a
+20 boe con tutti i protocolli): le ritrasmissioni moltiplicano le ricezioni
+riuscite prima che la contesa diventi rilevante.
 
 \paragraph{Collision rate.}
 \begin{figure}[htbp]
@@ -631,17 +633,17 @@ contesa diventi rilevante.
 \end{figure}
 Il collision rate nel canale non ideale (Figura~\ref{fig:error-collision})
 \`e sistematicamente inferiore a quello del canale ideale a parit\`a di
-configurazione: per il forwarding singolo con SBP a 100 boe vale 0.354 contro
-0.553 (Sezione~\ref{sec:res-ideal}). La ragione \`e indiretta ma sistematica:
+configurazione: per il forwarding singolo con SBP a 100 boe vale 0.349 contro
+0.557 (Sezione~\ref{sec:res-ideal}). La ragione \`e indiretta ma sistematica:
 i beacon persi dal canale non vengono ricevuti n\'e rilanciati, e l'errore di
 canale agisce cos\`i da regolatore del traffico di inoltro, riducendo il
 numero di trasmissioni in contesa. In single-hop le collisioni restano
-trascurabili ($CR \le 0.015$). Nel forwarding aggregato la contesa cresce con
+trascurabili ($CR \le 0.016$). Nel forwarding aggregato la contesa cresce con
 la densit\`a ma resta contenuta dall'adattivit\`a: a 100 boe il collision
-rate vale 0.108 con SBP, 0.052 con ADAB e appena 0.019 con ACAB. Il
-forwarding singolo \`e di nuovo la modalit\`a pi\`u onerosa (0.354 con SBP a
+rate vale 0.110 con SBP, 0.050 con ADAB e appena 0.019 con ACAB. Il
+forwarding singolo \`e di nuovo la modalit\`a pi\`u onerosa (0.349 con SBP a
 100 boe), con i protocolli adattivi che ne riducono sensibilmente il costo
-(0.191 con ADAB, 0.221 con ACAB). L'ordinamento
+(0.196 con ADAB, 0.215 con ACAB). L'ordinamento
 $\text{ACAB} < \text{ADAB} < \text{SBP}$ del forwarding aggregato si
 conferma anche in presenza di errori di canale.
 
@@ -657,17 +659,17 @@ Il packet loss (Eq.~\ref{eq:packetloss}) somma alle collisioni le perdite
 dovute al canale e ne fornisce quindi la misura complessiva di
 inaffidabilit\`a (Figura~\ref{fig:error-loss}). A differenza del canale
 ideale, dove $PL = CR$, qui il packet loss parte da una base elevata anche in
-assenza di contesa: gi\`a a 20 boe si colloca tra 0.55 e 0.64, riflesso
+assenza di contesa: gi\`a a 20 boe si colloca tra 0.54 e 0.61, riflesso
 diretto della probabilit\`a di consegna nella corona esterna. Il single-hop
 si mantiene su questa base per ogni densit\`a ($\approx 0.59$ a 100 boe, con
-$CR \le 0.015$): quasi tutta la perdita \`e imputabile al canale. Nel
+$CR \le 0.016$): quasi tutta la perdita \`e imputabile al canale. Nel
 forwarding aggregato la contesa aggiunge un contributo modesto --- a 100 boe
-il packet loss vale 0.633 con SBP, 0.617 con ADAB e 0.596 con ACAB ---
+il packet loss vale 0.625 con SBP, 0.607 con ADAB e 0.591 con ACAB ---
 mentre nel forwarding singolo il contributo della contesa \`e ben visibile:
-con SBP il packet loss raggiunge 0.728 a 100 boe, contro 0.666 (ADAB) e
-0.680 (ACAB). La differenza $PL - CR$ isola in ogni caso il peso del canale
+con SBP il packet loss raggiunge 0.721 a 100 boe, contro 0.661 (ADAB) e
+0.672 (ACAB). La differenza $PL - CR$ isola in ogni caso il peso del canale
 rispetto a quello della contesa: per il forwarding singolo con SBP a 100 boe
-le collisioni pesano per 0.354 e il canale per i restanti $\approx 0.37$, a
+le collisioni pesano per 0.349 e il canale per i restanti $\approx 0.37$, a
 conferma che, nelle condizioni realistiche, la perdita \`e dominata dal
 livello fisico e solo accentuata dall'inoltro. La
 Tabella~\ref{tab:error-summary} riepiloga i valori numerici.
@@ -677,7 +679,7 @@ Tabella~\ref{tab:error-summary} riepiloga i valori numerici.
   \caption[Riepilogo dei risultati con canale non ideale]{Riepilogo dei
   risultati con canale non ideale ($BI=\SI{1.0}{\second}$): percentuale media
   di rete scoperta e B-PDR a 20, 60 e 100 boe, collision rate e packet loss a
-  100 boe. Medie su 20 repliche.}
+  100 boe. Medie su 30 repliche.}
   \label{tab:error-summary}
   \small
   \begin{tabular}{llcccccccc}
@@ -687,19 +689,19 @@ Tabella~\ref{tab:error-summary} riepiloga i valori numerici.
     Modalit\`a & Protocollo & 20 & 60 & 100 & 20 & 60 & 100 & 100 & 100 \\
     \midrule
     \multirow{3}{*}{Single-hop}
-      & SBP  & 53.9 & 64.6 & 67.6 & 0.402 & 0.420 & 0.410 & 0.015 & 0.590 \\
-      & ADAB & 56.0 & 58.3 & 57.4 & 0.400 & 0.409 & 0.407 & 0.005 & 0.593 \\
-      & ACAB & 49.6 & 57.3 & 55.0 & 0.371 & 0.409 & 0.409 & 0.002 & 0.591 \\
+      & SBP  & 55.7 & 63.8 & 66.2 & 0.432 & 0.423 & 0.416 & 0.016 & 0.584 \\
+      & ADAB & 56.7 & 58.6 & 58.8 & 0.424 & 0.416 & 0.411 & 0.005 & 0.589 \\
+      & ACAB & 48.9 & 53.8 & 56.5 & 0.388 & 0.410 & 0.416 & 0.003 & 0.584 \\
     \midrule
     \multirow{3}{*}{Forw.\ aggregato}
-      & SBP  & 72.4 & 99.8 & 100.0 & 0.401 & 0.402 & 0.367 & 0.108 & 0.633 \\
-      & ADAB & 84.2 & 99.9 & 100.0 & 0.389 & 0.396 & 0.383 & 0.052 & 0.617 \\
-      & ACAB & 58.9 & 95.6 & 99.5  & 0.363 & 0.404 & 0.404 & 0.019 & 0.596 \\
+      & SBP  & 70.0 & 99.5 & 100.0 & 0.418 & 0.410 & 0.375 & 0.110 & 0.625 \\
+      & ADAB & 80.6 & 99.6 & 99.9  & 0.419 & 0.408 & 0.393 & 0.050 & 0.607 \\
+      & ACAB & 60.8 & 96.9 & 99.8  & 0.389 & 0.409 & 0.409 & 0.019 & 0.591 \\
     \midrule
     \multirow{3}{*}{Forw.\ singolo}
-      & SBP  & 66.7 & 94.5 & 97.2 & 0.450 & 0.367 & 0.272 & 0.354 & 0.728 \\
-      & ADAB & 68.7 & 93.4 & 97.3 & 0.431 & 0.402 & 0.334 & 0.191 & 0.666 \\
-      & ACAB & 61.8 & 91.8 & 97.8 & 0.427 & 0.396 & 0.320 & 0.221 & 0.680 \\
+      & SBP  & 68.6 & 96.4 & 96.6 & 0.460 & 0.364 & 0.279 & 0.349 & 0.721 \\
+      & ADAB & 67.9 & 94.1 & 97.3 & 0.462 & 0.402 & 0.339 & 0.196 & 0.661 \\
+      & ACAB & 61.2 & 92.4 & 97.7 & 0.456 & 0.398 & 0.328 & 0.215 & 0.672 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -718,7 +720,7 @@ pi\`u densa, per entrambi gli scenari di canale.
   \caption[Latenze medie a 100 boe]{Latenze medie a 100 boe
   ($BI=\SI{1.0}{\second}$): latenza di consegna ($L_{\text{cons}}$), di
   reazione ($L_{\text{reaz}}$) e di scheduler ($L_{\text{sched}}$) nei due
-  scenari di canale. Valori in millisecondi; medie su 20 repliche.}
+  scenari di canale. Valori in millisecondi; medie su 30 repliche.}
   \label{tab:latency-summary}
   \small
   \begin{tabular}{llcccccc}
@@ -729,19 +731,19 @@ pi\`u densa, per entrambi gli scenari di canale.
                             & $L_{\text{cons}}$ & $L_{\text{reaz}}$ & $L_{\text{sched}}$ \\
     \midrule
     \multirow{3}{*}{Single-hop}
-      & SBP  & 2.9 & 3.3 & 0.3 & 2.3 & 2.5 & 0.3 \\
-      & ADAB & 2.1 & 3.0 & 0.2 & 1.4 & 1.9 & 0.2 \\
-      & ACAB & 2.7 & 3.0 & 0.2 & 1.4 & 1.7 & 0.2 \\
+      & SBP  & 2.9 & 3.2 & 0.3 & 2.3 & 2.5 & 0.2 \\
+      & ADAB & 1.9 & 2.9 & 0.2 & 1.4 & 1.9 & 0.2 \\
+      & ACAB & 2.5 & 2.8 & 0.2 & 1.5 & 1.7 & 0.2 \\
     \midrule
     \multirow{3}{*}{Forw.\ aggregato}
-      & SBP  & 20.6 & 15.9 & 2.7 & 19.3 & 16.9 & 2.5 \\
-      & ADAB & 20.6 & 16.5 & 0.8 & 18.8 & 16.5 & 1.2 \\
-      & ACAB & 18.4 & 15.6 & 0.6 & 12.9 & 13.2 & 0.5 \\
+      & SBP  & 20.7 & 16.0 & 2.8 & 19.5 & 16.8 & 2.6 \\
+      & ADAB & 20.7 & 16.8 & 0.8 & 18.7 & 16.2 & 1.1 \\
+      & ACAB & 18.7 & 15.7 & 0.6 & 13.2 & 13.2 & 0.5 \\
     \midrule
     \multirow{3}{*}{Forw.\ singolo}
-      & SBP  & 18.9 & 115.4 & 12.2 & 12.3 & 105.9 & 7.7 \\
-      & ADAB & 21.8 & 89.1  & 5.9  & 14.1 & 93.8  & 2.5 \\
-      & ACAB & 33.6 & 93.3  & 6.5  & 23.4 & 94.1  & 3.1 \\
+      & SBP  & 20.2 & 113.9 & 12.4 & 13.5 & 105.8 & 7.5 \\
+      & ADAB & 19.5 & 86.1  & 5.4  & 13.2 & 93.5  & 2.4 \\
+      & ACAB & 32.9 & 90.3  & 6.2  & 23.8 & 93.3  & 3.1 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -750,19 +752,19 @@ La \emph{latenza di consegna} resta in ogni caso dell'ordine dei millisecondi:
 1--3~\si{ms} nel single-hop, dove pesa la sola contesa CSMA/CA, e
 13--21~\si{ms} nel forwarding aggregato, dove il frame allungato dalla lista
 dei nodi annunciati occupa il canale pi\`u a lungo; nel forwarding singolo i
-valori sono comparabili o superiori (12--34~\si{ms}), per effetto
+valori sono comparabili o superiori (13--33~\si{ms}), per effetto
 dell'accodamento degli inoltri. \`E per\`o la \emph{latenza di reazione} a
 distinguere le due modalit\`a multi-hop: nel forwarding aggregato essa resta
 allineata alla latenza di consegna (13--17~\si{ms} a 100 boe), perch\'e la
 conoscenza viaggia in blocco con i beacon periodici, mentre nel forwarding
 singolo la scoperta di un'origine lontana richiede il completamento della
-catena di ritrasmissioni hop per hop e sale a 89--115~\si{ms}, quasi un
+catena di ritrasmissioni hop per hop e sale a 86--114~\si{ms}, quasi un
 ordine di grandezza in pi\`u. Il valore contenuto del single-hop
 (2--3~\si{ms}) va letto con cautela: la media \`e calcolata sulle sole
 origini effettivamente scoperte, che per questa modalit\`a sono i soli vicini
 diretti. La \emph{latenza di scheduler}, infine, conferma quanto osservato
 sul collision rate: dal valore di base di circa \SI{0.2}{ms} essa cresce con
-la contesa fino a \SI{12.2}{ms} per il forwarding singolo con SBP nel canale
+la contesa fino a \SI{12.4}{ms} per il forwarding singolo con SBP nel canale
 ideale, mentre i protocolli adattivi la mantengono sotto i 7~\si{ms} e il
 forwarding aggregato adattivo sotto il millisecondo. Nel canale non ideale
 tutti i valori risultano leggermente inferiori, coerentemente con il minor
@@ -790,7 +792,7 @@ di forwarding aggregato nella configurazione pi\`u densa.
   \caption[Sensibilit\`a all'intervallo di beaconing (forwarding aggregato,
   100 boe)]{B-PDR e collision rate a 100 boe in modalit\`a forwarding
   aggregato, al variare dell'intervallo di beaconing e del protocollo, nei
-  due scenari di canale. Medie su 20 repliche.}
+  due scenari di canale. Medie su 30 repliche.}
   \label{tab:interval-summary}
   \begin{tabular}{llcccccc}
     \toprule
@@ -799,34 +801,34 @@ di forwarding aggregato nella configurazione pi\`u densa.
     Canale & $BI$ (\si{\second}) & B-PDR & $CR$ & B-PDR & $CR$ & B-PDR & $CR$ \\
     \midrule
     \multirow{3}{*}{ideale}
-      & 1.0  & 0.837 & 0.163 & 0.949 & 0.051 & 0.965 & 0.035 \\
-      & 0.5  & 0.667 & 0.333 & 0.950 & 0.050 & 0.964 & 0.036 \\
-      & 0.25 & 0.396 & 0.604 & 0.950 & 0.050 & 0.965 & 0.035 \\
+      & 1.0  & 0.843 & 0.157 & 0.952 & 0.048 & 0.967 & 0.033 \\
+      & 0.5  & 0.667 & 0.333 & 0.950 & 0.049 & 0.966 & 0.034 \\
+      & 0.25 & 0.412 & 0.587 & 0.951 & 0.049 & 0.967 & 0.033 \\
     \midrule
     \multirow{3}{*}{non ideale}
-      & 1.0  & 0.367 & 0.108 & 0.383 & 0.052 & 0.404 & 0.019 \\
-      & 0.5  & 0.316 & 0.227 & 0.384 & 0.052 & 0.402 & 0.018 \\
-      & 0.25 & 0.212 & 0.469 & 0.383 & 0.052 & 0.402 & 0.018 \\
+      & 1.0  & 0.375 & 0.110 & 0.393 & 0.050 & 0.409 & 0.019 \\
+      & 0.5  & 0.318 & 0.234 & 0.391 & 0.049 & 0.408 & 0.018 \\
+      & 0.25 & 0.219 & 0.461 & 0.392 & 0.052 & 0.408 & 0.018 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 Per SBP l'intervallo \`e il fattore dominante: passando da 1.0 a
-\SI{0.25}{\second} il collision rate a 100 boe quasi quadruplica (da 0.163 a
-0.604) e il B-PDR crolla da 0.837 a 0.396; nel canale non ideale l'effetto
-\`e analogo ($CR$ da 0.108 a 0.469, B-PDR da 0.367 a 0.212). Lo stesso vale,
-in forma attenuata, per il forwarding singolo (B-PDR da 0.447 a 0.314 nel
+\SI{0.25}{\second} il collision rate a 100 boe quasi quadruplica (da 0.157 a
+0.587) e il B-PDR crolla da 0.843 a 0.412; nel canale non ideale l'effetto
+\`e analogo ($CR$ da 0.110 a 0.461, B-PDR da 0.375 a 0.219). Lo stesso vale,
+in forma attenuata, per il forwarding singolo (B-PDR da 0.443 a 0.332 nel
 canale ideale). Il confronto con i protocolli adattivi \`e reso pi\`u eloquente
 proprio dalla loro configurazione: ADAB e ACAB operano gi\`a, a ogni riga
 della tabella, con il limite inferiore pi\`u aggressivo
 ($\bimin=\SI{0.25}{\second}$, lo stesso valore che con SBP porta il collision
-rate a 0.604), eppure mantengono $CR \le 0.052$ e B-PDR stabili al secondo
+rate a 0.587), eppure mantengono $CR \le 0.052$ e B-PDR stabili al secondo
 decimale: il backoff adattivo riespande l'intervallo effettivo non appena la
 contesa locale cresce, neutralizzando l'aggressivit\`a del limite inferiore.
 L'intervallo breve conserva
 un'utilit\`a alle basse densit\`a: nello scenario sparso a 20 boe con canale
-non ideale la scoperta di SBP--append sale dal 72.4\% ($BI=\SI{1.0}{\second}$)
-al 90.3\% ($BI=\SI{0.25}{\second}$), poich\'e le trasmissioni pi\`u frequenti
+non ideale la scoperta di SBP--append sale dal 70.0\% ($BI=\SI{1.0}{\second}$)
+all'87.9\% ($BI=\SI{0.25}{\second}$), poich\'e le trasmissioni pi\`u frequenti
 moltiplicano le occasioni di superare i collegamenti a bassa probabilit\`a
 dove la contesa \`e assente. Il protocollo statico \`e per\`o costretto a
 scegliere tra reattivit\`a in scarsit\`a e stabilit\`a in densit\`a, mentre i
@@ -837,16 +839,16 @@ protocolli adattivi ottengono entrambe senza riconfigurazione.
 \label{sec:confronto-sintesi}
 I risultati delineano un quadro coerente lungo i tre assi della valutazione.
 Sul piano della \emph{copertura} l'inoltro multi-hop \`e una necessit\`a, non
-un'ottimizzazione: nello scenario adottato il single-hop si ferma al 63--77\%
-nel canale ideale e al 50--68\% in quello non ideale, mentre entrambe le
+un'ottimizzazione: nello scenario adottato il single-hop si ferma al 60--76\%
+nel canale ideale e al 49--66\% in quello non ideale, mentre entrambe le
 modalit\`a multi-hop completano di fatto la scoperta dalle densit\`a medie in
 su. Sul piano del \emph{delivery ratio} il forwarding aggregato domina
 sistematicamente quello singolo: a parit\`a di copertura ne paga una frazione
-del costo in contesa (a 100 boe nel canale ideale, $CR$ 0.163 contro 0.553
-con SBP e 0.035 contro 0.421 con ACAB), perch\'e affida la diffusione
+del costo in contesa (a 100 boe nel canale ideale, $CR$ 0.157 contro 0.557
+con SBP e 0.033 contro 0.400 con ACAB), perch\'e affida la diffusione
 dell'informazione all'allungamento dei frame anzich\'e a trasmissioni
 aggiuntive; la diffonde inoltre pi\`u rapidamente, con una latenza di
-reazione di circa \SI{16}{ms} contro i 89--115~\si{ms} del forwarding
+reazione di circa \SI{16}{ms} contro i 86--114~\si{ms} del forwarding
 singolo (Sezione~\ref{sec:res-latency}). Il forwarding singolo conserva il pregio della semplicit\`a e un
 B-PDR migliore nei soli scenari sparsi con canale con perdite, ma sul piano
 della \emph{scalabilit\`a} il suo traffico cresce con la densit\`a fino a

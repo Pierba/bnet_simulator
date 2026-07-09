@@ -38,7 +38,7 @@ il comportamento delle componenti preesistenti, e affiancandovi le metriche
 necessarie a misurarne gli effetti (Capitolo~\ref{ch:simulatore}). Le
 modalit\`a sono state infine confrontate in una campagna che combina due
 condizioni di canale, tre intervalli di beaconing e tre protocolli di
-scheduling su cinque livelli di densit\`a, con 20 repliche indipendenti per
+scheduling su cinque livelli di densit\`a, con 30 repliche indipendenti per
 configurazione (Capitolo~\ref{ch:risultati}).
 
 % ---------------------------------------------------------------------
@@ -49,16 +49,16 @@ La valutazione sperimentale ha prodotto quattro indicazioni principali.
 \paragraph{L'inoltro multi-hop \`e una necessit\`a, non un'ottimizzazione.}
 Nello scenario adottato --- area ampia rispetto alla portata radio e
 popolazione in continuo ricambio --- il beaconing single-hop si ferma al
-63--77\% di rete scoperta nel canale ideale e al 50--68\% in quello con
+60--76\% di rete scoperta nel canale ideale e al 49--66\% in quello con
 perdite, senza mai convergere. Entrambe le modalit\`a multi-hop completano
 invece di fatto la scoperta dai 60 nodi in su, in entrambe le condizioni di
 canale.
 
 \paragraph{Il forwarding aggregato domina il forwarding singolo.} A parit\`a
 di copertura, l'aggregato paga una frazione del costo in contesa del singolo
-(a 100 boe nel canale ideale, collision rate 0.163 contro 0.553 con SBP e
-0.035 contro 0.421 con ACAB) e diffonde la conoscenza pi\`u rapidamente
-(latenza di reazione di circa \SI{16}{ms} contro 89--115~\si{ms}): affidare
+(a 100 boe nel canale ideale, collision rate 0.157 contro 0.557 con SBP e
+0.033 contro 0.400 con ACAB) e diffonde la conoscenza pi\`u rapidamente
+(latenza di reazione di circa \SI{16}{ms} contro 86--114~\si{ms}): affidare
 la disseminazione all'allungamento dei frame anzich\'e a trasmissioni
 aggiuntive si \`e rivelata la scelta pi\`u efficiente lungo tutti gli assi
 misurati. Il forwarding singolo conserva la semplicit\`a del meccanismo e un
@@ -66,7 +66,7 @@ delivery ratio migliore nei soli scenari sparsi con canale con perdite.
 
 \paragraph{Il beaconing adattivo rende l'inoltro sostenibile.} ADAB e ACAB
 assorbono quasi interamente la contesa aggiuntiva introdotta dal forwarding
-aggregato --- mantenendo il B-PDR sopra 0.94 nel canale ideale fino a 100 boe
+aggregato --- mantenendo il B-PDR sopra 0.95 nel canale ideale fino a 100 boe
 --- e rendono le prestazioni insensibili all'intervallo di beaconing
 configurato, l\`a dove SBP degrada rapidamente con densit\`a e frequenza di
 trasmissione. Segnali puramente locali, come il conteggio dei vicini,
