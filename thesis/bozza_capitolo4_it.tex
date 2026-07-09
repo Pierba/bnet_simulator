@@ -152,8 +152,10 @@ dettaglio nel Capitolo~\ref{ch:contributo} (progettazione) e nel
 Capitolo~\ref{ch:simulatore} (implementazione).
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{Single-hop.} Beaconing a singolo hop, privo di
-  qualunque inoltro: la conoscenza di ciascuna boa si limita ai vicini entro la propria portata radio, 
-  gli unici dai quali riceve beacon (Sezione~\ref{sec:multihop}). 
+  qualunque inoltro: la tabella locale di ciascuna boa si limita ai vicini entro la propria portata radio,
+  gli unici dai quali riceve beacon. Le liste annunciate nei beacon estendono
+  comunque la conoscenza --- rilevata dalla sola metrica di scoperta, senza essere
+  memorizzata n\'e ridiffusa --- fino ai vicini dei vicini (Sezione~\ref{sec:multihop}).
   Funge da termine di paragone rispetto al quale
   si misurano le prestazioni delle modalit\`a multi-hop.
   \item \textbf{Forwarding singolo.} La boa inoltra i beacon altrui fino a un
@@ -437,7 +439,9 @@ scoperta ($D_{\%}$, Eq.~\ref{eq:netdisc}). Nell'area adottata la portata radio
 copre una frazione minima del mondo e il ricambio della popolazione rinnova di
 continuo l'insieme dei nodi da scoprire: il beaconing single-hop \`e cos\`i
 strutturalmente incapace di costruire una visione completa della rete e si
-ferma tra il 60\% e il 76\% a seconda di protocollo e densit\`a. Le modalit\`a
+ferma tra il 60\% e il 76\% a seconda di protocollo e densit\`a --- valori che
+gi\`a includono i nodi a due hop appresi dalle liste annunciate nei beacon
+(Sezione~\ref{sec:multihop}), non i soli vicini diretti. Le modalit\`a
 multi-hop cambiano qualitativamente il quadro: gi\`a a 20 boe --- dove il
 grafo \`e in gran parte partizionato, con meno di due vicini medi --- si
 collocano tra l'80\% e il 90\%, a 40 boe oltrepassano il 98\% e dai 60 nodi

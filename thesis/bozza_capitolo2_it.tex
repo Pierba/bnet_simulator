@@ -64,9 +64,16 @@ dettagliata \`e riportata nel Capitolo~\ref{ch:risultati}.
 % ---------------------------------------------------------------------
 \section{Contributo sulla conoscenza dei nodi}
 \label{sec:multihop}
-Con il protocollo di beaconing a singolo hop descritto nella sezione precedente, ogni boa apprende
-l'esistenza dei soli vicini diretti, ovvero i nodi dai quali riceve beacon. Il
-contributo di questa tesi estende questa conoscenza oltre il primo hop, in modo tale
+Con il protocollo di beaconing a singolo hop descritto nella sezione precedente, la tabella
+locale di ogni boa contiene i soli vicini diretti, ovvero i nodi dai quali riceve beacon.
+Va precisato che anche in questa modalit\`a il beacon trasporta la lista dei nodi noti al
+mittente (Sezione~\ref{sec:commodel}): alla ricezione la boa apprende quindi anche
+l'esistenza dei nodi annunciati --- i vicini del mittente, fino a due hop di distanza ---
+e tale informazione concorre alla metrica di scoperta della rete (Eq.~\ref{eq:netdisc}).
+Senza un meccanismo di inoltro, per\`o, essa non viene memorizzata nello stato del nodo
+n\'e ridiffusa: la conoscenza resta confinata alla finestra dei vicini dei vicini e
+decade con la mobilit\`a. Il
+contributo di questa tesi estende questa conoscenza oltre tale finestra, in modo tale
 che un nodo apprenda anche l'esistenza di boe pi\`u distanti, o schermate da altri nodi, e che diffonda in modo pi\`u efficiente le informazioni in
 suo possesso. A tal fine vengono proposte due modalit\`a di trasmissione multihop descritte nelle
 sezioni successive; esse si basano su due meccanismi diversi che operano sugli stessi piani di trasmissione e ricezione pacchetto.
