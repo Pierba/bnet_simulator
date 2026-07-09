@@ -85,7 +85,7 @@ quali:
     \item il canale: modellato nella classe \texttt{Channel};
     \item le boe: modellate nella classe \texttt{Buoy}.
 \end{itemize}
-Nel corso della simulazione vengono accodati vari eventi
+Nel corso della simulazione vengono accodati vari eventi --- la cui struttura e' dettagliata nella sezione~\ref{sec:event} ---
 ordinati per tempo simulato. Per tutta la durata della simulazione,
 stabilita in fase di configurazione, ciascuno di essi viene
 estratto dalla coda e gestito da un handler specifico dell'entit\`a che lo riguarda
@@ -161,12 +161,16 @@ La logica di queste variazioni dipende dallo scenario configurato:
   \item \textbf{static} --- tutte le boe sono attive dall'inizio alla fine; l'evento non
   viene mai schedulato;
   \item \textbf{ramp} --- si parte con sole $2$ boe attive e se ne attiva una alla volta a
-  intervallo fisso, calcolato spalmando le attivazioni rimanenti sulla durata residua
-  della simulazione; serve a osservare il comportamento dei protocolli al crescere
+  intervallo fisso, calcolato spalmando le attivazioni rimanenti sulla durata residua della simulazione $d$: 
+  \begin{equation}
+      \mathcal{I} = \frac{|Boe| - 2}{d}\,\si{\second};
+  \label{eq:ramp}
+  \end{equation}
+  serve a osservare il comportamento dei protocolli al crescere
   monotono della densit\`a;
   \item \textbf{random} --- a ogni aggiornamento, rischedulato a intervallo casuale
   $\mathcal{U}[15, 20]\,\si{\second}$, viene attivato o disattivato --- con probabilit\`a
-  $50\%$ e quando \`e possibile farlo in base al numero minimo di boe che devono essere presenti ---
+  $50\%$ e quando \`e possibile farlo in base al numero minimo di boe ---
   un numero casuale di boe fino a un massimo di $\max(1, \lfloor \rho\,N \rfloor)$,
   con $N$ il totale delle boe e $\rho$ la percentuale di variabilit\`a configurata; 
   vi \`e anche un vincolo inferiore sul numero minimo di boe che devono rimanere attive, pari a $\max(3,\, 0.2\,N)$.
@@ -187,7 +191,7 @@ rientra in rete non inoltra informazioni obsolete.
 % ---------------------------------------------------------------------
 \section{Modellazione della boa}
 \label{sec:buoy}
-La boa \`e la componente pi\`u complessa del simulatore: implementa la politica CSMA/CA di 
+La boa \`e la componente pi\`u complessa del simulatore, implementa: la politica CSMA/CA di 
 accesso al mezzo, la creazione e la ricezione dei beacon e il modello di mobilit\`a RWP (Sezione~\ref{sec:rwp}).
 Gestisce inoltre il funzionamento delle due modalit\`a di multihop descritte nel Capitolo~\ref{ch:contributo}, la cui implementazione \`e
 approfondita nella sezione dedicata (Sezione~\ref{sec:multihop-impl}). 
@@ -248,15 +252,14 @@ trasmissione, ossia il costo della contesa CSMA/CA.
     Pipeline di trasmissione di una boa (CSMA/CA). La pipeline ha due punti d'ingresso: la decisione
     periodica dello scheduler (\texttt{SCHEDULER\_CHECK}) e l'accodamento di
     un beacon inoltrabile alla ricezione (\texttt{RECEPTION}); in entrambi i
-    casi la contesa parte solo se non ce n'\`e gi\`a una in volo (lock di
-    contesa). Il canale viene rilevato prima del DIFS, dopo il
-    DIFS e al termine del backoff (Eq.~\ref{eq:backoff}): se risulta occupato
+    casi la contesa parte solo se non ce n'\`e gi\`a una in corso (lock di
+    contesa). Il canale viene rilevato prima del DIFS, dopo di
+    esso e al termine del backoff (Eq.~\ref{eq:backoff}): se risulta occupato
     in una qualunque delle tre verifiche, si rientra dal \texttt{CHANNEL\_SENSE}.
     Vinta la contesa, la boa invia un solo frame -- con precedenza al beacon
     proprio, altrimenti un inoltro dalla coda con il TTL decrementato
     (Eq.~\ref{eq:ttl}) -- e, se restano inoltri in sospeso, rientra subito in
-    contesa. Per leggibilit\`a non \`e mostrato il controllo, ripetuto a ogni
-    stadio, che rilascia il lock se non resta nulla da inviare.}
+    contesa.}
   \label{fig:tx-pipeline}
 \end{figure}
 
@@ -294,7 +297,7 @@ con $L_x,L_y$ le dimensioni dei lati del piano e $v_{\min},v_{\max}$ rispettivam
 Il moto verso il waypoint \`e calcolato a intervalli discreti di
 durata $\Delta t$ di tempo simulato: detta $\mathbf{p}_t$ la
 posizione corrente, a ogni passo si ricalcolano il versore di direzione, il vettore
-velocit\`a e la nuova posizione
+velocit\`a e la nuova posizione:
 \begin{equation}
   \hat{\mathbf{u}}_t = \frac{W - \mathbf{p}_t}{\lVert W - \mathbf{p}_t \rVert},
   \qquad
@@ -420,7 +423,7 @@ Il costo computazionale per beacon ricevuto \`e lineare nella lunghezza della li
 annunciata.
 
 % ---------------------------------------------------------------------
-\subsection{Prevenzione delle informazioni obsolete}
+\subsection{Aggiornamento delle memorie}
 \label{sec:multihop-cleanup}
 Le strutture accumulate dalle due modalit\`a non crescono senza controllo. L'evento
 periodico \texttt{NEIGHBOR\_CLEANUP} rimuove da ogni struttura dati ogni voce pi\`u vecchia della scadenza configurata:
@@ -494,7 +497,7 @@ la boa destinataria non trova il proprio id nell'insieme e quindi non processa n
 simulativo di un nodo che riceve bit corrotti.
 
 \paragraph{Perdita probabilistica con canale non ideale.} Se il canale \`e configurato
-come non ideale, ogni consegna sopravvissuta alle collisioni viene
+come \emph{non ideale}, ogni consegna sopravvissuta alle collisioni viene
 messa alla prova da una probabilit\`a dipendente dalla distanza:
 \begin{equation}
   P_{\text{rx}}(d) =
