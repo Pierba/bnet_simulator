@@ -157,22 +157,25 @@ Le due modalit\`a multi-hop rappresentano due scelte diverse per mediare il comp
 copertura e costo di canale, come accennato nella Sezione~\ref{sec:tradeoff}. 
 La valutazione ha il compito di quantificare questo compromesso in termini numerici.
 
-\paragraph{Assi di valutazione.} Il confronto tra le modalità è condotto lungo tre assi:
+\paragraph{Criteri di valutazione.} Il confronto tra le modalità è condotto secondo tre criteri:
 \begin{itemize}[leftmargin=1.4em,nosep]
-  \item \textbf{Copertura della rete.} La quota di rete che ciascun nodo arriva
-  a conoscere, ossia fin dove si propaga la conoscenza grazie alle trasmissioni effettuate. 
-  \`E la grandezza che le modalit\`a multi-hop mirano a massimizzare ed \`e 
-  misurata dalla percentuale media di rete scoperta (Sezione~\ref{sec:eval-metrics}).
-  \item \textbf{Delivery ratio.} L'affidabilit\`a della consegna dei beacon,
-  cio\`e la probabilit\`a che un frame trasmesso raggiunga integro i nodi in
-  ascolto. \`E misurata dal B-PDR, la metrica complementare a quella relativa alle perdite (Sezione~\ref{sec:eval-metrics}).
-  \item \textbf{Scalabilit\`a.} Il modo in cui copertura e delivery ratio
-  evolvono al crescere della densit\`a della rete. \`E osservata incrementando sequenzialmente
-  il numero di boe nell'area di simulazione (Sezione~\ref{sec:eval-setup}).
+  \item \textbf{Copertura della rete.} Misura la capacit\`a del protocollo di
+  diffondere le informazioni all'interno della rete, quantificando la porzione
+  di nodi di cui ciascuna boa riesce ad acquisire conoscenza grazie ai
+  meccanismi di forwarding. Tale propriet\`a \`e misurata mediante la
+  percentuale media di rete scoperta (Sezione~\ref{sec:eval-metrics}).
+  \item \textbf{Affidabilit\`a della disseminazione.} Valuta la probabilit\`a
+  che un beacon venga ricevuto correttamente dai nodi destinatari, nonostante
+  collisioni e perdite sul canale radio. \`E misurata mediante il
+  \emph{Broadcast Packet Delivery Ratio} (B-PDR) (Sezione~\ref{sec:eval-metrics}).
+  \item \textbf{Scalabilit\`a.} Analizza come copertura e affidabilit\`a
+  evolvono all'aumentare della densit\`a della rete, valutando la capacit\`a
+  del protocollo di mantenere prestazioni elevate anche in presenza di un
+  numero crescente di boe (Sezione~\ref{sec:eval-setup}).
 \end{itemize}
 L'obiettivo della valutazione \`e quindi quello di analizzare le prestazioni osservando questi
-tre criteri: quanta copertura aggiuntiva introduce ciascuna modalit\`a di inoltro, 
-quale prezzo in termini di delivery ratio ne consegue e come questi due fattori si
+tre criteri: quanta copertura aggiuntiva introduce ciascuna modalit\`a di inoltro,
+quale prezzo in termini di affidabilit\`a ne consegue e come questi due fattori si
 evolvono all'aumentare della densit\`a dei nodi.
 
 % =====================================================================
@@ -304,18 +307,18 @@ per un totale di $|S|=18$. L'intervallo di beaconing agisce sul solo SBP
 ($BI_{\text{static}}$); per ADAB e ACAB i limiti $\bimin$ e $\bimax$ restano
 fissi (Sezione~\ref{sec:eval-params}).
 
-\subsection{Analisi statistica}
+\subsection{Repliche delle simulazioni}
 \label{sec:eval-stats}
-Ogni configurazione \`e simulata 30 volte --- quindi un totale di $30 \cdot |S| = 540$ simulazioni totali, Eq.~\ref{eq:sim-combinations} ---
-con semi casuali diversi producendo ognuna un campione indipendente di ciascuna metrica. 
-I risultati finali sono riportati come media delle repliche. Nei grafici temporali la linea
-mostra la media tra le repliche e la banda ombreggiata attorno ad essa copre
-$\pm 1$ deviazione standard, calcolata tra le repliche in ciascun istante: banda
-stretta significa repliche concordi, banda larga significa alta variabilit\`a tra
-le simulazioni. Due curve la cui separazione supera l'ampiezza delle rispettive
-bande mostrano una differenza che si pu\`o considerare significativa; se le bande
-si sovrappongono, la differenza osservata rientra nella normale variabilit\`a tra
-repliche e non \`e da considerarsi conclusiva.
+Ogni configurazione \`e simulata 30 volte, per un totale di
+$30 \cdot |S| = 540$ esecuzioni (Eq.~\ref{eq:sim-combinations}), utilizzando
+semi casuali differenti in modo da ottenere campioni indipendenti delle
+metriche considerate. I risultati riportati nel seguito rappresentano la media
+delle repliche. Nei grafici temporali, la linea continua indica il valore medio
+della metrica, mentre la banda ombreggiata rappresenta $\pm 1$ deviazione
+standard calcolata tra le repliche in ciascun istante. Bande pi\`u strette
+indicano una maggiore ripetibilit\`a dei risultati, mentre bande pi\`u ampie
+evidenziano una maggiore variabilit\`a dovuta alla natura stocastica della
+simulazione.
 
 % =====================================================================
 %  4.3 METRICHE DI VALUTAZIONE  (invariata)
@@ -344,11 +347,12 @@ dove il denominatore $N-1$ \`e il massimo numero di nodi che una boa pu\`o
 scoprire, poich\'e $S_i$ non include mai la boa stessa. A scoperta completa
 ogni $|S_i|$ vale $N-1$, dunque $\overline{U}=N-1$ e $D_{\%}=100\%$.
 
-\paragraph{B-PDR (Packet Delivery Ratio per broadcast).} Esprime
-l'affidabilit\`a delle trasmissioni, ossia la probabilit\`a che un frame
-in aria raggiunga integro un nodo in ascolto. Per ogni trasmissione, il canale
-conta i destinatari entro la portata (opportunit\`a di ricezione) e le boe
-contano le ricezioni andate a buon fine:
+\paragraph{B-PDR (Broadcast Packet Delivery Ratio).} Il B-PDR quantifica
+l'affidabilit\`a della disseminazione dei beacon, misurando la frazione di
+opportunit\`a di ricezione che si traducono in una ricezione corretta. Per ogni
+trasmissione vengono conteggiati sia i nodi che si trovano entro la portata
+radio (opportunit\`a di ricezione) sia quelli che ricevono correttamente il
+beacon. Il B-PDR \`e quindi definito come
 \begin{equation}
   \text{B-PDR} = \frac{R_{\text{rx}}}{R_{\text{opp}}},
   \label{eq:bpdr}
@@ -395,9 +399,9 @@ Sezione~\ref{sec:confronto}.
 % =====================================================================
 \section{Confronto tra forwarding singolo e forwarding aggregato}
 \label{sec:confronto}
-Questa sezione presenta i risultati della campagna sperimentale lungo i tre
-assi definiti nella Sezione~\ref{sec:eval-goals}: copertura, delivery ratio e
-scalabilit\`a. I risultati sono esposti dapprima per lo scenario a canale
+Questa sezione presenta i risultati della campagna sperimentale secondo i tre
+criteri definiti nella Sezione~\ref{sec:eval-goals}: copertura, affidabilit\`a
+della disseminazione e scalabilit\`a. I risultati sono esposti dapprima per lo scenario a canale
 ideale, che isola l'effetto della contesa MAC, quindi per lo scenario a canale
 non ideale, che aggiunge le perdite dipendenti dalla distanza. Tutti i
 grafici che mettono a confronto le modalit\`a si riferiscono all'intervallo
@@ -841,12 +845,12 @@ protocolli adattivi ottengono entrambe senza riconfigurazione.
 % ---------------------------------------------------------------------
 \subsection{Sintesi del confronto}
 \label{sec:confronto-sintesi}
-I risultati delineano un quadro coerente lungo i tre assi della valutazione.
+I risultati delineano un quadro coerente rispetto ai tre criteri della valutazione.
 Sul piano della \emph{copertura} l'inoltro multi-hop \`e una necessit\`a, non
 un'ottimizzazione: nello scenario adottato il single-hop si ferma al 60--76\%
 nel canale ideale e al 49--66\% in quello non ideale, mentre entrambe le
 modalit\`a multi-hop completano di fatto la scoperta dalle densit\`a medie in
-su. Sul piano del \emph{delivery ratio} il forwarding aggregato domina
+su. Sul piano dell'\emph{affidabilit\`a della disseminazione} il forwarding aggregato domina
 sistematicamente quello singolo: a parit\`a di copertura ne paga una frazione
 del costo in contesa (a 100 boe nel canale ideale, $CR$ 0.157 contro 0.557
 con SBP e 0.033 contro 0.400 con ACAB), perch\'e affida la diffusione
