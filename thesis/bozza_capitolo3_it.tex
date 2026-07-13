@@ -177,7 +177,7 @@ La logica di queste variazioni dipende dallo scenario configurato:
 \end{itemize}
 
 L'attivazione di una boa ne rischedula gli eventi ricorrenti (verifica dello scheduler,
-pulizia dei vicini e il movimento per le boe mobili). La disattivazione pone il problema
+pulizia dei vicini e movimento per le boe mobili). La disattivazione pone il problema
 opposto: gli eventi gi\`a in coda per quella boa non possono essere rimossi da uno heap in
 modo efficiente. Si \`e adottato perci\`o un sistema di \emph{cancellazione pigra}: ogni boa mantiene un
 contatore di generazione, incrementato a ogni disattivazione e incluso
@@ -191,7 +191,7 @@ rientra in rete non inoltra informazioni obsolete.
 % ---------------------------------------------------------------------
 \section{Modellazione della boa}
 \label{sec:buoy}
-La boa \`e la componente pi\`u complessa del simulatore, implementa: la politica CSMA/CA di 
+La boa \`e la componente pi\`u complessa del simulatore; implementa: la politica CSMA/CA di
 accesso al mezzo, la creazione e la ricezione dei beacon e il modello di mobilit\`a RWP (Sezione~\ref{sec:rwp}).
 Gestisce inoltre il funzionamento delle due modalit\`a di multihop descritte nel Capitolo~\ref{ch:contributo}, la cui implementazione \`e
 approfondita nella sezione dedicata (Sezione~\ref{sec:multihop-impl}). 
@@ -267,7 +267,7 @@ trasmissione, ossia il costo della contesa CSMA/CA.
 \subsection{Ricezione di un beacon}
 \label{sec:rx}
 L'handler dell'evento \texttt{RECEPTION} scarta anzitutto i beacon la cui consegna \`e stata
-revocata da una collisione sopravvenuta da un terminale nascosto~\cite{tobagi-hidden} (il meccanismo \`e descritto nella
+revocata da una collisione causata da un terminale nascosto~\cite{tobagi-hidden} (il meccanismo \`e descritto nella
 Sezione~\ref{sec:broadcast-impl}). Per i beacon ancora validi aggiorna la tabella dei vicini
 diretti con il mittente e il timestamp dell'ultimo contatto, usato poi per i calcoli di ACAB (Eq.~\ref{eq:acab-con}). 
 Ogni ricezione popola l'insieme dei nodi unici conosciuti dalla boa --- il mittente, l'eventuale origine (per i pacchetti del forwarding singolo) e tutti i nodi
@@ -385,7 +385,7 @@ desincronizza i nodi ricevitori dello stesso frame, i quali altrimenti
 contenderebbero il canale tutti insieme. A ogni contesa vinta viene trasmesso un solo
 frame, con precedenza ai beacon propri; quando \`e il turno di un inoltro, la boa
 estrae la voce in testa alla coda e ne costruisce una copia
-in cui la boa inoltrante ne diviene il nuovo mittente inserendovi la propria posizione ---
+in cui la boa inoltrante diviene il nuovo mittente inserendovi la propria posizione ---
 necessaria al canale per calcolare portata e propagazione --- mentre origine,
 timestamp e lista dei vicini restano immutati e il TTL viene decrementato
 (Eq.~\ref{eq:ttl}). Se dopo l'invio la coda non \`e vuota, la boa rientra
@@ -504,13 +504,13 @@ messa alla prova da una probabilit\`a dipendente dalla distanza:
   \begin{cases}
     p_{\text{high}} = 0.9 & d \le r_{\text{high}} = \SI{70}{\metre},\\[2pt]
     p_{\text{low}} = 0.15 & r_{\text{high}} < d \le r_{\text{max}} = \SI{120}{\metre},\\[2pt]
-    0 & d > r_{\text{max}},
+    0 & d > r_{\text{max}}.
   \end{cases}
   \label{eq:delivery-prob}
 \end{equation}
 Queste probabilit\`a derivano da misurazioni effettuate sul campo~\cite{prosafe}: entro i \SI{70}{\metre} la consegna
-\`e affidabile, oltre questo raggio il segnale \`e fortemente ridotto e la maggior parte dei
-frame va persa, oltre la portata massima (\SI{120}{\metre}) non arriva pi\`u nulla. I frame respinti da questo errore probabilistico
+\`e affidabile; oltre questo raggio il segnale \`e fortemente ridotto e la maggior parte dei
+frame va persa; oltre la portata massima (\SI{120}{\metre}) non arriva pi\`u nulla. I frame respinti da questo errore probabilistico
 sono conteggiati come perdite di canale, distinte dalle perdite per collisione.
 
 % ---------------------------------------------------------------------

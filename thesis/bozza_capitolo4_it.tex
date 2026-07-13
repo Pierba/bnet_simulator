@@ -68,7 +68,7 @@ congestione. I valori adottati negli esperimenti sono $\bimin = \SI{0.25}{\secon
 ACAB regola l'intervallo combinando tre segnali: la densit\`a dei vicini, il tempo
 trascorso dall'ultimo contatto e la mobilit\`a del nodo.
 
-\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un fattore di densit\`a normalizzato in funzione del numero dei vicini; stavolta con una soglia pi\`u bassa:
+\paragraph{Componente di densit\`a.} Come in ADAB, si calcola un fattore di densit\`a normalizzato in funzione del numero dei vicini, stavolta con una soglia pi\`u bassa:
 \begin{equation}
   s_{\mathrm{den}} = \min\!\left(1,\;\frac{N_t}{\nthr^{\mathrm{ACAB}}}\right),
   \qquad \nthr^{\mathrm{ACAB}} = 10 .
@@ -78,7 +78,7 @@ trascorso dall'ultimo contatto e la mobilit\`a del nodo.
 \paragraph{Componente di tempo dall'ultimo contatto.} La ricezione recente di un
 beacon riduce l'urgenza di trasmettere, mentre un periodo prolungato privo di contatti
 la accresce. Detto $\Delta_t = t - t_{\text{ultimo contatto}}$ il tempo trascorso
-dall'ultimo beacon ricevuto --- con $t_{\text{ultimo contatto}}$ pari all'istante dell'ultima ricezione avvenuta (se non \`e mai avvenuta alcuna ricezione, \`e pari a -$\infty$) --- e $\tau_c = \SI{20}{\second}$ la durata oltre la
+dall'ultimo beacon ricevuto --- con $t_{\text{ultimo contatto}}$ pari all'istante dell'ultima ricezione avvenuta (se non \`e mai avvenuta alcuna ricezione, \`e pari a $-\infty$) --- e $\tau_c = \SI{20}{\second}$ la durata oltre la
 quale un contatto non \`e pi\`u considerato recente:
 \begin{equation}
   s_{\mathrm{con}} =
@@ -93,7 +93,7 @@ nodo isolato o a lungo silenzioso produce $0$ (e trasmette pi\`u di frequente).
 
 \paragraph{Componente di mobilit\`a.} Un nodo in rapido movimento invalida in
 breve tempo l'informazione di posizione annunciata e deve pertanto aggiornarla
-con maggiore frequenza. Con l'intensit\`a di velocit\`a $v$ e velocit\`a
+con maggiore frequenza. Con l'intensit\`a di velocit\`a $v$ e la velocit\`a
 di riferimento $v_{\text{ref}}$ (la velocit\`a di default, pari a
 \SI{15}{m/s} negli esperimenti):
 \begin{equation}
@@ -135,7 +135,7 @@ per poi condurne il confronto.
 \paragraph{Modalit\`a di inoltro a confronto.} Il confronto riguarda tre
 modalit\`a, richiamate qui nella sola definizione essenziale e descritte in
 dettaglio nel Capitolo~\ref{ch:contributo} (progettazione) e nel
-Capitolo~\ref{ch:simulatore} (implementazione).
+Capitolo~\ref{ch:simulatore} (implementazione):
 \begin{itemize}[leftmargin=1.4em,nosep]
   \item \textbf{Single-hop.} Beaconing a singolo hop, privo di
   qualunque inoltro: la tabella locale di ciascuna boa si limita ai vicini entro la propria portata radio,
@@ -201,13 +201,13 @@ Capitolo~\ref{ch:simulatore}. Ai fini della valutazione sperimentale \`e stato
 adottato lo scenario random: la popolazione di nodi cresce e decresce
 periodicamente cos\`i da riprodurre il comportamento di una rete reale, in cui i nodi entrano ed
 escono di continuo dal raggio di copertura radio. A ogni aggiornamento periodico la quantit\`a di
-popolazione attiva varia di una frazione casuale, fino ad un massimo del 30\% del
+popolazione attiva varia di una frazione casuale, fino a un massimo del 30\% del
 totale (\texttt{random\_variability} = 0.3).
 
 \subsection{Parametri di simulazione}
 \label{sec:eval-params}
 Di seguito vi sono i parametri di configurazione con annessi i 
-valori usati per le simulazioni effettuate, gi\`a visti nella sezione~\ref{sec:config}. 
+valori usati per le simulazioni effettuate, gi\`a visti nella Sezione~\ref{sec:config}. 
 Sono riportati secondo categorie di appartenenza. 
 
 \paragraph{Configurazione di rete.}
@@ -382,7 +382,7 @@ rispetto a quelle della contesa.
 beacon nella rete. Vengono registrate la \emph{latenza di consegna} (tempo tra
 generazione e prima ricezione di un beacon), la \emph{latenza di reazione}
 (tempo perch\'e un nodo scopra per la prima volta una data origine) e la
-gi\`a citata latenza di scheduler (tempo trascorso tra la decisione di trasmettere e l’effettivo inizio della trasmissione, Sezione~\ref{sec:txpipeline}).
+gi\`a citata latenza di scheduler (tempo trascorso tra la decisione di trasmettere e l'effettivo inizio della trasmissione, Sezione~\ref{sec:txpipeline}).
 
 \paragraph{Numero medio di vicini.} Per interpretare le metriche precedenti in
 funzione della densit\`a locale, il simulatore traccia inoltre il numero medio

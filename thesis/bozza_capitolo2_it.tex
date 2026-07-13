@@ -83,7 +83,7 @@ nuovo mittente senza alterare il contenuto del frame. La conservazione di origin
 timestamp consente di riconoscere i duplicati e impedisce a un nodo di inoltrare beacon
 creati da esso stesso. I pacchetti da inoltrare fluiscono nella medesima pipeline CSMA dei beacon
 propri, dopo un jitter casuale $\delta \sim \mathcal{U}[0, \SI{0.05}{\second}]$ che
-desincronizza i molteplici ricevitori dello stesso frame; i quali altrimenti
+desincronizza i molteplici ricevitori dello stesso frame, i quali altrimenti
 contenderebbero il canale simultaneamente. 
 
 In assenza di controlli il forwarding pu\`o degenerare in un \emph{broadcast storm}~\cite{broadcaststorm};
@@ -100,7 +100,7 @@ la modalit\`a adotta quindi tre meccanismi di contenimento:
   evita inoltri ripetuti della stessa informazione e previene i cicli.
   \item \textbf{Limite del TTL.} Il contatore $\ell$, decrementato a ogni inoltro
   (Eq.~\ref{eq:ttl}), limita la profondit\`a di propagazione; negli esperimenti \`e
-  valorizzato in funzione del lato maggiore del piano di simulazione $l$ e del raggio massimo di trasmissione $r_{max}$
+  valorizzato in funzione del lato maggiore del piano di simulazione $l$ e del raggio massimo di trasmissione $r_{max}$:
   \begin{equation}
     \ell \simeq \left\lceil\frac{l}{r_{max}}\right\rceil.
     \label{eq:ttl-value}
