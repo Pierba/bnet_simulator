@@ -2,8 +2,9 @@
 %  Documento "wrapper" della tesi, ora basato sulla classe sapthesis
 %  (impaginazione conforme alle linee guida Sapienza:
 %  https://www.uniroma1.it/it/pagina/impaginazione-della-tesi-e-logo).
-%  Include frontespizio, sommario e i Capitoli 1-5 (Introduzione,
-%  Contributo multihop, Implementazione, Risultati, Conclusioni).
+%  Include frontespizio, sommario, i Capitoli 1-5 (Introduzione,
+%  Contributo multihop, Implementazione, Risultati, Conclusioni)
+%  e i Ringraziamenti in coda (dopo la bibliografia).
 %
 %  Richiede nella stessa cartella: sapthesis.cls e sapienzalogo.pdf
 %  (copiati da thesis/sapthesis/, vedi README della classe).
@@ -15,7 +16,7 @@
 % !TeX encoding = UTF-8
 % !TeX program = pdflatex
 % !TeX spellcheck = it_IT
-\documentclass[binding=0.6cm,oneside]{sapthesis}
+\documentclass[binding=0.6cm,oneside,noexaminfo]{sapthesis}
 
 % NB: sapthesis (basata su book, corpo 11pt su A4) carica gia' geometry
 % (margini conformi), fontenc T1, lmodern, graphicx, caption, booktabs,
@@ -96,5 +97,10 @@
 \addcontentsline{toc}{chapter}{\bibname}
 \bibliographystyle{sapthesis}
 \bibliography{bibliografia}
+
+% ---------------------------------------------------------------------
+% Ringraziamenti (capitolo non numerato, in coda alla tesi)
+% ---------------------------------------------------------------------
+\input{ringraziamenti}
 
 \end{document}
